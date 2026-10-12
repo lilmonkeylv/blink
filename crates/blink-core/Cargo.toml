@@ -1,0 +1,22 @@
+[package]
+name = "blink-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+arc-swap.workspace = true
+blink-diff.workspace = true
+blink-git.workspace = true
+dashmap.workspace = true
+parking_lot.workspace = true
+rayon.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+trash.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+tokio = { workspace = true, features = ["test-util"] }

@@ -1,0 +1,40 @@
+[package]
+name = "blink"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "A fast, multithreaded Git client for GitHub"
+
+[lib]
+name = "blink_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2.7", features = [] }
+
+[dependencies]
+base64.workspace = true
+blink-core.workspace = true
+blink-diff.workspace = true
+blink-git.workspace = true
+blink-github.workspace = true
+blink-store.workspace = true
+blink-watch.workspace = true
+crossbeam-channel.workspace = true
+parking_lot.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tauri = { version = "2.12", features = [] }
+tauri-plugin-deep-link = "2.6"
+tauri-plugin-dialog = "2.8"
+tauri-plugin-notification = "2.6"
+tauri-plugin-opener = "2.7"
+tauri-plugin-single-instance = "2.5"
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+url.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true

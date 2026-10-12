@@ -1,0 +1,23 @@
+[package]
+name = "blink-benches"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish = false
+
+[lib]
+bench = false
+
+[dependencies]
+blink-git.workspace = true
+tempfile.workspace = true
+
+[dev-dependencies]
+blink-core.workspace = true
+blink-diff.workspace = true
+criterion.workspace = true
+tokio.workspace = true
+
+[[bench]]
+name = "core"
+harness = false
