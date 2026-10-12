@@ -1,0 +1,110 @@
+use blink_core::ops::{self, CommitMessage, FileSelection};
+use blink_diff::{DiffOptions, FileDiff};
+use blink_git::FileChange;
+use serde::{Deserialize, Serialize};
+use tauri::State;
+
+use crate::error::{CmdResult, CommandError};
+use crate::state::AppState;
+
+fn change_for(state: &AppState, id: &str, path: &str) -> CmdResult<FileChange> {
+    state
+        .engine
+        .get(id)?
+        .snapshot()
+        .status
+        .files
+        .iter()
+        .find(|f| f.path == path)
+        .cloned()
+        .ok_or_else(|| CommandError::new("stale", format!("{path} has no changes")))
+}
+
+#[tauri::command]
+pub async fn file_diff(
+    state: State<'_, AppState>,
+    id: String,
+    path: String,
+    ignore_whitespace: Option<bool>,
+    full: Option<bool>,
+) -> CmdResult<FileDiff> {
+    let change = change_for(&state, &id, &path)?;
+    let opts = DiffOptions {
+        ignore_whitespace: ignore_whitespace.unwrap_or(false),
+        max_lines: if full.unwrap_or(false) { None } else { DiffOptions::default().max_lines },
+        ..Default::default()
+    };
+    Ok(state.engine.read(&id, move |repo| ops::working_diff(repo, &change, opts)).await?)
+}
+
+#[tauri::command]
+pub async fn commit(
+    state: State<'_, AppState>,
+    id: String,
+    files: Vec<FileSelection>,
+    message: CommitMessage,
+    amend: Option<bool>,
+) -> CmdResult<String> {
+    if files.is_empty() && !amend.unwrap_or(false) {
+        return Err(CommandError::new("nothingSelected", "Select at least one file to commit"));
+    }
+    let amend = amend.unwrap_or(false);
+    let sign = state.settings.read().git.sign_commits;
+    let label = if amend { "Amend commit" } else { "Commit" };
+    Ok(state.engine.rewrite(&id, label, move |repo| ops::commit_selection(repo, &files, &message, amend, sign)).await?)
+}
+
+#[tauri::command]
+pub async fn discard_files(state: State<'_, AppState>, id: String, paths: Vec<String>) -> CmdResult<()> {
+    let changes: Vec<FileChange> = paths.iter().map(|p| change_for(&state, &id, p)).collect::<CmdResult<_>>()?;
+    Ok(state.engine.write(&id, move |repo| ops::discard_files(repo, &changes)).await?)
+}
+
+#[tauri::command]
+pub async fn discard_lines(
+    state: State<'_, AppState>,
+    id: String,
+    path: String,
+    lines: Vec<(usize, usize)>,
+) -> CmdResult<()> {
+    let change = change_for(&state, &id, &path)?;
+    Ok(state.engine.write(&id, move |repo| ops::discard_lines(repo, &change, &lines)).await?)
+}
+
+#[tauri::command]
+pub async fn ignore_path(state: State<'_, AppState>, id: String, pattern: String) -> CmdResult<()> {
+    Ok(state.engine.write(&id, move |repo| ops::ignore(repo, &pattern)).await?)
+}
+
+#[tauri::command]
+pub async fn undo_last_commit(state: State<'_, AppState>, id: String) -> CmdResult<()> {
+    Ok(state.engine.rewrite(&id, "Undo commit", |repo| repo.cli().undo_last_commit()).await?)
+}
+
+#[derive(Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GitIdentity {
+    name: Option<String>,
+    email: Option<String>,
+}
+
+#[tauri::command]
+pub async fn git_identity(state: State<'_, AppState>, id: Option<String>) -> CmdResult<GitIdentity> {
+    let cli = match id {
+        Some(id) => state.engine.get(&id)?.repo().cli(),
+        None => blink_git::GitCli::new(&state.paths.data_dir),
+    };
+    Ok(GitIdentity { name: cli.config_get("user.name"), email: cli.config_get("user.email") })
+}
+
+#[tauri::command]
+pub async fn set_git_identity(state: State<'_, AppState>, identity: GitIdentity) -> CmdResult<()> {
+    let cli = blink_git::GitCli::new(&state.paths.data_dir);
+    if let Some(name) = identity.name.filter(|n| !n.trim().is_empty()) {
+        cli.config_set_global("user.name", name.trim())?;
+    }
+    if let Some(email) = identity.email.filter(|e| !e.trim().is_empty()) {
+        cli.config_set_global("user.email", email.trim())?;
+    }
+    Ok(())
+}

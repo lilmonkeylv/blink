@@ -1,0 +1,10 @@
+[package]
+name = "blink-diff"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+imara-diff.workspace = true
+syntect.workspace = true
+serde.workspace = true
