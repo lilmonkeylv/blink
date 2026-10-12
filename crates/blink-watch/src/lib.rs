@@ -45,6 +45,17 @@ fn is_relevant_git_path(rel: &Path) -> bool {
     )
 }
 
+// FSEvents and inotify report resolved paths (macOS temp dirs live behind the /var -> /private/var symlink).
+#[cfg(not(windows))]
+fn real_path(path: &Path) -> PathBuf {
+    std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf())
+}
+
+#[cfg(windows)]
+fn real_path(path: &Path) -> PathBuf {
+    path.to_path_buf()
+}
+
 pub fn classify(root: &Path, git_dir: &Path, paths: impl IntoIterator<Item = PathBuf>) -> Change {
     let mut change = Change { root: root.to_path_buf(), ..Default::default() };
     for path in paths {
@@ -64,6 +75,9 @@ pub fn classify(root: &Path, git_dir: &Path, paths: impl IntoIterator<Item = Pat
 
 impl RepoWatcher {
     pub fn start(root: &Path, git_dir: &Path, debounce: Duration, tx: Sender<Change>) -> Result<Self, Error> {
+        let root = real_path(root);
+        let git_dir = real_path(git_dir);
+        let (root, git_dir) = (root.as_path(), git_dir.as_path());
         let root_owned = root.to_path_buf();
         let git_dir_owned = git_dir.to_path_buf();
         let handler = move |result: DebounceEventResult| match result {
