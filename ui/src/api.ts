@@ -394,8 +394,8 @@ export const api = {
   reveal: (id: string, path?: string) => invoke<void>("reveal_in_file_manager", { id, path }),
   openOnGithub: (id: string) => invoke<void>("open_on_github", { id }),
 
-  fileDiff: (id: string, path: string, ignoreWhitespace = false, full = false) =>
-    invoke<FileDiff>("file_diff", { id, path, ignoreWhitespace, full }),
+  fileDiff: (id: string, path: string, ignoreWhitespace = false, full = false, highlight = true) =>
+    invoke<FileDiff>("file_diff", { id, path, ignoreWhitespace, full, highlight }),
   commit: (id: string, files: FileSelection[], message: CommitMessage, amend = false) =>
     invoke<string>("commit", { id, files, message, amend }),
   discardFiles: (id: string, paths: string[]) => invoke<void>("discard_files", { id, paths }),
@@ -409,8 +409,8 @@ export const api = {
   history: (id: string, offset: number, limit: number, rev?: string) =>
     invoke<CommitSummary[]>("history", { id, offset, limit, rev }),
   commitDetail: (id: string, sha: string) => invoke<CommitDetail>("commit_detail", { id, sha }),
-  commitFileDiff: (id: string, sha: string, path: string, oldPath: string | null, ignoreWhitespace = false) =>
-    invoke<FileDiff>("commit_file_diff", { id, sha, path, oldPath, ignoreWhitespace }),
+  commitFileDiff: (id: string, sha: string, path: string, oldPath: string | null, ignoreWhitespace = false, highlight = true) =>
+    invoke<FileDiff>("commit_file_diff", { id, sha, path, oldPath, ignoreWhitespace, highlight }),
 
   branches: (id: string) => invoke<Branch[]>("branches", { id }),
   checkout: (id: string, name: string, kind: BranchKind, changes?: "bringAlong" | "stashOnCurrent") =>
@@ -458,8 +458,8 @@ export const api = {
   reflog: (id: string) => invoke<ReflogEntry[]>("reflog", { id }),
   historyGraph: (id: string, offset: number, limit: number) => invoke<GraphPage>("history_graph", { id, offset, limit }),
   rangeFiles: (id: string, oldest: string, newest: string) => invoke<CommitFile[]>("range_files", { id, oldest, newest }),
-  rangeFileDiff: (id: string, oldest: string, newest: string, path: string, oldPath: string | null) =>
-    invoke<FileDiff>("range_file_diff", { id, oldest, newest, path, oldPath }),
+  rangeFileDiff: (id: string, oldest: string, newest: string, path: string, oldPath: string | null, highlight = true) =>
+    invoke<FileDiff>("range_file_diff", { id, oldest, newest, path, oldPath, highlight }),
   compare: (id: string, other: string) =>
     invoke<{ ahead: CommitSummary[]; behind: CommitSummary[] }>("compare_branch", { id, other }),
   worktrees: (id: string) => invoke<Worktree[]>("worktrees", { id }),

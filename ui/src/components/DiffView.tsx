@@ -162,6 +162,7 @@ export function DiffView(p: {
           class="diff"
           items={rows()}
           rowHeight={ROW_HEIGHT}
+          dynamic
           onKeyDown={onKeyDown}
           scrollToIndex={cursor()}
           render={(row, index) =>

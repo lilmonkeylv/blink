@@ -430,10 +430,14 @@ export function Toolbar() {
         <button class="toolbar-button repo" classList={{ open: store.popover === "repos" }} onClick={() => toggle("repos")} title="Ctrl+T">
           <RepoIcon />
           <span class="labels">
-            <span class="title">Current repository</span>
-            <span class="value">{store.repo?.name ?? "Select a repository"}</span>
+            <span class="title">{store.opening ? "Opening repository" : "Current repository"}</span>
+            <span class="value">
+              {store.opening ? store.opening.split(/[\/]/).pop() : (store.repo?.name ?? "Select a repository")}
+            </span>
           </span>
-          <ChevronDown />
+          <Show when={store.opening} fallback={<ChevronDown />}>
+            <span class="spinner" aria-label="Loading" />
+          </Show>
         </button>
         <button
           class="toolbar-button branch"
@@ -518,6 +522,9 @@ export function Toolbar() {
           <MenuIcon />
         </button>
       </div>
+      <Show when={store.opening || store.busy}>
+        <div class="activity-bar" title={store.busy ?? "Opening repository"} />
+      </Show>
       <Show when={store.popover === "repos"}>
         <RepoPopover />
       </Show>

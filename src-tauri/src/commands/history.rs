@@ -33,7 +33,12 @@ pub async fn commit_file_diff(
     path: String,
     old_path: Option<String>,
     ignore_whitespace: Option<bool>,
+    highlight: Option<bool>,
 ) -> CmdResult<FileDiff> {
-    let opts = DiffOptions { ignore_whitespace: ignore_whitespace.unwrap_or(false), ..Default::default() };
+    let opts = DiffOptions {
+        ignore_whitespace: ignore_whitespace.unwrap_or(false),
+        highlight: highlight.unwrap_or(true),
+        ..Default::default()
+    };
     Ok(state.engine.read(&id, move |repo| ops::commit_diff(repo, &sha, &path, old_path.as_deref(), opts)).await?)
 }

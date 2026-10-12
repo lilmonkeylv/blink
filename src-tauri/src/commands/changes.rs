@@ -27,11 +27,13 @@ pub async fn file_diff(
     path: String,
     ignore_whitespace: Option<bool>,
     full: Option<bool>,
+    highlight: Option<bool>,
 ) -> CmdResult<FileDiff> {
     let change = change_for(&state, &id, &path)?;
     let opts = DiffOptions {
         ignore_whitespace: ignore_whitespace.unwrap_or(false),
         max_lines: if full.unwrap_or(false) { None } else { DiffOptions::default().max_lines },
+        highlight: highlight.unwrap_or(true),
         ..Default::default()
     };
     Ok(state.engine.read(&id, move |repo| ops::working_diff(repo, &change, opts)).await?)

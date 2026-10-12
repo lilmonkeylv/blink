@@ -360,7 +360,9 @@ dependencies = [
  "blink-core",
  "blink-diff",
  "blink-git",
+ "blink-watch",
  "criterion",
+ "crossbeam-channel",
  "tempfile",
  "tokio",
 ]

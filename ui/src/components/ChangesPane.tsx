@@ -1,6 +1,6 @@
 import { ask } from "@tauri-apps/plugin-dialog";
 import { createEffect, createMemo, createSignal, on, Show } from "solid-js";
-import { api, type FileChange, type FileSelection } from "../api";
+import { api, type FileChange, type FileDiff, type FileSelection } from "../api";
 import { checkState, diffSignature, setLines, toggleFile, toPayload, type CheckState, type FileSel } from "../lib/selection";
 import { cachedDiff, currentBranch, notify, refreshRepo, reportError, run, setStore, store, storeDiff } from "../store";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
@@ -109,10 +109,10 @@ export function ChangesList() {
         <OperationBar />
       </Show>
       <div class="list-header">
-        <Checkbox checked={toCheck(allState())} onChange={toggleAll} ariaLabel="Include all changes" />
-        <span>
-          {files().length} changed file{files().length === 1 ? "" : "s"}
-        </span>
+        <Show when={files().length}>
+          <Checkbox checked={toCheck(allState())} onChange={toggleAll} ariaLabel="Include all changes" />
+        </Show>
+        <span>{files().length ? `${files().length} changed file${files().length === 1 ? "" : "s"}` : "No changed files"}</span>
       </div>
       <Show
         when={files().length}
@@ -341,19 +341,27 @@ export function ChangesDiff() {
   const [wsDiff, setWsDiff] = createSignal<ReturnType<typeof cachedDiff>>();
   const file = () => store.repo?.files.find((f) => f.path === store.selectedPath) ?? null;
   let token = 0;
+  const highlighted = new Set<string>();
 
   createEffect(
     on(
       () => [store.repo?.id, store.repo?.generation, store.selectedPath, ignoreWhitespace(), full()] as const,
-      async ([id, , path, ws, loadFull]) => {
+      async ([id, generation, path, ws, loadFull]) => {
         if (!id || !path || isImagePath(path)) return;
-        if (!ws && !loadFull && cachedDiff(path)) return;
+        const key = `${generation}:${path}`;
+        if (!ws && !loadFull && cachedDiff(path) && highlighted.has(key)) return;
         const mine = ++token;
-        try {
-          const diff = await api.fileDiff(id, path, ws, loadFull);
-          if (mine !== token) return;
+        const apply = (diff: FileDiff) => {
+          if (mine !== token) return false;
           if (ws) setWsDiff(diff);
           else storeDiff(path, diff);
+          return true;
+        };
+        try {
+          if (ws || loadFull || !cachedDiff(path)) {
+            if (!apply(await api.fileDiff(id, path, ws, loadFull, false))) return;
+          }
+          if (apply(await api.fileDiff(id, path, ws, loadFull, true)) && !ws && !loadFull) highlighted.add(key);
         } catch (e) {
           if (mine === token) reportError(e);
         }

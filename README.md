@@ -12,7 +12,7 @@ Everything you use in GitHub Desktop, without the lag.
 
 ---
 
-> **Status: pre-alpha.** Blink is under active development and not ready for daily use yet. Features below marked _planned_ are not implemented. Watch the repo or check the [roadmap](#roadmap) for progress.
+> **Status: alpha.** All roadmap phases have a first implementation. Expect rough edges; features marked _planned_ are not implemented yet.
 
 ## Why Blink?
 
@@ -29,30 +29,32 @@ Blink keeps the workflow and rebuilds the engine:
 
 ### GitHub Desktop parity
 
-- Sign in with GitHub through OAuth (PKCE, system browser); GitHub Enterprise supported
+- Sign in with GitHub through OAuth (PKCE, system browser) or a device code; GitHub Enterprise _(planned)_
 - Clone, create, add and publish repositories
 - Changes view with line- and hunk-level staging, discard, ignore
-- Unified and split diffs with syntax highlighting; image diffs (2-up, swipe, onion skin, difference)
+- Unified diffs with syntax highlighting (split view _planned_); image diffs (2-up, swipe, onion skin, difference)
 - Commit with co-authors, amend, undo
 - History with revert, cherry-pick, reorder and squash by drag-and-drop
 - Branches: create, rename, delete, merge, rebase, squash-merge, compare
 - Fetch, pull, push with background fetch and force-with-lease
-- Pull requests: list, check out (including forks), create, CI check status, notifications
-- Merge conflict resolution
+- Pull requests: list, check out (including forks), create, CI check status with re-run, failure notifications
+- Merge conflict resolution with a built-in conflict editor
 - External editor and shell integration
 - Same settings tabs as Desktop: Accounts, Integrations, Git, Appearance, Notifications, Prompts, Advanced, Accessibility
 
-### Beyond GitHub Desktop _(planned)_
+### Beyond GitHub Desktop
 
 - Commit graph
 - File history and blame
 - Unlimited named stashes, partial stashes
-- Undo for any Git operation via reflog (`Ctrl+Z`)
-- Built-in three-way merge editor
+- Undo for commits, resets, rebases, merges and branch deletes (`Ctrl+Z`), plus a reflog browser
+- Built-in conflict editor (ours, theirs, both)
 - Interactive rebase screen
-- Worktrees, multiple windows, tabbed repositories
+- Worktrees; multiple windows and tabbed repositories _(planned)_
 - Command palette (`Ctrl/Cmd+K`)
 - History search by message, author, path or content
+- Compare branches, multi-commit diffs, copy and apply patches
+- `blink .` from a terminal and `blink://` links
 
 ## Performance targets
 
@@ -60,12 +62,12 @@ Measured on a mid-range laptop. GitHub Desktop figures are approximate baselines
 
 | Metric                        | GitHub Desktop  | Blink target       |
 | ----------------------------- | --------------- | ------------------ |
-| Cold start to interactive     | 2–4 s           | < 400 ms           |
-| Idle memory                   | 300–600 MB      | < 120 MB           |
+| Cold start to interactive     | 2-4 s           | < 400 ms           |
+| Idle memory                   | 300-600 MB      | < 120 MB           |
 | Installer size                | ~150 MB         | < 20 MB            |
-| Status refresh, 50k-file repo | 0.5–2 s         | < 100 ms           |
+| Status refresh, 50k-file repo | 0.5-2 s         | < 100 ms           |
 | Open history, 500k commits    | several seconds | < 50 ms first page |
-| Switch repository             | 1–3 s           | < 150 ms           |
+| Switch repository             | 1-3 s           | < 150 ms           |
 
 Benchmarks run in CI on every pull request; a regression over 10% fails the build.
 
@@ -181,12 +183,12 @@ bun run test
 
 | Phase                       | Scope                                                                    | Status      |
 | --------------------------- | ------------------------------------------------------------------------ | ----------- |
-| P0 · Spike and baseline     | Benchmarks, Tauri and thread-pool skeleton, OAuth proof                  | In progress |
-| P1 · Local MVP              | Changes, staging, commit, history, branches, merge, stash, sync, sign-in | Planned     |
-| P2 · GitHub integration     | Clone, publish, PRs, checks, notifications, forks                        | Planned     |
-| P3 · Rewrites and conflicts | Cherry-pick, reorder, squash, rebase, undo, merge editor                 | Planned     |
-| P4 · Parity and v1.0        | LFS, submodules, signing, CLI, migration from GitHub Desktop             | Planned     |
-| P5 · Beyond Desktop         | Commit graph, blame, worktrees, multi-window                             | Planned     |
+| P0 · Spike and baseline     | Benchmarks, Tauri and thread-pool skeleton, OAuth proof                  | Done        |
+| P1 · Local MVP              | Changes, staging, commit, history, branches, merge, stash, sync, sign-in | Done        |
+| P2 · GitHub integration     | Clone, publish, PRs, checks, notifications, forks                        | Done        |
+| P3 · Rewrites and conflicts | Cherry-pick, reorder, squash, rebase, undo, merge editor                 | Done        |
+| P4 · Parity and v1.0        | LFS, submodules, signing, CLI, migration from GitHub Desktop             | In progress |
+| P5 · Beyond Desktop         | Commit graph, blame, worktrees, multi-window                             | In progress |
 
 ## Contributing
 

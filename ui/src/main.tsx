@@ -9,6 +9,8 @@ if (import.meta.env.DEV && !("__TAURI_INTERNALS__" in window)) {
   installDevMock();
 }
 
+document.documentElement.dataset.theme = window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+
 render(() => <App />, document.getElementById("root")!);
 
 try {

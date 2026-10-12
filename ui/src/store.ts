@@ -72,6 +72,7 @@ interface AppStore {
   banners: Banner[];
   sync: { action: SyncAction; progress: Progress | null } | null;
   busy: string | null;
+  opening: string | null;
   checks: ChecksSummary | null;
   historySearch: { kind: SearchKind; query: string } | null;
   compareWith: string | null;
@@ -93,6 +94,7 @@ export const [store, setStore] = createStore<AppStore>({
   banners: [],
   sync: null,
   busy: null,
+  opening: null,
   checks: null,
   historySearch: null,
   compareWith: null,
@@ -178,12 +180,13 @@ export async function bootstrap() {
     ready: true,
   });
   applyTheme();
+  setTimeout(() => document.documentElement.classList.remove("preload"), 60);
   const last = boot.lastRepository ?? boot.repositories[0]?.path;
   if (last && boot.repositories.some((r) => r.path === last)) await openRepo(last);
 }
 
 export async function openRepo(path: string) {
-  setStore("popover", null);
+  setStore({ popover: null, opening: path });
   try {
     const view = await api.openRepository(path);
     diffCache.clear();
@@ -200,6 +203,8 @@ export async function openRepo(path: string) {
     setDiffVersion((v) => v + 1);
   } catch (e) {
     reportError(e, "Could not open repository");
+  } finally {
+    if (store.opening === path) setStore("opening", null);
   }
 }
 

@@ -71,7 +71,7 @@ pub fn syntax_for(path: &str, first_line: &str) -> Option<&'static SyntaxReferen
         .filter(|s| s.name != "Plain Text")
 }
 
-pub fn highlight(path: &str, text: &str) -> Option<Vec<Vec<Span>>> {
+pub fn highlight(path: &str, text: &str, until: usize) -> Option<Vec<Vec<Span>>> {
     let syntax = syntax_for(path, text.lines().next().unwrap_or_default())?;
     let ss = &*SYNTAXES;
     let mut state = ParseState::new(syntax);
@@ -79,7 +79,7 @@ pub fn highlight(path: &str, text: &str) -> Option<Vec<Vec<Span>>> {
     let mut out = Vec::new();
 
     for (index, raw) in text.split_inclusive('\n').enumerate() {
-        if index >= MAX_LINES {
+        if index >= MAX_LINES.min(until) {
             break;
         }
         if raw.len() > MAX_LINE_LEN {
@@ -123,7 +123,7 @@ mod tests {
 
     #[test]
     fn highlights_rust_keywords_and_strings() {
-        let lines = highlight("main.rs", "fn main() {\n    let s = \"hi\"; // note\n}\n").unwrap();
+        let lines = highlight("main.rs", "fn main() {\n    let s = \"hi\"; // note\n}\n", usize::MAX).unwrap();
         assert_eq!(lines.len(), 3);
         assert!(lines[0].iter().any(|s| s.2 == 5 && s.0 == 0 && s.1 == 2));
         assert!(lines[1].iter().any(|s| s.2 == 2));
@@ -132,12 +132,12 @@ mod tests {
 
     #[test]
     fn unknown_extension_is_not_highlighted() {
-        assert!(highlight("notes.unknownext", "hello\n").is_none());
+        assert!(highlight("notes.unknownext", "hello\n", usize::MAX).is_none());
     }
 
     #[test]
     fn offsets_are_utf16() {
-        let lines = highlight("a.js", "const é = \"x\";\n").unwrap();
+        let lines = highlight("a.js", "const é = \"x\";\n", usize::MAX).unwrap();
         let string = lines[0].iter().find(|s| s.2 == 2).unwrap();
         assert_eq!(string.0, 10);
     }

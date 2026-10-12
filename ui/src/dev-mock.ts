@@ -37,13 +37,27 @@ const diff: FileDiff = {
         { kind: "removed", oldNo: 12, newNo: null, text: "        let (events, _) = broadcast::channel(64);", noNewline: false },
         { kind: "added", oldNo: null, newNo: 12, text: "        let (events, _) = broadcast::channel(256);", noNewline: false },
         { kind: "added", oldNo: null, newNo: 13, text: "        tracing::debug!(?config, \"engine starting\");", noNewline: false, tokens: [[17, 6, 6], [34, 17, 2]] },
-        { kind: "added", oldNo: null, newNo: 14, text: "", noNewline: false },
+        { kind: "added", oldNo: null, newNo: 14, text: "        return Err(Error::Git(\"finish or abort the operation in progress first before trying to undo anything else\".into()));", noNewline: false },
         { kind: "context", oldNo: 13, newNo: 15, text: "        Self {", noNewline: false },
         { kind: "context", oldNo: 14, newNo: 16, text: "            network: Arc::new(Semaphore::new(4)),", noNewline: false },
       ],
     },
   ],
 };
+
+diff.hunks.push({
+  oldStart: 40,
+  oldLen: 40,
+  newStart: 42,
+  newLen: 0,
+  lines: Array.from({ length: 40 }, (_, i) => ({
+    kind: "removed" as const,
+    oldNo: 40 + i,
+    newNo: null,
+    text: `${i}:` + "function(){const a=document.querySelector('x');a&&a.addEventListener('click',()=>{});}".repeat(8),
+    noNewline: false,
+  })),
+});
 
 const history: CommitSummary[] = Array.from({ length: 60 }, (_, i) => ({
   id: `${(i + 1).toString(16).padStart(40, "a")}`,

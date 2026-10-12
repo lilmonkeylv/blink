@@ -72,11 +72,12 @@ pub struct DiffOptions {
     pub context: u32,
     pub ignore_whitespace: bool,
     pub max_lines: Option<usize>,
+    pub highlight: bool,
 }
 
 impl Default for DiffOptions {
     fn default() -> Self {
-        Self { context: DEFAULT_CONTEXT, ignore_whitespace: false, max_lines: Some(LARGE_DIFF_LINES) }
+        Self { context: DEFAULT_CONTEXT, ignore_whitespace: false, max_lines: Some(LARGE_DIFF_LINES), highlight: true }
     }
 }
 
@@ -138,13 +139,17 @@ pub fn diff_bytes(old: &[u8], new: &[u8], opts: DiffOptions) -> FileDiff {
 
 pub fn diff_file(path: &str, old: &[u8], new: &[u8], opts: DiffOptions) -> FileDiff {
     let mut diff = diff_bytes(old, new, opts);
-    if diff.hunks.is_empty() {
+    if diff.hunks.is_empty() || !opts.highlight {
         return diff;
     }
+    let lines = diff.hunks.iter().flat_map(|h| &h.lines);
+    let last_old = lines.clone().filter(|l| l.kind == LineKind::Removed).filter_map(|l| l.old_no).max().unwrap_or(0);
+    let last_new = lines.filter_map(|l| l.new_no).max().unwrap_or(0);
     let (old_tokens, new_tokens) = std::thread::scope(|scope| {
-        let old_job = scope.spawn(|| highlight(path, &String::from_utf8_lossy(old)));
-        let new_tokens = highlight(path, &String::from_utf8_lossy(new));
-        (old_job.join().ok().flatten(), new_tokens)
+        let old_job =
+            (last_old > 0).then(|| scope.spawn(|| highlight(path, &String::from_utf8_lossy(old), last_old as usize)));
+        let new_tokens = highlight(path, &String::from_utf8_lossy(new), last_new as usize);
+        (old_job.and_then(|j| j.join().ok().flatten()), new_tokens)
     });
     let pick = |tokens: &Option<Vec<Vec<Span>>>, no: Option<u32>| {
         tokens.as_ref().zip(no).and_then(|(t, n)| t.get(n as usize - 1).cloned()).unwrap_or_default()

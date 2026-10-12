@@ -1,5 +1,5 @@
 import { createVirtualizer } from "@tanstack/solid-virtual";
-import { createEffect, For, on, type JSX } from "solid-js";
+import { createEffect, For, on, Show, type JSX } from "solid-js";
 
 export function VirtualList<T>(p: {
   items: readonly T[];
@@ -12,6 +12,7 @@ export function VirtualList<T>(p: {
   onEndReached?: () => void;
   ref?: (el: HTMLDivElement) => void;
   style?: JSX.CSSProperties;
+  dynamic?: boolean;
 }) {
   let scroller!: HTMLDivElement;
   const virtualizer = createVirtualizer({
@@ -22,6 +23,8 @@ export function VirtualList<T>(p: {
     estimateSize: () => p.rowHeight,
     overscan: 12,
   });
+
+  createEffect(on(() => p.items, () => p.dynamic && virtualizer.measure(), { defer: true }));
 
   createEffect(
     on(
@@ -50,13 +53,36 @@ export function VirtualList<T>(p: {
       style={p.style}
     >
       <div style={{ height: `${virtualizer.getTotalSize()}px`, position: "relative", "min-width": "100%" }}>
-        <For each={virtualizer.getVirtualItems()}>
-          {(row) => (
-            <div style={{ position: "absolute", top: `${row.start}px`, left: 0, right: 0, height: `${p.rowHeight}px` }}>
-              {p.render(p.items[row.index], row.index)}
-            </div>
-          )}
-        </For>
+        <Show
+          when={p.dynamic}
+          fallback={
+            <For each={virtualizer.getVirtualItems()}>
+              {(row) => (
+                <div style={{ position: "absolute", top: `${row.start}px`, left: 0, right: 0, height: `${p.rowHeight}px` }}>
+                  {p.render(p.items[row.index], row.index)}
+                </div>
+              )}
+            </For>
+          }
+        >
+          <div
+            style={{
+              position: "absolute",
+              top: 0,
+              left: 0,
+              right: 0,
+              transform: `translateY(${virtualizer.getVirtualItems()[0]?.start ?? 0}px)`,
+            }}
+          >
+            <For each={virtualizer.getVirtualItems()}>
+              {(row) => (
+                <div data-index={row.index} ref={(el) => queueMicrotask(() => el.isConnected && virtualizer.measureElement(el))}>
+                  {p.render(p.items[row.index], row.index)}
+                </div>
+              )}
+            </For>
+          </div>
+        </Show>
       </div>
     </div>
   );

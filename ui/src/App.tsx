@@ -99,6 +99,17 @@ function Welcome() {
   );
 }
 
+function Loading(p: { label: string }) {
+  return (
+    <div class="empty">
+      <div class="loading">
+        <span class="spinner large" />
+        <span class="muted">{p.label}…</span>
+      </div>
+    </div>
+  );
+}
+
 function Sidebar() {
   const changes = () => store.repo?.files.length ?? 0;
   return (
@@ -301,8 +312,8 @@ export function App() {
     >
       <Toolbar />
       <Banners />
-      <Show when={store.ready}>
-        <Show when={store.repo} fallback={<Welcome />}>
+      <Show when={store.ready} fallback={<Loading label="Starting Blink" />}>
+        <Show when={store.repo} fallback={store.opening ? <Loading label="Opening repository" /> : <Welcome />}>
           <div
             class="main"
             style={{

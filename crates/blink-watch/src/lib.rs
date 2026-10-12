@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use crossbeam_channel::Sender;
-use notify_debouncer_full::notify::{RecommendedWatcher, RecursiveMode};
-use notify_debouncer_full::{DebounceEventResult, Debouncer, RecommendedCache, new_debouncer};
+use notify_debouncer_full::notify::{Config, RecommendedWatcher, RecursiveMode};
+use notify_debouncer_full::{DebounceEventResult, Debouncer, NoCache, new_debouncer_opt};
 
 pub const DEFAULT_DEBOUNCE: Duration = Duration::from_millis(75);
 
@@ -22,7 +22,7 @@ pub struct Change {
 }
 
 pub struct RepoWatcher {
-    _debouncer: Debouncer<RecommendedWatcher, RecommendedCache>,
+    _debouncer: Debouncer<RecommendedWatcher, NoCache>,
 }
 
 fn is_relevant_git_path(rel: &Path) -> bool {
@@ -66,7 +66,7 @@ impl RepoWatcher {
     pub fn start(root: &Path, git_dir: &Path, debounce: Duration, tx: Sender<Change>) -> Result<Self, Error> {
         let root_owned = root.to_path_buf();
         let git_dir_owned = git_dir.to_path_buf();
-        let mut debouncer = new_debouncer(debounce, None, move |result: DebounceEventResult| match result {
+        let handler = move |result: DebounceEventResult| match result {
             Ok(events) => {
                 let change = classify(&root_owned, &git_dir_owned, events.into_iter().flat_map(|e| e.event.paths));
                 if change.git_state_changed || !change.worktree_paths.is_empty() {
@@ -78,7 +78,9 @@ impl RepoWatcher {
                     tracing::warn!(error = %e, "watch error");
                 }
             }
-        })?;
+        };
+        let mut debouncer =
+            new_debouncer_opt::<_, RecommendedWatcher, NoCache>(debounce, None, handler, NoCache, Config::default())?;
         debouncer.watch(root, RecursiveMode::Recursive)?;
         if !git_dir.starts_with(root) {
             debouncer.watch(git_dir, RecursiveMode::Recursive)?;
