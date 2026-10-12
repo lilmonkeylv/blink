@@ -1,6 +1,15 @@
 import { ask } from "@tauri-apps/plugin-dialog";
 import { createEffect, createMemo, createResource, createSignal, For, on, Show } from "solid-js";
-import { api, type CommitFile, type CommitSummary, type FileDiff, type GraphRow, type SearchKind } from "../api";
+import {
+  api,
+  isCommandError,
+  type CommitDetail,
+  type CommitFile,
+  type CommitSummary,
+  type FileDiff,
+  type GraphRow,
+  type SearchKind,
+} from "../api";
 import { absoluteTime, relativeTime } from "../lib/time";
 import { currentBranch, notify, reportError, run, setStore, store } from "../store";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
@@ -435,15 +444,42 @@ export function CommitView() {
     return ordered.length >= 2 ? { newest: ordered[0].id, oldest: ordered[ordered.length - 1].id, count: ordered.length } : null;
   });
 
-  const [detail] = createResource(
-    () => (store.repo && selected()[0] && !range() ? { id: store.repo.id, sha: selected()[0] } : null),
-    ({ id, sha }) => api.commitDetail(id, sha),
+  const [detail, setDetail] = createSignal<CommitDetail | null>(null);
+  const [rangeFiles, setRangeFiles] = createSignal<CommitFile[] | null>(null);
+  const [loadError, setLoadError] = createSignal<string | null>(null);
+  const [attempt, setAttempt] = createSignal(0);
+  let detailToken = 0;
+  createEffect(
+    on(
+      () => [store.repo?.id, selected()[0], range()?.oldest, range()?.newest, attempt()] as const,
+      async ([id, sha, oldest, newest]) => {
+        const mine = ++detailToken;
+        setLoadError(null);
+        if (!id || !sha) {
+          setDetail(null);
+          setRangeFiles(null);
+          return;
+        }
+        try {
+          if (oldest && newest) {
+            const files = await api.rangeFiles(id, oldest, newest);
+            if (mine === detailToken) setRangeFiles(files);
+          } else {
+            const result = await api.commitDetail(id, sha);
+            if (mine === detailToken) setDetail(result);
+          }
+        } catch (e) {
+          if (mine !== detailToken) return;
+          setLoadError(isCommandError(e) ? [e.message, e.detail].filter(Boolean).join(": ") : String(e));
+        }
+      },
+    ),
   );
-  const [rangeFiles] = createResource(
-    () => (store.repo && range() ? { id: store.repo.id, ...range()! } : null),
-    ({ id, oldest, newest }) => api.rangeFiles(id, oldest, newest),
-  );
-  const files = () => (range() ? rangeFiles() ?? [] : detail()?.files ?? []);
+  const currentDetail = () => {
+    const d = detail();
+    return d && d.commit.id === selected()[0] ? d : null;
+  };
+  const files = () => (range() ? (rangeFiles() ?? []) : (currentDetail()?.files ?? []));
   const [file, setFile] = createSignal<CommitFile | null>(null);
   createEffect(on(files, (f) => setFile(f[0] ?? null)));
 
@@ -502,7 +538,24 @@ export function CommitView() {
     <Show
       when={range()}
       fallback={
-        <Show when={detail()} fallback={<div class="empty">{selected()[0] ? "Loading…" : "Select a commit"}</div>}>
+        <Show
+          when={!loadError() && currentDetail()}
+          fallback={
+            <div class="empty">
+              <Show when={loadError()} fallback={selected()[0] ? "Loading…" : "Select a commit"}>
+                <div>
+                  <h2>Could not load this commit</h2>
+                  <p class="muted" style={{ "user-select": "text" }}>
+                    {loadError()}
+                  </p>
+                  <button class="btn" onClick={() => setAttempt((n) => n + 1)}>
+                    Retry
+                  </button>
+                </div>
+              </Show>
+            </div>
+          }
+        >
           {(d) => (
             <div class="commit-detail">
               <div class="commit-meta">

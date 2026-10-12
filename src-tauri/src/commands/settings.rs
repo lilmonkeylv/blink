@@ -23,3 +23,11 @@ pub fn open_logs_folder(app: AppHandle, state: State<'_, AppState>) -> CmdResult
     std::fs::create_dir_all(&dir).map_err(|e| CommandError::new("io", e.to_string()))?;
     app.opener().open_path(dir.to_string_lossy(), None::<&str>).map_err(|e| CommandError::new("opener", e.to_string()))
 }
+
+#[tauri::command]
+pub fn open_devtools(window: tauri::WebviewWindow) {
+    #[cfg(debug_assertions)]
+    window.open_devtools();
+    #[cfg(not(debug_assertions))]
+    let _ = window;
+}

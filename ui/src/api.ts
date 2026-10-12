@@ -496,6 +496,7 @@ export const api = {
   openInEditor: (id: string, path?: string) => invoke<void>("open_in_editor", { id, path }),
   openInShell: (id: string, path?: string) => invoke<void>("open_in_shell", { id, path }),
   openLogsFolder: () => invoke<void>("open_logs_folder"),
+  openDevtools: () => invoke<void>("open_devtools"),
   takePendingLaunch: () => invoke<Launch[]>("take_pending_launch"),
   repoSettings: (id: string) => invoke<RepoSettings>("repo_settings", { id }),
   saveRepoSettings: (id: string, settings: RepoSettings) => invoke<void>("save_repo_settings", { id, settings }),

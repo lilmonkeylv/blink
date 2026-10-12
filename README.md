@@ -33,6 +33,7 @@ Blink keeps the workflow and rebuilds the engine:
 - Clone, create, add and publish repositories
 - Changes view with line- and hunk-level staging, discard, ignore
 - Unified diffs with syntax highlighting (split view _planned_); image diffs (2-up, swipe, onion skin, difference)
+- Syntax highlighting for most languages, including TypeScript/TSX, Vue, Svelte, Lua, Kotlin, Swift, Dockerfile, TOML and GraphQL _(planned; today only the grammars bundled with syntect are covered)_
 - Commit with co-authors, amend, undo
 - History with revert, cherry-pick, reorder and squash by drag-and-drop
 - Branches: create, rename, delete, merge, rebase, squash-merge, compare
@@ -189,6 +190,7 @@ bun run test
 | P3 · Rewrites and conflicts | Cherry-pick, reorder, squash, rebase, undo, merge editor                 | Done        |
 | P4 · Parity and v1.0        | LFS, submodules, signing, CLI, migration from GitHub Desktop             | In progress |
 | P5 · Beyond Desktop         | Commit graph, blame, worktrees, multi-window                             | In progress |
+| P6 · Language coverage      | Highlighting grammars for most languages (TS/TSX, Vue, Svelte, Lua)     | Planned     |
 
 ## Contributing
 

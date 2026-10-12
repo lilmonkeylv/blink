@@ -234,6 +234,11 @@ export function App() {
     const mod = e.ctrlKey || e.metaKey;
     const key = e.key.toLowerCase();
     const repo = store.repo;
+    if (e.key === "F12" && import.meta.env.DEV) {
+      e.preventDefault();
+      api.openDevtools().catch(() => {});
+      return;
+    }
     if (e.key === "F5") {
       e.preventDefault();
       refreshRepo();

@@ -141,6 +141,7 @@ pub fn run() {
             commands::settings::get_settings,
             commands::settings::save_settings,
             commands::settings::open_logs_folder,
+            commands::settings::open_devtools,
             launch::take_pending_launch,
         ])
         .run(tauri::generate_context!())
