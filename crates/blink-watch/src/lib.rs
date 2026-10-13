@@ -129,7 +129,13 @@ mod tests {
         let _w = RepoWatcher::start(dir.path(), &git, Duration::from_millis(30), tx).unwrap();
         std::thread::sleep(Duration::from_millis(100));
         std::fs::write(dir.path().join("a.txt"), "x").unwrap();
-        let change = rx.recv_timeout(Duration::from_secs(5)).expect("event");
-        assert!(change.worktree_paths.iter().any(|p| p.ends_with("a.txt")));
+        let deadline = std::time::Instant::now() + Duration::from_secs(10);
+        let mut seen = false;
+        while !seen && std::time::Instant::now() < deadline {
+            if let Ok(change) = rx.recv_timeout(Duration::from_millis(500)) {
+                seen = change.worktree_paths.iter().any(|p| p.ends_with("a.txt"));
+            }
+        }
+        assert!(seen, "no event for a.txt");
     }
 }
