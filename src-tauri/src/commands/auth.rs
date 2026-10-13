@@ -4,7 +4,7 @@ use tauri::{AppHandle, Manager, State};
 use tauri_plugin_opener::OpenerExt;
 
 use crate::error::{CmdResult, CommandError};
-use crate::state::{ACCOUNT_KEY, AppState};
+use crate::state::{ACCOUNT_KEY, AppState, EnterpriseAccount, GITHUB_HOST, api_base, normalize_host};
 
 fn oauth_app(state: &AppState) -> CmdResult<OAuthApp> {
     let client_id = state.oauth.client_id.clone().ok_or_else(|| {
@@ -77,4 +77,50 @@ pub fn sign_out(state: State<'_, AppState>) -> CmdResult<()> {
 #[tauri::command]
 pub fn revoke_url(state: State<'_, AppState>) -> Option<String> {
     state.oauth.client_id.as_ref().map(|id| format!("https://github.com/settings/connections/applications/{id}"))
+}
+
+#[tauri::command]
+pub fn enterprise_accounts(state: State<'_, AppState>) -> Vec<EnterpriseAccount> {
+    state.enterprise_accounts()
+}
+
+#[tauri::command]
+pub async fn enterprise_sign_in(
+    state: State<'_, AppState>,
+    host: String,
+    token: String,
+) -> CmdResult<EnterpriseAccount> {
+    let host =
+        normalize_host(&host).ok_or_else(|| CommandError::new("host", "That doesn't look like a server address"))?;
+    if host == GITHUB_HOST {
+        return Err(CommandError::new("host", "Use the GitHub.com sign-in for github.com"));
+    }
+    let token = token.trim().to_string();
+    if token.is_empty() {
+        return Err(CommandError::new("token", "Paste a personal access token"));
+    }
+    let account = Client::new(api_base(&host), &token).user().await?;
+    state.secrets.set(&AppState::host_token_key(&host, &account.login), &token)?;
+    let entry = EnterpriseAccount { host: host.clone(), account };
+    let mut accounts = state.enterprise_accounts();
+    if let Some(old) = accounts.iter().find(|a| a.host == host)
+        && old.account.login != entry.account.login
+    {
+        state.secrets.delete(&AppState::host_token_key(&host, &old.account.login))?;
+    }
+    accounts.retain(|a| a.host != host);
+    accounts.push(entry.clone());
+    state.save_enterprise_accounts(&accounts)?;
+    Ok(entry)
+}
+
+#[tauri::command]
+pub fn enterprise_sign_out(state: State<'_, AppState>, host: String) -> CmdResult<()> {
+    let mut accounts = state.enterprise_accounts();
+    if let Some(old) = accounts.iter().find(|a| a.host == host) {
+        state.secrets.delete(&AppState::host_token_key(&host, &old.account.login))?;
+    }
+    accounts.retain(|a| a.host != host);
+    state.save_enterprise_accounts(&accounts)?;
+    Ok(())
 }

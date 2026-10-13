@@ -368,6 +368,11 @@ export function onChecksChanged(handler: (e: { repo: string; summary: ChecksSumm
   return listen<{ repo: string; summary: ChecksSummary }>("checks-changed", (e) => handler(e.payload));
 }
 
+export interface EnterpriseAccount {
+  host: string;
+  account: Account;
+}
+
 export interface ReleaseNote {
   version: string;
   date: string | null;
@@ -532,6 +537,9 @@ export const api = {
   deviceComplete: (code: DeviceCode) => invoke<{ account: Account; primaryEmail: string | null }>("device_complete", { code }),
   signOut: () => invoke<void>("sign_out"),
   revokeUrl: () => invoke<string | null>("revoke_url"),
+  enterpriseAccounts: () => invoke<EnterpriseAccount[]>("enterprise_accounts"),
+  enterpriseSignIn: (host: string, token: string) => invoke<EnterpriseAccount>("enterprise_sign_in", { host, token }),
+  enterpriseSignOut: (host: string) => invoke<void>("enterprise_sign_out", { host }),
 
   getSettings: () => invoke<Settings>("get_settings"),
   saveSettings: (settings: Settings) => invoke<void>("save_settings", { settings }),

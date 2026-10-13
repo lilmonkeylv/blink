@@ -42,6 +42,60 @@ function Pane(p: { children: JSX.Element }) {
   return <div class="pane">{p.children}</div>;
 }
 
+function EnterpriseAccounts() {
+  const [accounts, { refetch }] = createResource(() => api.enterpriseAccounts());
+  const [host, setHost] = createSignal("");
+  const [token, setToken] = createSignal("");
+  const [busy, setBusy] = createSignal(false);
+  const add = async () => {
+    setBusy(true);
+    try {
+      const added = await api.enterpriseSignIn(host(), token());
+      notify("success", `Signed in to ${added.host} as ${added.account.login}`);
+      setHost("");
+      setToken("");
+      refetch();
+    } catch (e) {
+      reportError(e, "Could not sign in");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const remove = async (h: string) => {
+    await api.enterpriseSignOut(h).catch(reportError);
+    refetch();
+  };
+  return (
+    <>
+      <h3 style={{ margin: "12px 0 0" }}>GitHub Enterprise</h3>
+      <For each={accounts() ?? []}>
+        {(a) => (
+          <div class="summary-row">
+            <div style={{ flex: 1 }}>
+              <div style={{ "font-weight": 600 }}>{a.host}</div>
+              <div class="muted">@{a.account.login}</div>
+            </div>
+            <button class="btn" onClick={() => remove(a.host)}>
+              Sign out
+            </button>
+          </div>
+        )}
+      </For>
+      <Field label="Server" hint="Your GitHub Enterprise Server address, or a ghe.com subdomain for Enterprise Cloud with data residency.">
+        <input class="input" placeholder="github.example.com" value={host()} onInput={(e) => setHost(e.currentTarget.value)} />
+      </Field>
+      <Field label="Personal access token" hint="Create one on your server under Settings > Developer settings with the repo, read:org and workflow scopes. It's stored in your system keychain.">
+        <input class="input" type="password" autocomplete="off" value={token()} onInput={(e) => setToken(e.currentTarget.value)} />
+      </Field>
+      <div>
+        <button class="btn" disabled={busy() || !host().trim() || !token().trim()} onClick={add}>
+          {busy() ? "Checking…" : "Add Enterprise account"}
+        </button>
+      </div>
+    </>
+  );
+}
+
 function AccountsTab() {
   const signOut = async () => {
     await api.signOut().catch(reportError);
@@ -85,6 +139,7 @@ function AccountsTab() {
           </div>
         )}
       </Show>
+      <EnterpriseAccounts />
     </Pane>
   );
 }

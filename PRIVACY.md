@@ -15,7 +15,8 @@ Everything below stays on your machine. None of it is uploaded anywhere by Blink
 | Settings | Your preferences (theme, editor, Git behaviour and so on) | `settings.toml` in the config folder |
 | Repository list | The repositories you've added, their paths and remote URLs, so the list and your last open repository come back next time | `cache.sqlite3` in the data folder |
 | GitHub account profile | Your GitHub username, user ID, display name, public email and avatar URL, shown in the app once you sign in | `cache.sqlite3` in the data folder |
-| GitHub access token | Lets Blink call the GitHub API and push to GitHub on your behalf | Your operating system's credential store (Windows Credential Manager, macOS Keychain, or the Secret Service on Linux) under `dev.blink.app`. Never written to a file |
+| GitHub access tokens | Let Blink call the GitHub API and push on your behalf. One for github.com and one per GitHub Enterprise server you add | Your operating system's credential store (Windows Credential Manager, macOS Keychain, or the Secret Service on Linux) under `dev.blink.app`. Never written to a file |
+| GitHub Enterprise accounts | The server address and your username, ID and display name on each server you add | `cache.sqlite3` in the data folder |
 | Logs | Errors and warnings to help you debug problems. They can contain file paths, branch names and Git output | `logs/blink.log` in the data folder |
 
 Folder locations:
@@ -40,7 +41,9 @@ Signing in happens in your own browser on github.com. Blink never sees your pass
 - re-running failed checks when you ask
 - fetching `.gitignore` and license templates when you create a repository
 - loading your avatar image from `avatars.githubusercontent.com`
-- authenticating Git operations against `https://github.com` remotes. The token is only ever handed to Git for `https://github.com` URLs, never for other hosts
+- authenticating Git operations against `https://github.com` remotes. Each token is only ever handed to Git for `https://` remotes on the host it belongs to
+
+If you add a GitHub Enterprise account, the same requests go to that server instead, using the personal access token you entered, and only for repositories whose remote is on that server.
 
 All of this goes directly from your computer to GitHub. GitHub's own [privacy statement](https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement) covers what GitHub does with it. Signing out deletes the token from your credential store and the profile from the cache. You can also revoke Blink's access at any time from [GitHub settings](https://github.com/settings/applications).
 

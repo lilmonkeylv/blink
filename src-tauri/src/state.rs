@@ -9,6 +9,35 @@ use blink_watch::RepoWatcher;
 use parking_lot::{Mutex, RwLock};
 
 pub const ACCOUNT_KEY: &str = "account.github.com";
+pub const ENTERPRISE_KEY: &str = "accounts.enterprise";
+pub const GITHUB_HOST: &str = "github.com";
+
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct EnterpriseAccount {
+    pub host: String,
+    pub account: Account,
+}
+
+pub fn normalize_host(input: &str) -> Option<String> {
+    let trimmed = input.trim().trim_end_matches('/');
+    let with_scheme = if trimmed.contains("://") { trimmed.to_string() } else { format!("https://{trimmed}") };
+    let url = url::Url::parse(&with_scheme).ok()?;
+    url.host_str().map(|h| h.to_ascii_lowercase())
+}
+
+pub fn api_base(host: &str) -> String {
+    match host {
+        GITHUB_HOST => "https://api.github.com".to_string(),
+        h if h.ends_with(".ghe.com") => format!("https://api.{h}"),
+        h => format!("https://{h}/api/v3"),
+    }
+}
+
+pub fn https_host(url: &str) -> Option<String> {
+    let parsed = url::Url::parse(url).ok()?;
+    (parsed.scheme() == "https").then(|| parsed.host_str().map(str::to_ascii_lowercase)).flatten()
+}
 
 pub struct OAuthConfig {
     pub client_id: Option<String>,
@@ -86,7 +115,36 @@ impl AppState {
     }
 
     pub fn token_key(login: &str) -> String {
-        format!("github.com:{login}")
+        Self::host_token_key(GITHUB_HOST, login)
+    }
+
+    pub fn host_token_key(host: &str, login: &str) -> String {
+        format!("{host}:{login}")
+    }
+
+    pub fn enterprise_accounts(&self) -> Vec<EnterpriseAccount> {
+        self.cache.app_state(ENTERPRISE_KEY).ok().flatten().unwrap_or_default()
+    }
+
+    pub fn save_enterprise_accounts(&self, accounts: &[EnterpriseAccount]) -> Result<(), blink_store::Error> {
+        self.cache.put_app_state(ENTERPRISE_KEY, &accounts)
+    }
+
+    pub fn credentials_for_host(&self, host: &str) -> Option<(String, String)> {
+        if host == GITHUB_HOST {
+            return self.token().map(|(account, token)| (account.login, token));
+        }
+        let account = self.enterprise_accounts().into_iter().find(|a| a.host == host)?;
+        let token = self.secrets.get(&Self::host_token_key(host, &account.account.login)).ok().flatten()?;
+        Some((account.account.login, token))
+    }
+
+    pub fn client_for_host(&self, host: &str) -> Option<Client> {
+        if host == GITHUB_HOST {
+            return self.github();
+        }
+        let (_, token) = self.credentials_for_host(host)?;
+        Some(Client::new(api_base(host), token))
     }
 
     pub fn token(&self) -> Option<(Account, String)> {
@@ -115,13 +173,12 @@ impl AppState {
     }
 
     pub fn authenticate(&self, cli: GitCli, remote: Option<&str>) -> GitCli {
-        let Some((account, token)) = self.token() else { return cli };
-        if !remote.is_some_and(is_github_https) {
-            return cli;
-        }
-        cli.with_config("credential.https://github.com.helper", "")
-            .with_config("credential.https://github.com.helper", CREDENTIAL_HELPER)
-            .with_env("BLINK_GIT_USER", account.login)
+        let Some(host) = remote.and_then(https_host) else { return cli };
+        let Some((login, token)) = self.credentials_for_host(&host) else { return cli };
+        let key = format!("credential.https://{host}.helper");
+        cli.with_config(&key, "")
+            .with_config(&key, CREDENTIAL_HELPER)
+            .with_env("BLINK_GIT_USER", login)
             .with_env("BLINK_GIT_TOKEN", token)
     }
 }
@@ -129,8 +186,9 @@ impl AppState {
 const CREDENTIAL_HELPER: &str =
     "!f() { test \"$1\" = get || exit 0; echo \"username=$BLINK_GIT_USER\"; echo \"password=$BLINK_GIT_TOKEN\"; }; f";
 
-pub fn is_github_https(url: &str) -> bool {
-    url::Url::parse(url).is_ok_and(|u| u.scheme() == "https" && u.host_str() == Some("github.com"))
+#[cfg(test)]
+fn is_github_https(url: &str) -> bool {
+    https_host(url).as_deref() == Some(GITHUB_HOST)
 }
 
 #[cfg(test)]
@@ -143,5 +201,16 @@ mod tests {
         assert!(!is_github_https("https://gitlab.com/a/b.git"));
         assert!(!is_github_https("git@github.com:a/b.git"));
         assert!(!is_github_https("https://github.com.evil.io/a/b.git"));
+    }
+
+    #[test]
+    fn hosts_and_api_bases() {
+        assert_eq!(normalize_host("https://GHE.acme.com/").as_deref(), Some("ghe.acme.com"));
+        assert_eq!(normalize_host("ghe.acme.com").as_deref(), Some("ghe.acme.com"));
+        assert_eq!(api_base("github.com"), "https://api.github.com");
+        assert_eq!(api_base("ghe.acme.com"), "https://ghe.acme.com/api/v3");
+        assert_eq!(api_base("acme.ghe.com"), "https://api.acme.ghe.com");
+        assert_eq!(https_host("https://ghe.acme.com/a/b.git").as_deref(), Some("ghe.acme.com"));
+        assert_eq!(https_host("git@ghe.acme.com:a/b.git"), None);
     }
 }

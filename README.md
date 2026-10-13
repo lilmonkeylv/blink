@@ -29,7 +29,7 @@ Blink keeps the workflow and rebuilds the engine:
 
 ### GitHub Desktop parity
 
-- Sign in with GitHub through OAuth (PKCE, system browser) or a device code; GitHub Enterprise _(planned)_
+- Sign in with GitHub through OAuth (PKCE, system browser) or a device code; GitHub Enterprise Server and ghe.com accounts with a personal access token
 - Clone, create, add and publish repositories
 - Changes view with line- and hunk-level staging, discard, ignore
 - Unified and split diffs with syntax highlighting; image diffs (2-up, swipe, onion skin, difference)

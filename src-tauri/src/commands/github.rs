@@ -12,7 +12,7 @@ use tauri_plugin_opener::OpenerExt;
 use crate::commands::repo::{add_repository, origin_url};
 use crate::commands::sync::progress_emitter;
 use crate::error::{CmdResult, CommandError};
-use crate::state::AppState;
+use crate::state::{AppState, GITHUB_HOST};
 
 pub const CHECKS_CHANGED: &str = "checks-changed";
 
@@ -24,18 +24,34 @@ fn remote_url(repo: &Repository, name: &str) -> Option<String> {
     repo.cli().remotes().ok()?.into_iter().find(|(n, _)| n == name).map(|(_, u)| u)
 }
 
-pub fn github_coords(repo: &Repository, remote: Option<&str>) -> Option<(String, String)> {
+pub struct HostedRepo {
+    pub host: String,
+    pub owner: String,
+    pub name: String,
+}
+
+pub fn hosted_repo(state: &AppState, repo: &Repository, remote: Option<&str>) -> Option<HostedRepo> {
     let url = match remote {
         Some(name) => remote_url(repo, name)?,
         None => origin_url(repo)?,
     };
     let (host, owner, name) = parse_remote(&url)?;
-    (host == "github.com").then_some((owner, name))
+    let host = host.to_ascii_lowercase();
+    let known = host == GITHUB_HOST || state.enterprise_accounts().iter().any(|a| a.host == host);
+    known.then_some(HostedRepo { host, owner, name })
 }
 
-fn coords(repo: &Repository) -> CmdResult<(String, String)> {
-    github_coords(repo, None)
-        .ok_or_else(|| CommandError::new("notGithub", "This repository is not hosted on GitHub.com"))
+fn hosted(state: &AppState, repo: &Repository) -> CmdResult<HostedRepo> {
+    hosted_repo(state, repo, None).ok_or_else(|| {
+        CommandError::new(
+            "notGithub",
+            "This repository is not hosted on GitHub or a GitHub Enterprise account you added",
+        )
+    })
+}
+
+fn host_client(state: &AppState, host: &str) -> CmdResult<Client> {
+    state.client_for_host(host).ok_or_else(|| CommandError::new("signedOut", format!("Sign in to {host} first")))
 }
 
 #[tauri::command]
@@ -119,8 +135,8 @@ pub async fn publish_repository(
 pub async fn pull_requests(state: State<'_, AppState>, id: String) -> CmdResult<Vec<PullRequest>> {
     let handle = state.engine.get(&id)?;
     let repo = handle.repo();
-    let (owner, name) = github_coords(repo, Some("upstream")).map(Ok).unwrap_or_else(|| coords(repo))?;
-    Ok(client(&state)?.pulls(&owner, &name).await?)
+    let target = hosted_repo(&state, repo, Some("upstream")).map(Ok).unwrap_or_else(|| hosted(&state, repo))?;
+    Ok(host_client(&state, &target.host)?.pulls(&target.owner, &target.name).await?)
 }
 
 #[tauri::command]
@@ -153,17 +169,15 @@ pub async fn checkout_pull_request(
 pub async fn create_pull_request(app: AppHandle, state: State<'_, AppState>, id: String) -> CmdResult<()> {
     let handle = state.engine.get(&id)?;
     let repo = handle.repo();
-    let (owner, name) = coords(repo)?;
+    let HostedRepo { host, owner, name } = hosted(&state, repo)?;
     let branch = repo
         .head()?
         .branch_name()
         .map(str::to_string)
         .ok_or_else(|| CommandError::new("detached", "Check out a branch first"))?;
-    let url = match github_coords(repo, Some("upstream")) {
-        Some((up_owner, up_name)) => {
-            format!("https://github.com/{up_owner}/{up_name}/compare/{owner}:{branch}?expand=1")
-        }
-        None => format!("https://github.com/{owner}/{name}/compare/{branch}?expand=1"),
+    let url = match hosted_repo(&state, repo, Some("upstream")) {
+        Some(up) => format!("https://{}/{}/{}/compare/{owner}:{branch}?expand=1", up.host, up.owner, up.name),
+        None => format!("https://{host}/{owner}/{name}/compare/{branch}?expand=1"),
     };
     app.opener().open_url(url, None::<&str>).map_err(|e| CommandError::new("opener", e.to_string()))
 }
@@ -171,17 +185,17 @@ pub async fn create_pull_request(app: AppHandle, state: State<'_, AppState>, id:
 #[tauri::command]
 pub async fn branch_checks(state: State<'_, AppState>, id: String) -> CmdResult<Option<ChecksSummary>> {
     let handle = state.engine.get(&id)?;
-    let Some((owner, name)) = github_coords(handle.repo(), None) else { return Ok(None) };
+    let Some(target) = hosted_repo(&state, handle.repo(), None) else { return Ok(None) };
     let Some(HeadState::Branch { id: sha, .. }) = handle.snapshot().head.clone() else { return Ok(None) };
-    let Some(gh) = state.github() else { return Ok(None) };
-    Ok(Some(gh.checks(&owner, &name, &sha).await?))
+    let Some(gh) = state.client_for_host(&target.host) else { return Ok(None) };
+    Ok(Some(gh.checks(&target.owner, &target.name, &sha).await?))
 }
 
 #[tauri::command]
 pub async fn rerun_failed_checks(state: State<'_, AppState>, id: String, suites: Vec<u64>) -> CmdResult<()> {
     let handle = state.engine.get(&id)?;
-    let (owner, name) = coords(handle.repo())?;
-    let gh = client(&state)?;
+    let HostedRepo { host, owner, name } = hosted(&state, handle.repo())?;
+    let gh = host_client(&state, &host)?;
     for suite in suites {
         gh.rerun_check_suite(&owner, &name, suite).await?;
     }
@@ -201,8 +215,8 @@ pub struct ForkInfo {
 pub async fn fork_info(state: State<'_, AppState>, id: String) -> CmdResult<ForkInfo> {
     let handle = state.engine.get(&id)?;
     let has_upstream = remote_url(handle.repo(), "upstream").is_some();
-    let (owner, name) = coords(handle.repo())?;
-    let repo = client(&state)?.repo(&owner, &name).await?;
+    let HostedRepo { host, owner, name } = hosted(&state, handle.repo())?;
+    let repo = host_client(&state, &host)?.repo(&owner, &name).await?;
     Ok(ForkInfo {
         is_fork: repo.fork,
         parent: repo.parent.as_ref().map(|p| p.full_name.clone()),
@@ -236,16 +250,16 @@ pub fn spawn_checks_poller(app: AppHandle) {
         loop {
             tokio::time::sleep(Duration::from_secs(90)).await;
             let state = app.state::<AppState>();
-            let Some(gh) = state.github() else { continue };
             for id in state.engine.open_repos() {
                 let Ok(handle) = state.engine.get(&id) else { continue };
-                let Some((owner, name)) = github_coords(handle.repo(), None) else { continue };
+                let Some(HostedRepo { host, owner, name }) = hosted_repo(&state, handle.repo(), None) else { continue };
+                let Some(gh) = state.client_for_host(&host) else { continue };
                 let Some(HeadState::Branch { id: sha, name: branch }) = handle.snapshot().head.clone() else {
                     continue;
                 };
                 let summary = match gh.checks(&owner, &name, &sha).await {
                     Ok(s) => s,
-                    Err(blink_github::Error::Unauthorized) => break,
+                    Err(blink_github::Error::Unauthorized) => continue,
                     Err(e) => {
                         tracing::debug!(repo = %id, error = %e, "checks poll failed");
                         continue;

@@ -273,7 +273,7 @@ export function currentBranch(): string | null {
 
 export async function refreshChecks() {
   const repo = store.repo;
-  if (!repo || !store.account) return setStore("checks", null);
+  if (!repo) return setStore("checks", null);
   try {
     const checks = await api.branchChecks(repo.id);
     if (store.repo?.id === repo.id) setStore("checks", checks);

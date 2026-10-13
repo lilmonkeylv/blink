@@ -136,7 +136,7 @@ function RepoPopover() {
 
 function PullRequestList(p: { query: string }) {
   const [prs, { refetch }] = createResource(
-    () => (store.account ? store.repo?.id : null),
+    () => store.repo?.id,
     (id) => api.pullRequests(id),
   );
   const list = createMemo(() => fuzzyFilter(prs() ?? [], p.query, (pr) => `#${pr.number} ${pr.title} ${pr.user.login}`));
@@ -146,11 +146,11 @@ function PullRequestList(p: { query: string }) {
   };
   return (
     <Show
-      when={store.account}
+      when={(prs.error as { kind?: string } | undefined)?.kind !== "signedOut"}
       fallback={
         <div class="empty">
           <div>
-            <p>Sign in to see pull requests.</p>
+            <p>{String((prs.error as { message?: string })?.message ?? "Sign in to see pull requests.")}</p>
             <button class="btn primary" onClick={() => setStore("dialog", { type: "signIn" })}>
               Sign in
             </button>
@@ -404,7 +404,7 @@ export function appMenu(): MenuItem[] {
     { label: "Force push (with lease)…", run: () => doSync("push", true), disabled: !repo },
     "separator",
     { label: "Create pull request", run: r(api.createPullRequest), disabled: !repo },
-    { label: "Checks for this branch…", run: () => setStore("dialog", { type: "checks" }), disabled: !repo || !store.account },
+    { label: "Checks for this branch…", run: () => setStore("dialog", { type: "checks" }), disabled: !repo },
     { label: "View on GitHub", run: r(api.openOnGithub), disabled: !repo },
     "separator",
     { label: "Open in external editor", run: r((i) => api.openInEditor(i)), disabled: !repo },
