@@ -7,7 +7,6 @@ import { PromptHost } from "./components/Prompt";
 import { Dialog } from "./components/Dialog";
 import { Dialogs } from "./components/Dialogs";
 import { CommitView, HistoryList } from "./components/HistoryPane";
-import { GearIcon } from "./components/Icons";
 import { TabStrip } from "./components/TabStrip";
 import { applySidebarWidth, clampSidebar, saveRepoLayout } from "./lib/layout";
 import { appMenu, doSync, pickAndAddRepository, Toolbar } from "./components/Toolbar";
@@ -161,7 +160,7 @@ function Sidebar() {
   const changes = () => store.repo?.files.length ?? 0;
   return (
     <div class="sidebar">
-      <div class="tabs" role="tablist">
+      <div class="tabs sidebar-tabs" classList={{ history: store.tab === "history" }} role="tablist">
         <button class="tab" classList={{ active: store.tab === "changes" }} onClick={() => setStore("tab", "changes")} title="Ctrl+1">
           Changes{" "}
           <Show when={changes()}>
@@ -180,15 +179,11 @@ function Sidebar() {
           <HistoryList />
         </Match>
       </Switch>
-      <div class="list-header" style={{ "border-top": "1px solid var(--border)", "border-bottom": 0 }}>
-        <Show when={store.account} fallback={<a onClick={() => setStore("dialog", { type: "signIn" })}>Sign in to GitHub.com</a>}>
-          {(a) => <span class="muted">@{a().login}</span>}
-        </Show>
-        <span style={{ flex: 1 }} />
-        <button class="icon-button" title="Settings (Ctrl+,)" onClick={() => setStore("dialog", { type: "settings" })}>
-          <GearIcon />
-        </button>
-      </div>
+      <Show when={!store.account}>
+        <div class="list-header" style={{ "border-top": "1px solid var(--border)", "border-bottom": 0 }}>
+          <a onClick={() => setStore("dialog", { type: "signIn" })}>Sign in to GitHub.com</a>
+        </div>
+      </Show>
     </div>
   );
 }

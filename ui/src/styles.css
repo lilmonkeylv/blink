@@ -488,8 +488,49 @@ a {
 }
 
 .tabs {
+  position: relative;
   display: flex;
   border-bottom: 1px solid var(--border);
+}
+
+.sidebar-tabs .tab.active {
+  border-bottom-color: transparent;
+}
+
+.sidebar-tabs::after {
+  content: "";
+  position: absolute;
+  bottom: -1px;
+  left: 0;
+  width: 50%;
+  height: 2px;
+  background: #fd8c73;
+  transition: transform 220ms cubic-bezier(0.3, 0, 0, 1);
+}
+
+.sidebar-tabs.history::after {
+  transform: translateX(100%);
+}
+
+.sidebar-tabs + * {
+  animation: tab-in 180ms ease-out;
+}
+
+@keyframes tab-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sidebar-tabs::after {
+    transition: none;
+  }
+
+  .sidebar-tabs + * {
+    animation: none;
+  }
 }
 
 .tab {
@@ -739,11 +780,34 @@ select.input {
   align-items: center;
 }
 
+.summary-field {
+  position: relative;
+  display: flex;
+}
+
+.summary-field .input {
+  flex: 1;
+  padding-right: 36px;
+}
+
 .char-count {
+  position: absolute;
+  top: 50%;
+  right: 10px;
+  transform: translateY(-50%);
   font-size: 11px;
   color: var(--fg-muted);
-  min-width: 20px;
-  text-align: right;
+  pointer-events: none;
+}
+
+.commit-options {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.commit-options .check {
+  white-space: nowrap;
 }
 
 .char-count.over {
@@ -1431,8 +1495,17 @@ label.check {
   user-select: none;
 }
 
-.list:focus .row.selected .checkbox:not(.on):not(.mixed) {
+.list:focus .row.selected .checkbox {
   border-color: var(--fg-selected-focus);
+}
+
+.list:focus .row.selected .checkbox.on,
+.list:focus .row.selected .checkbox.mixed {
+  background: var(--fg-selected-focus);
+}
+
+.list:focus .row.selected .checkbox svg {
+  stroke: var(--bg-selected-focus);
 }
 
 .select {
