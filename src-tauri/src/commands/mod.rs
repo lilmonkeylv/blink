@@ -9,3 +9,4 @@ pub mod repo;
 pub mod rewrite;
 pub mod settings;
 pub mod sync;
+pub mod updater;

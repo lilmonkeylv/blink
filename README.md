@@ -172,6 +172,17 @@ git push origin master v0.2.0
 
 Pushing a `v*` tag runs `.github/workflows/release.yml`. It builds the Windows, macOS and Linux installers and attaches them to a draft release. Check it over and publish it from the Releases page. Tags with a suffix like `-beta.1` or `-rc.1` are marked as prereleases. To rebuild an existing tag, run the workflow by hand from the Actions tab.
 
+### Updater signing
+
+Installed copies of Blink check `releases/latest/download/latest.json` every few hours and offer to restart into the new version. Update bundles are signed with a minisign key whose public half lives in `tauri.conf.json` (`plugins.updater.pubkey`). The release workflow needs the private half as repository secrets:
+
+```bash
+gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/blink.key
+gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD --body ""
+```
+
+Without the secret, releases still build, just without updater bundles. Keep a backup of the private key somewhere safe. If it's lost, existing installs can't verify new updates. Local `bun tauri build` doesn't need the key.
+
 ### GitHub OAuth for local development
 
 1. Create an OAuth App at **GitHub → Settings → Developer settings → OAuth Apps**.

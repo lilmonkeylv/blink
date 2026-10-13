@@ -85,7 +85,17 @@ jobs:
       - run: bun install --frozen-lockfile
       - name: Build
         shell: bash
-        run: bun tauri build --ci --target ${{ matrix.target }} --bundles ${{ matrix.bundles }}
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          args=(--ci --target ${{ matrix.target }} --bundles ${{ matrix.bundles }})
+          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
+            args+=(--config '{"bundle":{"createUpdaterArtifacts":true}}')
+          else
+            echo "::warning::TAURI_SIGNING_PRIVATE_KEY is not set, building without updater artifacts"
+          fi
+          bun tauri build "${args[@]}"
       - uses: actions/upload-artifact@v4
         with:
           name: bundles-${{ matrix.target }}
@@ -97,6 +107,8 @@ jobs:
             target/${{ matrix.target }}/release/bundle/appimage/*.AppImage
             target/${{ matrix.target }}/release/bundle/deb/*.deb
             target/${{ matrix.target }}/release/bundle/rpm/*.rpm
+            target/${{ matrix.target }}/release/bundle/macos/*.app.tar.gz
+            target/${{ matrix.target }}/release/bundle/*/*.sig
 
   publish:
     needs: [prepare, build]
@@ -118,6 +130,8 @@ jobs:
           pattern: bundles-*
           path: dist
           merge-multiple: true
+      - name: Updater manifest
+        run: bun scripts/updater-manifest.ts dist "${{ needs.prepare.outputs.version }}" "$TAG" notes.md dist/latest.json
       - name: Draft release
         env:
           GH_TOKEN: ${{ github.token }}

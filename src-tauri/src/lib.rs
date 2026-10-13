@@ -38,6 +38,8 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(commands::updater::PendingUpdate::default())
         .setup(|app| {
             let state = AppState::initialize().map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
             state.engine.pools().background().spawn(blink_diff::warm_up);
@@ -46,7 +48,8 @@ pub fn run() {
             launch::handle_args(&handle, &std::env::args().collect::<Vec<_>>(), None);
             launch::register_deep_links(&handle);
             commands::sync::spawn_background_fetch(handle.clone());
-            commands::github::spawn_checks_poller(handle);
+            commands::github::spawn_checks_poller(handle.clone());
+            commands::updater::spawn_update_checks(handle);
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -142,6 +145,8 @@ pub fn run() {
             commands::settings::save_settings,
             commands::settings::open_logs_folder,
             commands::settings::open_devtools,
+            commands::updater::check_for_update,
+            commands::updater::install_update,
             launch::take_pending_launch,
         ])
         .run(tauri::generate_context!())

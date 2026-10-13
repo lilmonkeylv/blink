@@ -13,6 +13,7 @@ import {
   type SearchKind,
   type Settings,
   type SyncAction,
+  type UpdateInfo,
 } from "./api";
 import { reconcile, type FileSel } from "./lib/selection";
 
@@ -54,6 +55,7 @@ export interface Banner {
   message: string;
   detail?: string | null;
   action?: { label: string; run: () => void };
+  sticky?: boolean;
 }
 
 interface AppStore {
@@ -120,7 +122,7 @@ let bannerSeq = 0;
 export function notify(tone: Banner["tone"], message: string, extra: Partial<Banner> = {}) {
   const id = ++bannerSeq;
   setStore("banners", (b) => [...b.slice(-3), { id, tone, message, ...extra }]);
-  if (tone !== "error") setTimeout(() => dismiss(id), extra.action ? 8000 : 4000);
+  if (tone !== "error" && !extra.sticky) setTimeout(() => dismiss(id), extra.action ? 8000 : 4000);
 }
 
 export function dismiss(id: number) {
@@ -281,6 +283,42 @@ export async function undoLastOperation() {
     notify("success", `Undid "${entry.label}"`);
   } catch (e) {
     reportError(e, "Undo failed");
+  }
+}
+
+let updateOffered: string | null = null;
+
+export function offerUpdate(info: UpdateInfo) {
+  if (updateOffered === info.version) return;
+  updateOffered = info.version;
+  notify("info", `Blink ${info.version} is ready to install.`, {
+    sticky: true,
+    action: { label: "Restart to update", run: installUpdate },
+  });
+}
+
+export async function installUpdate() {
+  setStore("busy", "Downloading update");
+  try {
+    await api.installUpdate();
+  } catch (e) {
+    reportError(e, "Update failed");
+  } finally {
+    setStore("busy", null);
+  }
+}
+
+export async function checkForUpdates(manual = false) {
+  try {
+    const info = await api.checkForUpdate();
+    if (info) {
+      updateOffered = null;
+      offerUpdate(info);
+    } else if (manual) {
+      notify("success", "You're on the latest version of Blink.");
+    }
+  } catch (e) {
+    if (manual) reportError(e, "Could not check for updates");
   }
 }
 
