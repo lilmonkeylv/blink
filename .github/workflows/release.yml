@@ -171,6 +171,9 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y xvfb libwebkit2gtk-4.1-0 libayatana-appindicator3-1
+          deb=$(find dist -name '*.deb' | head -1)
+          dpkg-deb -f "$deb" Depends | grep -qw git || { echo "deb does not depend on git"; exit 1; }
+          dpkg-deb --fsys-tarfile "$deb" | tar -xO --wildcards './usr/share/applications/*.desktop' | grep -q 'x-scheme-handler/blink' || { echo "desktop entry is missing the blink:// handler"; exit 1; }
           appimage=$(find dist -name '*.AppImage' | head -1)
           chmod +x "$appimage"
           set +e

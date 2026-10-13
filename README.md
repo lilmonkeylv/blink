@@ -140,6 +140,10 @@ blink/
   - macOS: Xcode Command Line Tools
   - Linux: `webkit2gtk-4.1`, `libssl-dev`, `librsvg2-dev` and friends
 
+### Installing on Linux
+
+Releases ship an `.AppImage`, a `.deb` and an `.rpm`. The `.deb` and `.rpm` pull in `git` as a dependency and register the `blink://` link handler, and they're updated through your package manager. The AppImage updates itself like the Windows and macOS builds; just make sure `git` is on your `PATH`.
+
 ### Run in development
 
 ```bash

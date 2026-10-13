@@ -47,6 +47,13 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "publisher": "lilmonkeylv",
+    "homepage": "https://github.com/lilmonkeylv/blink",
+    "license": "MIT",
+    "copyright": "Copyright (c) 2026 lilmonkeylv",
+    "category": "DeveloperTool",
+    "shortDescription": "A fast Git client for GitHub",
+    "longDescription": "Blink is a GitHub Desktop style Git client with a native Rust core. Status, history, diffs and blame run in-process, so large repositories stay responsive.",
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -54,6 +61,24 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ],
+    "linux": {
+      "deb": {
+        "depends": [
+          "git"
+        ],
+        "section": "vcs",
+        "desktopTemplate": "linux/blink.desktop"
+      },
+      "rpm": {
+        "depends": [
+          "git"
+        ],
+        "desktopTemplate": "linux/blink.desktop"
+      },
+      "appimage": {
+        "bundleMediaFramework": false
+      }
+    },
     "windows": {
       "nsis": {
         "installMode": "currentUser"
