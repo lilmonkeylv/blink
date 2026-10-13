@@ -21,6 +21,12 @@ pub struct Account {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Verification {
+    pub verified: bool,
+    pub reason: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Email {
     pub email: String,
     pub primary: bool,
@@ -458,6 +464,22 @@ impl Client {
         match self.get::<Branch>(&format!("/repos/{owner}/{name}/branches/{branch}")).await {
             Ok(b) => Ok(b.protected),
             Err(Error::Api { status: 404, .. }) => Ok(false),
+            Err(e) => Err(e),
+        }
+    }
+
+    pub async fn commit_verification(&self, owner: &str, name: &str, sha: &str) -> Result<Option<Verification>> {
+        #[derive(Deserialize)]
+        struct Inner {
+            verification: Verification,
+        }
+        #[derive(Deserialize)]
+        struct Commit {
+            commit: Inner,
+        }
+        match self.get::<Commit>(&format!("/repos/{owner}/{name}/commits/{sha}")).await {
+            Ok(c) => Ok(Some(c.commit.verification)),
+            Err(Error::Api { status: 404 | 422, .. }) => Ok(None),
             Err(e) => Err(e),
         }
     }

@@ -8,7 +8,7 @@ mod pkce;
 
 pub use api::{
     Account, CheckApp, CheckRun, CheckState, ChecksSummary, Client, CommitStatus, Email, Job, JobStep, Org,
-    PullRequest, Repo, parse_remote, summarize_checks,
+    PullRequest, Repo, Verification, parse_remote, summarize_checks,
 };
 pub use device::{DeviceCode, DevicePoll};
 pub use error::{Error, Result};

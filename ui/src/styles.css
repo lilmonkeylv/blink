@@ -359,6 +359,20 @@ a {
   font-weight: 600;
 }
 
+.badge.signature {
+  margin-right: 6px;
+  border: 1px solid currentColor;
+  background: transparent;
+}
+
+.badge.signature.verified {
+  color: var(--add-fg);
+}
+
+.badge.signature.unverified {
+  color: var(--warn);
+}
+
 .main {
   display: grid;
   grid-template-columns: var(--sidebar) 1fr;
