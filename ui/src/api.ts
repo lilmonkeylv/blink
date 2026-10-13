@@ -1,6 +1,28 @@
-import { invoke, type InvokeArgs } from "@tauri-apps/api/core";
+import { invoke as tauriInvoke, type InvokeArgs } from "@tauri-apps/api/core";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { decodeDiff, decodeGraph, decodeHistory, type WirePayload } from "./lib/wire";
+
+const opening = new Map<string, Promise<unknown>>();
+
+function invoke<T>(cmd: string, args?: InvokeArgs): Promise<T> {
+  const id = args && typeof (args as Record<string, unknown>).id === "string" ? ((args as Record<string, unknown>).id as string) : null;
+  const pending = id ? opening.get(id) : undefined;
+  if (!pending) return tauriInvoke<T>(cmd, args);
+  return pending.then(
+    () => tauriInvoke<T>(cmd, args),
+    () => tauriInvoke<T>(cmd, args),
+  );
+}
+
+function openRepository(path: string): Promise<RepoView> {
+  const request = tauriInvoke<RepoView>("open_repository", { path });
+  opening.set(path, request);
+  const settle = () => {
+    if (opening.get(path) === request) opening.delete(path);
+  };
+  request.then(settle, settle);
+  return request;
+}
 
 export type ChangeKind =
   | "added"
@@ -573,7 +595,7 @@ export const api = {
     license?: string,
   ) => invokeShared<RepoRecord>("create_repository", { parent, name, description, readme, gitignore, license }),
   removeRepository: (path: string) => invokeShared<void>("remove_repository", { path }),
-  openRepository: (path: string) => invoke<RepoView>("open_repository", { path }),
+  openRepository,
   removeStaleLock: (id: string, path: string) => invoke<void>("remove_stale_lock", { id, path }),
   cachedRepository: (path: string) => invoke<RepoView | null>("cached_repository", { path }),
   openWindow: (path: string) => invoke<void>("open_window", { path }),
