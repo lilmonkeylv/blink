@@ -5,7 +5,7 @@ import { checkState, diffSignature, setLines, toggleFile, toPayload, type CheckS
 import { cachedDiff, currentBranch, notify, refreshRepo, reportError, run, sameDiff, setStore, store, storeDiff } from "../store";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { Checkbox } from "./Controls";
-import { DiffView } from "./DiffView";
+import { DiffLayoutToggle, DiffView } from "./DiffView";
 import { StatusIcon } from "./Icons";
 import { ImageDiff, isImagePath } from "./ImageDiff";
 import { VirtualList } from "./VirtualList";
@@ -419,6 +419,7 @@ export function ChangesDiff() {
                 </span>
               )}
             </Show>
+            <DiffLayoutToggle />
             <Checkbox checked={ignoreWhitespace()} onChange={setIgnoreWhitespace} label="Hide whitespace" class="muted small" />
           </div>
           <Show when={f().kind === "conflicted"}>

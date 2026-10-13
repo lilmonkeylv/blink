@@ -14,7 +14,7 @@ import { absoluteTime, relativeTime } from "../lib/time";
 import { currentBranch, notify, reportError, run, setStore, store } from "../store";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { Checkbox, Select, Segmented } from "./Controls";
-import { DiffView } from "./DiffView";
+import { DiffLayoutToggle, DiffView } from "./DiffView";
 import { CloseIcon, StatusIcon } from "./Icons";
 import { ImageDiff, isImagePath } from "./ImageDiff";
 import { VirtualList } from "./VirtualList";
@@ -526,6 +526,15 @@ export function CommitView() {
     <div class="commit-split">
       <FileList files={files()} current={file()} onSelect={setFile} />
       <div class="content">
+        <Show when={file()}>
+          {(f) => (
+            <div class="diff-header">
+              <StatusIcon kind={f().kind} />
+              <span class="path">{f().oldPath ? `${f().oldPath} -> ${f().path}` : f().path}</span>
+              <DiffLayoutToggle />
+            </div>
+          )}
+        </Show>
         <Show when={file()} fallback={<div class="empty muted">No files</div>}>
           {(f) => (
             <Show

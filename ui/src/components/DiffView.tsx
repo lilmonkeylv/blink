@@ -1,14 +1,51 @@
 import { createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
 import type { DiffHunk, DiffLine, FileDiff } from "../api";
 import { isLineIncluded, lineKey, type FileSel } from "../lib/selection";
+import { pairLines, type Cell } from "../lib/split";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
+import { Segmented } from "./Controls";
 import { VirtualList } from "./VirtualList";
 
 type Row =
   | { type: "hunk"; hunk: number; data: DiffHunk }
   | { type: "line"; hunk: number; line: number; data: DiffLine; key: string };
 
+type Side = "left" | "right";
+
 const ROW_HEIGHT = 20;
+
+function readLayout(): "unified" | "split" {
+  try {
+    return localStorage.getItem("blink.diffLayout") === "split" ? "split" : "unified";
+  } catch {
+    return "unified";
+  }
+}
+
+const [diffLayout, setLayoutSignal] = createSignal<"unified" | "split">(readLayout());
+
+export { diffLayout };
+
+export function setDiffLayout(layout: "unified" | "split") {
+  setLayoutSignal(layout);
+  try {
+    localStorage.setItem("blink.diffLayout", layout);
+  } catch {}
+}
+
+export function DiffLayoutToggle() {
+  return (
+    <Segmented
+      value={diffLayout()}
+      onChange={setDiffLayout}
+      options={[
+        { value: "unified", label: "Unified" },
+        { value: "split", label: "Split" },
+      ]}
+    />
+  );
+}
+
 
 export function Tokens(p: { line: Pick<DiffLine, "text" | "tokens"> }) {
   const parts = () => {
@@ -80,11 +117,85 @@ export function DiffView(p: {
   const lineIncludedView = (row: Extract<Row, { type: "line" }>, index: number) =>
     inDrag(index) ? drag()!.include : included(row.key);
 
+  const splitRows = createMemo(() => pairLines(p.diff.hunks));
+  const [splitDrag, setSplitDrag] = createSignal<{ side: Side; from: number; to: number; include: boolean } | null>(null);
+
+  const sideKeysBetween = (side: Side, a: number, b: number) => {
+    const [lo, hi] = a <= b ? [a, b] : [b, a];
+    const keys: string[] = [];
+    for (let i = lo; i <= hi; i++) {
+      const r = splitRows()[i];
+      const cell = r?.type === "pair" ? r[side] : undefined;
+      if (cell && cell.data.kind !== "context") keys.push(cell.key);
+    }
+    return keys;
+  };
+
+  const cellIncludedView = (side: Side, index: number, cell: Cell) => {
+    const d = splitDrag();
+    if (d && d.side === side) {
+      const [lo, hi] = d.from <= d.to ? [d.from, d.to] : [d.to, d.from];
+      if (index >= lo && index <= hi) return d.include;
+    }
+    return included(cell.key);
+  };
+
   const endDrag = () => {
+    const sd = splitDrag();
+    if (sd) {
+      setSplitDrag(null);
+      p.onSetLines?.(sideKeysBetween(sd.side, sd.from, sd.to), sd.include);
+    }
     const d = drag();
     if (!d) return;
     setDrag(null);
     p.onSetLines?.(changedKeysBetween(d.from, d.to), d.include);
+  };
+
+  const Half = (h: { side: Side; cell?: Cell; index: number; hunk: number }) => {
+    const changed = () => !!h.cell && h.cell.data.kind !== "context";
+    const kind = () => (!h.cell ? "filler" : h.cell.data.kind);
+    return (
+      <div
+        class={`diff-row split-half ${kind()}`}
+        classList={{
+          selectable: !!p.selectable && changed(),
+          included: !!p.selectable && changed() && cellIncludedView(h.side, h.index, h.cell!),
+          excluded: !!p.selectable && changed() && !cellIncludedView(h.side, h.index, h.cell!),
+        }}
+        onContextMenu={(e) => {
+          if (!p.selectable || !p.onDiscardLines) return;
+          const items: MenuItem[] = [];
+          if (changed()) items.push({ label: "Discard line…", run: () => p.onDiscardLines!([h.cell!.key]) });
+          items.push({ label: "Discard hunk…", run: () => p.onDiscardLines!(hunkKeys(h.hunk)) });
+          openContextMenu(e, items);
+        }}
+      >
+        <div
+          class="gutter"
+          onMouseDown={(e) => {
+            e.preventDefault();
+            if (p.selectable && changed()) setSplitDrag({ side: h.side, from: h.index, to: h.index, include: !included(h.cell!.key) });
+          }}
+          onMouseEnter={() => splitDrag()?.side === h.side && setSplitDrag({ ...splitDrag()!, to: h.index })}
+        >
+          <span class="no">{h.cell ? (h.side === "left" ? h.cell.data.oldNo : h.cell.data.newNo) ?? "" : ""}</span>
+        </div>
+        <span class="marker">{kind() === "added" ? "+" : kind() === "removed" ? "-" : " "}</span>
+        <span class="code">
+          <Show when={h.cell}>
+            {(c) => (
+              <>
+                <Tokens line={c().data} />
+                <Show when={c().data.noNewline}>
+                  <span class="eol">No newline at end of file</span>
+                </Show>
+              </>
+            )}
+          </Show>
+        </span>
+      </div>
+    );
   };
   window.addEventListener("mouseup", endDrag);
   onCleanup(() => window.removeEventListener("mouseup", endDrag));
@@ -156,6 +267,38 @@ export function DiffView(p: {
       </Match>
       <Match when={p.diff.hunks.length === 0}>
         <div class="empty">No content changes</div>
+      </Match>
+      <Match when={diffLayout() === "split"}>
+        <VirtualList
+          class="diff"
+          items={splitRows()}
+          rowHeight={ROW_HEIGHT}
+          dynamic
+          render={(row, index) =>
+            row.type === "hunk" ? (
+              <div class={`diff-row hunk ${p.selectable ? "selectable" : ""}`}>
+                <div
+                  class="gutter"
+                  onMouseDown={() => {
+                    if (!p.selectable) return;
+                    const keys = hunkKeys(row.hunk);
+                    p.onSetLines?.(keys, !keys.every(included));
+                  }}
+                  title={p.selectable ? "Toggle hunk" : undefined}
+                >
+                  <span class="no" />
+                </div>
+                <span class="marker" />
+                <span class="code">{header(row.data)}</span>
+              </div>
+            ) : (
+              <div class="split-row">
+                <Half side="left" cell={row.left} index={index} hunk={row.hunk} />
+                <Half side="right" cell={row.right} index={index} hunk={row.hunk} />
+              </div>
+            )
+          }
+        />
       </Match>
       <Match when={true}>
         <VirtualList

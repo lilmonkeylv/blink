@@ -1753,3 +1753,29 @@ input[type="range"] {
   background: var(--bg-subtle);
   font: 12px var(--font-mono);
 }
+
+.split-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.split-half {
+  min-width: 0;
+}
+
+.split-half + .split-half {
+  border-left: 1px solid var(--border);
+}
+
+.split-half.filler {
+  background: repeating-linear-gradient(-45deg, transparent 0 6px, var(--bg-subtle) 6px 12px);
+}
+
+.split-half.filler .gutter {
+  background-color: transparent;
+}
+
+.diff-header .segmented button {
+  padding: 2px 10px;
+  font-size: 12px;
+}

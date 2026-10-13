@@ -32,7 +32,7 @@ Blink keeps the workflow and rebuilds the engine:
 - Sign in with GitHub through OAuth (PKCE, system browser) or a device code; GitHub Enterprise _(planned)_
 - Clone, create, add and publish repositories
 - Changes view with line- and hunk-level staging, discard, ignore
-- Unified diffs with syntax highlighting (split view _planned_); image diffs (2-up, swipe, onion skin, difference)
+- Unified and split diffs with syntax highlighting; image diffs (2-up, swipe, onion skin, difference)
 - Syntax highlighting for most languages, including TypeScript/TSX, Vue, Svelte, Lua, Kotlin, Swift, Dockerfile, TOML and GraphQL
 - Commit with co-authors, amend, undo
 - History with revert, cherry-pick, reorder and squash by drag-and-drop
