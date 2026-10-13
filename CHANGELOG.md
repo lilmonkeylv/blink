@@ -2,6 +2,14 @@
 
 All notable changes to Blink are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.1.0-alpha.4] - 2026-10-13
+
+### Fixes
+
+- **ui:** Animate the sync button while fetch, pull and push run ([475011f](https://github.com/lilmonkeylv/blink/commit/475011fe8a18b7f2abadfcbf61209e20c8e4c90c))
+- **updater:** Prerelease builds follow beta and a missing manifest means no update ([c6b302a](https://github.com/lilmonkeylv/blink/commit/c6b302a10e84901b6bd538c37e9f1684e5a72fc9))
+- **ui:** Wait for a repository to open before asking the backend about it ([eb50b2b](https://github.com/lilmonkeylv/blink/commit/eb50b2bad8b1e1936c578d85a593c37288cf6a63))
+
 ## [0.1.0-alpha.3] - 2026-10-13
 
 ### Fixes
