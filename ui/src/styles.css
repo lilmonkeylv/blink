@@ -1690,6 +1690,58 @@ input[type="range"] {
   animation: pulse 1.2s ease-in-out infinite;
 }
 
+.log-steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-subtle);
+  font-size: 12px;
+  color: var(--fg-muted);
+}
+
+.log-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.log-step .dot {
+  width: 8px;
+  height: 8px;
+}
+
+.log-step.failed {
+  color: var(--del-fg);
+  font-weight: 600;
+}
+
+.log-line {
+  height: 20px;
+  padding: 0 12px;
+  line-height: 20px;
+  white-space: pre;
+  user-select: text;
+}
+
+.log-line.group {
+  font-weight: 600;
+}
+
+.log-line.command {
+  color: var(--accent);
+}
+
+.log-line.warning {
+  color: var(--warn);
+}
+
+.log-line.error {
+  background: var(--del-bg);
+  color: var(--del-fg);
+}
+
 @keyframes pulse {
   50% {
     opacity: 0.4;

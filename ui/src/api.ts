@@ -357,6 +357,24 @@ export interface CheckRun {
   conclusion: string | null;
   html_url: string | null;
   check_suite: { id: number } | null;
+  app: { slug: string } | null;
+}
+
+export interface JobStep {
+  number: number;
+  name: string;
+  status: string;
+  conclusion: string | null;
+}
+
+export interface Job {
+  id: number;
+  run_id: number;
+  name: string;
+  status: string;
+  conclusion: string | null;
+  html_url: string | null;
+  steps: JobStep[];
 }
 
 export interface ChecksSummary {
@@ -571,6 +589,9 @@ export const api = {
   branchChecks: (id: string) => invoke<ChecksSummary | null>("branch_checks", { id }),
   commitWarnings: (id: string) => invoke<CommitWarnings>("commit_warnings", { id }),
   rerunFailedChecks: (id: string, suites: number[]) => invoke<void>("rerun_failed_checks", { id, suites }),
+  workflowRunJobs: (id: string, runId: number) => invoke<Job[]>("workflow_run_jobs", { id, runId }),
+  workflowJob: (id: string, jobId: number) => invoke<Job>("workflow_job", { id, jobId }),
+  jobLog: (id: string, jobId: number) => invoke<string>("job_log", { id, jobId }),
   forkInfo: (id: string) => invoke<ForkInfo>("fork_info", { id }),
   addUpstream: (id: string, url: string) => invoke<void>("add_upstream", { id, url }),
 

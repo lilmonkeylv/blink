@@ -53,6 +53,7 @@ export type Dialog =
   | { type: "fileHistory"; path: string }
   | { type: "mergeEditor"; path: string }
   | { type: "checks" }
+  | { type: "checkLog"; jobId: number; name: string }
   | { type: "whatsNew"; notes: ReleaseNote[] };
 
 export interface Banner {

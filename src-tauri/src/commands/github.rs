@@ -4,7 +4,7 @@ use std::time::Duration;
 use parking_lot::Mutex;
 
 use blink_git::{GitCli, HeadState, Repository, SyncAction};
-use blink_github::{CheckState, ChecksSummary, Client, Org, PullRequest, Repo, parse_remote};
+use blink_github::{CheckState, ChecksSummary, Client, Job, Org, PullRequest, Repo, parse_remote};
 use blink_store::RepoRecord;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
@@ -271,6 +271,27 @@ pub async fn rerun_failed_checks(state: State<'_, AppState>, id: String, suites:
         gh.rerun_check_suite(&owner, &name, suite).await?;
     }
     Ok(())
+}
+
+#[tauri::command]
+pub async fn workflow_run_jobs(state: State<'_, AppState>, id: String, run_id: u64) -> CmdResult<Vec<Job>> {
+    let handle = state.engine.get(&id)?;
+    let HostedRepo { host, owner, name } = hosted(&state, handle.repo())?;
+    Ok(host_client(&state, &host)?.run_jobs(&owner, &name, run_id).await?)
+}
+
+#[tauri::command]
+pub async fn workflow_job(state: State<'_, AppState>, id: String, job_id: u64) -> CmdResult<Job> {
+    let handle = state.engine.get(&id)?;
+    let HostedRepo { host, owner, name } = hosted(&state, handle.repo())?;
+    Ok(host_client(&state, &host)?.job(&owner, &name, job_id).await?)
+}
+
+#[tauri::command]
+pub async fn job_log(state: State<'_, AppState>, id: String, job_id: u64) -> CmdResult<String> {
+    let handle = state.engine.get(&id)?;
+    let HostedRepo { host, owner, name } = hosted(&state, handle.repo())?;
+    Ok(host_client(&state, &host)?.job_log(&owner, &name, job_id).await?)
 }
 
 #[derive(Serialize)]

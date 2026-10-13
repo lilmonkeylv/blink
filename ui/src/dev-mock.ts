@@ -134,10 +134,22 @@ export function installDevMock() {
         return { editors: [{ id: "code", name: "Visual Studio Code" }], shells: [{ id: "wt", name: "Windows Terminal" }, { id: "pwsh", name: "PowerShell 7" }] };
       case "branch_checks":
         return { state: "failure", total: 3, failed: 1, pending: 1, statuses: [], runs: [
-          { id: 1, name: "build (ubuntu)", status: "completed", conclusion: "success", html_url: null, check_suite: { id: 9 } },
-          { id: 2, name: "test (windows)", status: "completed", conclusion: "failure", html_url: null, check_suite: { id: 9 } },
-          { id: 3, name: "bench", status: "in_progress", conclusion: null, html_url: null, check_suite: { id: 9 } },
+          { id: 1, name: "build (ubuntu)", status: "completed", conclusion: "success", html_url: null, check_suite: { id: 9 }, app: { slug: "github-actions" } },
+          { id: 2, name: "test (windows)", status: "completed", conclusion: "failure", html_url: null, check_suite: { id: 9 }, app: { slug: "github-actions" } },
+          { id: 3, name: "bench", status: "in_progress", conclusion: null, html_url: null, check_suite: { id: 9 }, app: { slug: "github-actions" } },
         ] };
+      case "workflow_job":
+        return { id: a.jobId, run_id: 7, name: "test (windows)", status: "completed", conclusion: "failure", html_url: null, steps: [
+          { number: 1, name: "Set up job", status: "completed", conclusion: "success" },
+          { number: 2, name: "cargo test", status: "completed", conclusion: "failure" },
+          { number: 3, name: "Upload artifacts", status: "completed", conclusion: "skipped" },
+        ] };
+      case "job_log":
+        return [
+          ...Array.from({ length: 300 }, (_, i) => `2026-10-13T08:00:00.0000000Z test case_${i} ... ok`),
+          "2026-10-13T08:00:01.0000000Z thread 'watcher' panicked at crates/blink-watch/src/lib.rs:42:9",
+          "2026-10-13T08:00:01.1000000Z ##[error]Process completed with exit code 101.",
+        ].join("\n");
       case "pull_requests":
         return [{ number: 42, title: "Add commit graph lanes", html_url: "", state: "open", draft: false, user: { login: "octocat" },
           head: { ref: "feature/graph", sha: "", repo: null }, base: { ref: "main", sha: "" }, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }];

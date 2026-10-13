@@ -1,11 +1,13 @@
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { createMemo, createResource, createSignal, For, Match, Show, Switch } from "solid-js";
-import { api, type DeviceCode, type ReleaseNote } from "../../api";
+import { api, type DeviceCode, type JobStep, type ReleaseNote } from "../../api";
 import { conflictCount, parseConflicts, render, type Resolution, type Segment } from "../../lib/conflicts";
+import { parseJobLog } from "../../lib/joblog";
 import { addRepository, notify, refreshChecks, reportError, run, setStore, store } from "../../store";
 import { Checkbox, Field, Segmented } from "../Controls";
 import { Dialog } from "../Dialog";
 import { Markdown } from "../Markdown";
+import { VirtualList } from "../VirtualList";
 import { closeDialog, sanitizeBranchName } from "./common";
 
 export function SignInDialog() {
@@ -265,6 +267,11 @@ export function ChecksDialog() {
                   <span class={`dot ${CONCLUSION_STATE(r.status, r.conclusion)}`} />
                   <span class="grow">{r.name}</span>
                   <span class="muted small">{r.conclusion ?? r.status.replace("_", " ")}</span>
+                  <Show when={r.app?.slug === "github-actions" && CONCLUSION_STATE(r.status, r.conclusion) === "failure"}>
+                    <button class="btn" onClick={() => setStore("dialog", { type: "checkLog", jobId: r.id, name: r.name })}>
+                      View log
+                    </button>
+                  </Show>
                 </div>
               )}
             </For>
@@ -280,6 +287,72 @@ export function ChecksDialog() {
           </>
         )}
       </Show>
+    </Dialog>
+  );
+}
+
+export function CheckLogDialog(p: { jobId: number; name: string }) {
+  const id = store.repo!.id;
+  const [job] = createResource(() => api.workflowJob(id, p.jobId));
+  const [log] = createResource(async () => parseJobLog(await api.jobLog(id, p.jobId)));
+  const steps = () => (job.error ? [] : (job()?.steps ?? []));
+  const jobUrl = () => (job.error ? null : (job()?.html_url ?? null));
+  const stepState = (s: JobStep) => (s.conclusion === "skipped" ? "" : CONCLUSION_STATE(s.status, s.conclusion));
+  return (
+    <Dialog
+      title={`Log for ${p.name}`}
+      onClose={closeDialog}
+      class="fill"
+      footer={
+        <>
+          <Show when={!log.error && log()?.hidden}>
+            {(hidden) => (
+              <span class="muted small" style={{ "margin-right": "auto" }}>
+                {hidden()} earlier lines not shown
+              </span>
+            )}
+          </Show>
+          <Show when={jobUrl()}>
+            {(url) => (
+              <button class="btn" onClick={() => api.openExternal(url()).catch(reportError)}>
+                Open on GitHub
+              </button>
+            )}
+          </Show>
+          <button class="btn primary" onClick={() => setStore("dialog", { type: "checks" })}>
+            Back to checks
+          </button>
+        </>
+      }
+    >
+      <Show when={steps().length}>
+        <div class="log-steps">
+          <For each={steps()}>
+            {(s) => (
+              <span class="log-step" classList={{ failed: stepState(s) === "failure" }}>
+                <span class={`dot ${stepState(s)}`} />
+                {s.name}
+              </span>
+            )}
+          </For>
+        </div>
+      </Show>
+      <Switch fallback={<div class="empty muted">Loading…</div>}>
+        <Match when={log.error}>
+          <div class="empty muted">{String((log.error as { message?: string })?.message ?? "Could not load the log")}</div>
+        </Match>
+        <Match when={log()}>
+          {(l) => (
+            <VirtualList
+              items={l().lines}
+              rowHeight={20}
+              class="diff job-log"
+              scrollToIndex={l().firstError}
+              render={(line) => <div class={`log-line ${line.kind}`}>{line.text}</div>}
+            />
+          )}
+        </Match>
+      </Switch>
     </Dialog>
   );
 }
