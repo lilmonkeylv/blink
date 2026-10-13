@@ -439,6 +439,7 @@ export function appMenu(): MenuItem[] {
     { label: "Push", run: () => doSync("push"), disabled: !repo },
     { label: "Pull", run: () => doSync("pull"), disabled: !repo },
     { label: "Fetch", run: () => doSync("fetch"), disabled: !repo },
+    { label: "Fetch all repositories…", run: () => setStore("dialog", { type: "fetchAll" }) },
     { label: "Force push (with lease)…", run: () => doSync("push", true), disabled: !repo },
     "separator",
     { label: "Preview pull request…", run: () => setStore("dialog", { type: "previewPullRequest" }), disabled: !repo },

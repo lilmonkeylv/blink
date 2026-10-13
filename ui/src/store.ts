@@ -40,6 +40,7 @@ export type Dialog =
   | { type: "publish" }
   | { type: "repoSettings" }
   | { type: "import" }
+  | { type: "fetchAll" }
   | { type: "rebase" }
   | { type: "tag"; sha: string }
   | { type: "reset"; sha: string }

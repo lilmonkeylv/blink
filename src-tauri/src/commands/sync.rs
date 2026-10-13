@@ -98,6 +98,81 @@ fn maintain_commit_graph(state: &AppState, id: String) {
     });
 }
 
+pub const FETCH_ALL_PROGRESS: &str = "fetch-all-progress";
+
+#[derive(Debug, Clone, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FetchAllRow {
+    path: String,
+    name: String,
+    fetched: bool,
+    error: Option<String>,
+    ahead: usize,
+    behind: usize,
+    changes: usize,
+}
+
+async fn fetch_one(state: &AppState, path: &str, prune: bool) -> CmdResult<FetchAllRow> {
+    let (id, handle) = state.engine.open(path).await?;
+    let mut fetched = false;
+    if handle.snapshot().has_remote {
+        let cli = state.git_cli(handle.repo());
+        state.engine.network_write(&id, move |_| cli.fetch(None, prune, |_| {})).await?;
+        fetched = true;
+    }
+    let snapshot = state.engine.refresh(&id).await?;
+    let (ahead, behind) = snapshot.ahead_behind.map(|ab| (ab.ahead, ab.behind)).unwrap_or_default();
+    Ok(FetchAllRow {
+        path: path.to_string(),
+        name: handle.repo().name(),
+        fetched,
+        error: None,
+        ahead,
+        behind,
+        changes: snapshot.status.files.len(),
+    })
+}
+
+#[tauri::command]
+pub async fn fetch_all(app: AppHandle, state: State<'_, AppState>) -> CmdResult<Vec<FetchAllRow>> {
+    let prune = state.settings.read().git.prune_on_fetch;
+    let tasks: Vec<_> = state
+        .cache
+        .repositories()?
+        .into_iter()
+        .map(|record| {
+            let app = app.clone();
+            tauri::async_runtime::spawn(async move {
+                let state = app.state::<AppState>();
+                let row = fetch_one(&state, &record.path, prune).await.unwrap_or_else(|e| FetchAllRow {
+                    path: record.path.clone(),
+                    name: record.name.clone(),
+                    fetched: false,
+                    error: Some(e.detail.unwrap_or(e.message)),
+                    ahead: 0,
+                    behind: 0,
+                    changes: 0,
+                });
+                let _ = app.emit(FETCH_ALL_PROGRESS, &row);
+                if row.error.is_none()
+                    && let Ok(handle) = state.engine.get(&row.path)
+                {
+                    let _ = app
+                        .emit(REPO_CHANGED, RepoView::from_snapshot(&row.path, row.name.clone(), &handle.snapshot()));
+                }
+                row
+            })
+        })
+        .collect();
+    let mut rows = Vec::with_capacity(tasks.len());
+    for task in tasks {
+        if let Ok(row) = task.await {
+            rows.push(row);
+        }
+    }
+    Ok(rows)
+}
+
 pub fn spawn_background_fetch(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
         let mut last_run = std::time::Instant::now();
