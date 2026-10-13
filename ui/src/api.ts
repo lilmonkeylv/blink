@@ -485,6 +485,9 @@ export const api = {
   cachedRepository: (path: string) => invoke<RepoView | null>("cached_repository", { path }),
   openWindow: (path: string) => invoke<void>("open_window", { path }),
   refreshRepository: (id: string) => invoke<RepoView>("refresh_repository", { id }),
+  fsmonitorSuggestion: (id: string) => invoke<boolean>("fsmonitor_suggestion", { id }),
+  enableFsmonitor: (id: string) => invoke<void>("enable_fsmonitor", { id }),
+  dismissFsmonitorSuggestion: (id: string) => invoke<void>("dismiss_fsmonitor_suggestion", { id }),
   reveal: (id: string, path?: string) => invoke<void>("reveal_in_file_manager", { id, path }),
   openOnGithub: (id: string) => invoke<void>("open_on_github", { id }),
 

@@ -55,7 +55,7 @@ pub async fn sync(
         SyncAction::Pull => "Pull",
         _ => "Sync",
     };
-    state
+    let result = state
         .engine
         .rewrite(&id, label, move |repo| match action {
             SyncAction::Fetch => cli.fetch(None, prune, emit),
@@ -82,7 +82,20 @@ pub async fn sync(
             }
         })
         .await
-        .map_err(CommandError::from)
+        .map_err(CommandError::from);
+    if result.is_ok() && action != SyncAction::Push {
+        maintain_commit_graph(&state, id);
+    }
+    result
+}
+
+fn maintain_commit_graph(state: &AppState, id: String) {
+    let engine = state.engine.clone();
+    tauri::async_runtime::spawn(async move {
+        if let Err(e) = engine.maintain_commit_graph(&id).await {
+            tracing::debug!(repo = %id, error = %e, "commit-graph maintenance skipped");
+        }
+    });
 }
 
 pub fn spawn_background_fetch(app: AppHandle) {
@@ -108,6 +121,7 @@ pub fn spawn_background_fetch(app: AppHandle) {
                     tracing::debug!(repo = %id, error = %e, "background fetch failed");
                     continue;
                 }
+                maintain_commit_graph(&state, id.clone());
                 if let Ok(handle) = engine.get(&id) {
                     let view = RepoView::from_snapshot(&id, handle.repo().name(), &handle.snapshot());
                     let _ = app.emit(REPO_CHANGED, view);

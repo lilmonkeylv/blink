@@ -118,6 +118,25 @@ impl Engine {
         let _permit = self.network.clone().acquire_owned().await.map_err(|_| Error::PoolClosed)?;
         self.write(id, op).await
     }
+
+    pub async fn maintain_commit_graph(&self, id: &str) -> Result<bool> {
+        let repo = self.get(id)?.repo().clone();
+        let id = id.to_string();
+        self.pools
+            .run_background(move || {
+                if !repo.commit_graph_is_stale() {
+                    return false;
+                }
+                match repo.cli().write_commit_graph() {
+                    Ok(()) => true,
+                    Err(e) => {
+                        tracing::debug!(repo = %id, error = %e, "commit-graph write failed");
+                        false
+                    }
+                }
+            })
+            .await
+    }
 }
 
 #[cfg(test)]
@@ -179,6 +198,25 @@ mod tests {
             let _ = t.await.unwrap();
         }
         assert!(handle.snapshot().generation >= 1);
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn commit_graph_is_written_only_when_stale() {
+        let dir = fixture();
+        let engine = Engine::new(PoolConfig::default());
+        let (id, handle) = engine.open(dir.path()).await.unwrap();
+        let graph = handle.repo().common_dir().join("objects/info/commit-graph");
+        assert!(!graph.exists());
+
+        assert!(engine.maintain_commit_graph(&id).await.unwrap());
+        assert!(graph.is_file());
+        assert!(!engine.maintain_commit_graph(&id).await.unwrap());
+
+        GitCli::new(dir.path()).create_branch("topic", None, false).unwrap();
+        let later = std::time::SystemTime::now() + std::time::Duration::from_secs(60);
+        let topic = handle.repo().common_dir().join("refs/heads/topic");
+        std::fs::File::options().write(true).open(topic).unwrap().set_modified(later).unwrap();
+        assert!(engine.maintain_commit_graph(&id).await.unwrap());
     }
 
     #[tokio::test(flavor = "multi_thread")]

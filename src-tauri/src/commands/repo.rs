@@ -332,6 +332,51 @@ pub fn cached_repository(state: State<'_, AppState>, path: String) -> Option<ser
     RepoView::cached(&state.cache, &path)
 }
 
+const LARGE_REPO_FILES: usize = 20_000;
+
+fn fsmonitor_dismissed_key(id: &str) -> String {
+    format!("fsmonitorDismissed:{id}")
+}
+
+#[tauri::command]
+pub async fn fsmonitor_suggestion(state: State<'_, AppState>, id: String) -> CmdResult<bool> {
+    // Git's built-in fsmonitor daemon only exists on Windows and macOS.
+    if !cfg!(any(windows, target_os = "macos")) {
+        return Ok(false);
+    }
+    let handle = state.engine.get(&id)?;
+    if handle.snapshot().status.tracked <= LARGE_REPO_FILES
+        || state.cache.app_state::<bool>(&fsmonitor_dismissed_key(&id))?.unwrap_or(false)
+    {
+        return Ok(false);
+    }
+    Ok(state
+        .engine
+        .read(&id, |repo| {
+            let cli = repo.cli();
+            Ok(cli.config_get("core.fsmonitor").is_none() || cli.config_get("core.untrackedCache").is_none())
+        })
+        .await?)
+}
+
+#[tauri::command]
+pub async fn enable_fsmonitor(state: State<'_, AppState>, id: String) -> CmdResult<()> {
+    state
+        .engine
+        .write(&id, |repo| {
+            let cli = repo.cli();
+            cli.set_local_config("core.fsmonitor", Some("true"))?;
+            cli.set_local_config("core.untrackedCache", Some("true"))
+        })
+        .await?;
+    dismiss_fsmonitor_suggestion(state, id)
+}
+
+#[tauri::command]
+pub fn dismiss_fsmonitor_suggestion(state: State<'_, AppState>, id: String) -> CmdResult<()> {
+    Ok(state.cache.put_app_state(&fsmonitor_dismissed_key(&id), &true)?)
+}
+
 #[tauri::command]
 pub async fn refresh_repository(state: State<'_, AppState>, id: String) -> CmdResult<RepoView> {
     let handle = state.engine.get(&id)?;

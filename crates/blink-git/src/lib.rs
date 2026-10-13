@@ -4,6 +4,7 @@ mod error;
 mod graph;
 mod inspect;
 mod log;
+mod maintenance;
 mod redact;
 mod refs;
 mod repo;
