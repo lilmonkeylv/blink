@@ -1,8 +1,6 @@
-import { invoke } from "@tauri-apps/api/core";
-import { listen, type UnlistenFn } from "@tauri-apps/api/event";
-import { decodeDiff, decodeGraph, decodeHistory, type WirePayload } from "./lib/wire";
 import { invoke, type InvokeArgs } from "@tauri-apps/api/core";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { decodeDiff, decodeGraph, decodeHistory, type WirePayload } from "./lib/wire";
 
 export type ChangeKind =
   | "added"
@@ -428,6 +426,8 @@ function wire<T>(decode: (payload: WirePayload) => T) {
     // the browser dev mock answers with plain objects
     return binary ? decode(payload as WirePayload) : (payload as T);
   };
+}
+
 const SHARED_CHANGED = "shared-changed";
 
 function invokeShared<T>(cmd: string, args?: InvokeArgs): Promise<T> {
@@ -573,9 +573,8 @@ export const api = {
   takePendingLaunch: () => invoke<Launch[]>("take_pending_launch"),
   repoSettings: (id: string) => invoke<RepoSettings>("repo_settings", { id }),
   saveRepoSettings: (id: string, settings: RepoSettings) => invoke<void>("save_repo_settings", { id, settings }),
-  importRepositories: (root: string) => invoke<RepoRecord[]>("import_repositories", { root }),
-  desktopRepositories: () => invoke<RepoRecord[]>("desktop_repositories"),
   importRepositories: (root: string) => invokeShared<RepoRecord[]>("import_repositories", { root }),
+  desktopRepositories: () => invoke<RepoRecord[]>("desktop_repositories"),
 
   signIn: () => invokeShared<{ account: Account; primaryEmail: string | null }>("sign_in"),
   deviceStart: () => invoke<DeviceCode>("device_start"),
