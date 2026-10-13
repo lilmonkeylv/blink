@@ -82,6 +82,10 @@ export function SignInDialog() {
 const SHORTCUTS: [string, string][] = [
   ["Ctrl+1 / Ctrl+2", "Changes / History"],
   ["Ctrl+T", "Repository list"],
+  ["Ctrl+Alt+T", "Open a repository in a new tab"],
+  ["Ctrl+Tab", "Next tab"],
+  ["Ctrl+Shift+Tab", "Previous tab"],
+  ["Ctrl+W", "Close tab"],
   ["Ctrl+B", "Branch list"],
   ["Ctrl+Shift+N", "New branch"],
   ["Ctrl+O", "Add local repository"],

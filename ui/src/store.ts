@@ -17,6 +17,7 @@ import {
   type UpdateInfo,
 } from "./api";
 import { reconcile, type FileSel } from "./lib/selection";
+import { closeTab, cycleTab, placeTab } from "./lib/tabs";
 
 export type Tab = "changes" | "history";
 export type Popover = "repos" | "branches" | null;
@@ -80,6 +81,8 @@ interface AppStore {
   checks: ChecksSummary | null;
   historySearch: { kind: SearchKind; query: string } | null;
   compareWith: string | null;
+  tabs: string[];
+  pickingNewTab: boolean;
 }
 
 export const [store, setStore] = createStore<AppStore>({
@@ -102,6 +105,8 @@ export const [store, setStore] = createStore<AppStore>({
   checks: null,
   historySearch: null,
   compareWith: null,
+  tabs: [],
+  pickingNewTab: false,
 });
 
 const diffCache = new Map<string, FileDiff>();
@@ -158,7 +163,55 @@ export async function run<T>(label: string, task: () => Promise<T>): Promise<T |
   }
 }
 
+const tabViews = new Map<string, RepoView>();
+const tabMemory = new Map<string, { tab: Tab; selectedPath: string | null }>();
+const TABS_KEY = "blink.tabs";
+
+function saveTabs() {
+  if (windowRepo) return;
+  try {
+    localStorage.setItem(TABS_KEY, JSON.stringify(store.tabs));
+  } catch {}
+}
+
+function savedTabs(): string[] {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(TABS_KEY) ?? "[]");
+    return Array.isArray(parsed) ? parsed.filter((t): t is string => typeof t === "string") : [];
+  } catch {
+    return [];
+  }
+}
+
+function setTabs(tabs: string[]) {
+  setStore("tabs", tabs);
+  for (const path of tabViews.keys()) if (!tabs.includes(path)) tabViews.delete(path);
+  saveTabs();
+}
+
+export function openInNewTab(path: string) {
+  return openRepo(path, true);
+}
+
+export function pickNewTab() {
+  setStore({ pickingNewTab: true, popover: "repos" });
+}
+
+export function closeRepoTab(path: string) {
+  const { tabs, next } = closeTab(store.tabs, path, store.repo?.id ?? null);
+  tabMemory.delete(path);
+  setTabs(tabs);
+  if (next === null) setStore("repo", null);
+  else if (next !== store.repo?.id) void openRepo(next);
+}
+
+export function cycleRepoTab(step: number) {
+  const next = cycleTab(store.tabs, store.repo?.id ?? null, step);
+  if (next && next !== store.repo?.id) void openRepo(next);
+}
+
 export function applyRepoView(view: RepoView) {
+  if (store.tabs.includes(view.id)) tabViews.set(view.id, view);
   if (store.repo && store.repo.id !== view.id) return;
   if (store.repo && view.generation < store.repo.generation) return;
   batch(() => {
@@ -192,8 +245,10 @@ export async function bootstrap() {
   });
   applyTheme();
   setTimeout(() => document.documentElement.classList.remove("preload"), 60);
+  const known = new Set(boot.repositories.map((r) => r.path));
+  if (!windowRepo) setStore("tabs", savedTabs().filter((t) => known.has(t)));
   const last = windowRepo ?? boot.lastRepository ?? boot.repositories[0]?.path;
-  if (last && boot.repositories.some((r) => r.path === last)) await openRepo(last);
+  if (last && known.has(last)) await openRepo(last);
 }
 
 export function openInNewWindow(path: string) {
@@ -201,23 +256,39 @@ export function openInNewWindow(path: string) {
   api.openWindow(path).catch((e) => reportError(e, "Could not open a new window"));
 }
 
-export async function openRepo(path: string) {
-  setStore({ popover: null, opening: path });
+function showRepo(view: RepoView) {
+  const memory = tabMemory.get(view.id);
+  const selected = memory?.selectedPath;
+  diffCache.clear();
+  batch(() => {
+    setStore({
+      repo: view,
+      tab: memory?.tab ?? store.tab,
+      checkedPaths: {},
+      selectedPath: selected && view.files.some((f) => f.path === selected) ? selected : (view.files[0]?.path ?? null),
+      checks: null,
+      historySearch: null,
+      compareWith: null,
+    });
+  });
+  setDiffVersion((v) => v + 1);
+}
+
+export async function openRepo(path: string, asNewTab = store.pickingNewTab) {
+  const current = store.repo?.id ?? null;
+  const previousTabs = store.tabs;
+  if (current && current !== path) tabMemory.set(current, { tab: store.tab, selectedPath: store.selectedPath });
+  setTabs(placeTab(store.tabs, current, path, asNewTab));
+  setStore({ popover: null, opening: path, pickingNewTab: false });
+  const cached = tabViews.get(path);
+  if (cached && current !== path) showRepo(cached);
   try {
     const view = await api.openRepository(path);
-    diffCache.clear();
-    batch(() => {
-      setStore({
-        repo: view,
-        checkedPaths: {},
-        selectedPath: view.files[0]?.path ?? null,
-        checks: null,
-        historySearch: null,
-        compareWith: null,
-      });
-    });
-    setDiffVersion((v) => v + 1);
+    tabViews.set(path, view);
+    if (cached && store.repo?.id === path) applyRepoView(view);
+    else showRepo(view);
   } catch (e) {
+    if (store.repo?.id !== path) setTabs(previousTabs);
     reportError(e, "Could not open repository");
   } finally {
     if (store.opening === path) setStore("opening", null);
