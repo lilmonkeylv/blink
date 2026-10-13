@@ -434,6 +434,7 @@ export const api = {
   ) => invoke<RepoRecord>("create_repository", { parent, name, description, readme, gitignore, license }),
   removeRepository: (path: string) => invoke<void>("remove_repository", { path }),
   openRepository: (path: string) => invoke<RepoView>("open_repository", { path }),
+  openWindow: (path: string) => invoke<void>("open_window", { path }),
   refreshRepository: (id: string) => invoke<RepoView>("refresh_repository", { id }),
   reveal: (id: string, path?: string) => invoke<void>("reveal_in_file_manager", { id, path }),
   openOnGithub: (id: string) => invoke<void>("open_on_github", { id }),

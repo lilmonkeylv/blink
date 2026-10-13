@@ -178,6 +178,8 @@ export function applyRepoView(view: RepoView) {
   });
 }
 
+export const windowRepo = new URLSearchParams(location.search).get("repo");
+
 export async function bootstrap() {
   const boot: Bootstrap = await api.bootstrap();
   setStore({
@@ -190,8 +192,13 @@ export async function bootstrap() {
   });
   applyTheme();
   setTimeout(() => document.documentElement.classList.remove("preload"), 60);
-  const last = boot.lastRepository ?? boot.repositories[0]?.path;
+  const last = windowRepo ?? boot.lastRepository ?? boot.repositories[0]?.path;
   if (last && boot.repositories.some((r) => r.path === last)) await openRepo(last);
+}
+
+export function openInNewWindow(path: string) {
+  setStore("popover", null);
+  api.openWindow(path).catch((e) => reportError(e, "Could not open a new window"));
 }
 
 export async function openRepo(path: string) {

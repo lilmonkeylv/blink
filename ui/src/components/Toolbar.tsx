@@ -5,17 +5,18 @@ import { fuzzyFilter } from "../lib/fuzzy";
 import { relativeTime } from "../lib/time";
 import {
   addRepository,
+  checkForUpdates,
   currentBranch,
   notify,
+  openInNewWindow,
   openRepo,
   reloadRepositories,
   reportError,
   run,
   setStore,
+  showWhatsNew,
   store,
   undoLastOperation,
-  checkForUpdates,
-  showWhatsNew,
 } from "../store";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { DRAG_TYPE } from "./HistoryPane";
@@ -111,6 +112,7 @@ function RepoPopover() {
                     onClick={() => openRepo(r.path)}
                     onContextMenu={(e) =>
                       openContextMenu(e, [
+                        { label: "Open in new window", run: () => openInNewWindow(r.path) },
                         { label: "Copy repository path", run: () => navigator.clipboard.writeText(r.path) },
                         "separator",
                         { label: "Remove…", run: () => remove(r) },
@@ -407,6 +409,7 @@ export function appMenu(): MenuItem[] {
     { label: "Checks for this branch…", run: () => setStore("dialog", { type: "checks" }), disabled: !repo },
     { label: "View on GitHub", run: r(api.openOnGithub), disabled: !repo },
     "separator",
+    { label: "Open in new window", run: () => id && openInNewWindow(id), disabled: !repo },
     { label: "Open in external editor", run: r((i) => api.openInEditor(i)), disabled: !repo },
     { label: "Open in shell", run: r((i) => api.openInShell(i)), disabled: !repo },
     { label: "Show in file manager", run: r((i) => api.reveal(i)), disabled: !repo },

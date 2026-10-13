@@ -15,15 +15,16 @@ import {
   dismiss,
   handleLaunches,
   offerUpdate,
-  showWhatsNew,
   openRepo,
   refreshChecks,
   refreshRepo,
   reportError,
   run,
   setStore,
+  showWhatsNew,
   store,
   undoLastOperation,
+  windowRepo,
 } from "./store";
 
 function Banners() {
@@ -285,8 +286,7 @@ export function App() {
     onChecksChanged((e) => {
       if (store.repo?.id === e.repo) setStore("checks", e.summary);
     }),
-    onLaunch(handleLaunches),
-    onUpdateAvailable(offerUpdate),
+    ...(windowRepo ? [] : [onLaunch(handleLaunches), onUpdateAvailable(offerUpdate)]),
   ]);
   onCleanup(() => {
     window.removeEventListener("keydown", onKey);
@@ -305,6 +305,7 @@ export function App() {
     window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
     try {
       await bootstrap();
+      if (windowRepo) return;
       await handleLaunches();
       if (!store.dialog) await showWhatsNew();
     } catch (e) {

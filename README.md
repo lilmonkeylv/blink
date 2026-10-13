@@ -52,7 +52,8 @@ Blink keeps the workflow and rebuilds the engine:
 - Undo for commits, resets, rebases, merges and branch deletes (`Ctrl+Z`), plus a reflog browser
 - Built-in conflict editor (ours, theirs, both)
 - Interactive rebase screen
-- Worktrees; multiple windows and tabbed repositories _(planned)_
+- Worktrees
+- A window per repository; tabbed repositories _(planned)_
 - Command palette (`Ctrl/Cmd+K`)
 - History search by message, author, path or content
 - Compare branches, multi-commit diffs, copy and apply patches
