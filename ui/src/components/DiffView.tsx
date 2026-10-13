@@ -79,6 +79,8 @@ export function DiffView(p: {
   onDiscardLines?: (keys: string[]) => void;
   onStashLines?: (keys: string[]) => void;
   onLoadAnyway?: () => void;
+  onLineClick?: (line: DiffLine) => void;
+  noted?: (line: DiffLine) => boolean;
 }) {
   const rows = createMemo<Row[]>(() => {
     const out: Row[] = [];
@@ -347,11 +349,14 @@ export function DiffView(p: {
               >
                 <div
                   class="gutter"
+                  classList={{ noted: !!p.noted?.(row.data), commentable: !!p.onLineClick }}
                   onMouseDown={(e) => {
                     e.preventDefault();
+                    if (p.onLineClick) return p.onLineClick(row.data);
                     startDrag(index, row);
                   }}
                   onMouseEnter={() => drag() && setDrag({ ...drag()!, to: index })}
+                  title={p.onLineClick ? "Comment on this line" : undefined}
                 >
                   <span class="no">{row.data.oldNo ?? ""}</span>
                   <span class="no">{row.data.newNo ?? ""}</span>

@@ -1,11 +1,13 @@
 mod highlight;
 mod patch;
+mod unified;
 
 use imara_diff::{Algorithm, Diff, InternedInput};
 use serde::Serialize;
 
 pub use highlight::{Span, highlight, warm_up};
 pub use patch::{LineSelection, PatchDirection, build_partial_patch};
+pub use unified::parse_unified;
 
 pub const DEFAULT_CONTEXT: u32 = 3;
 pub const LARGE_DIFF_LINES: usize = 5_000;

@@ -184,6 +184,14 @@ export function installDevMock() {
         ];
       case "keymap":
         return {};
+      case "pull_request_review":
+        return {
+          detail: { number: 42, title: "Add commit graph lanes", body: "Draws **lanes** next to history.", html_url: "", user: { login: "octocat" } },
+          files: [{ path: "crates/blink-core/src/engine.rs", oldPath: null, status: "modified", diff }],
+          comments: [{ id: 1, body: "Looks good so far", user: { login: "hubot" }, created_at: new Date().toISOString() }],
+          reviewComments: [{ id: 2, path: "crates/blink-core/src/engine.rs", line: 12, original_line: 12, side: "RIGHT", body: "Why 256?", user: { login: "hubot" }, created_at: new Date().toISOString(), in_reply_to_id: null }],
+          reviews: [],
+        };
       case "whats_new":
         return [];
       case "release_notes":
