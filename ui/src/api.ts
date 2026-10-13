@@ -99,6 +99,14 @@ export interface CommitSignature {
   reason: string | null;
 }
 
+export interface PullRequestPreview {
+  base: string;
+  bases: string[];
+  mergeBase: string | null;
+  commits: CommitSummary[];
+  files: CommitFile[];
+}
+
 export interface CommitSummary {
   id: string;
   shortId: string;
@@ -596,7 +604,10 @@ export const api = {
   pullRequests: (id: string) => invoke<PullRequest[]>("pull_requests", { id }),
   checkoutPullRequest: (id: string, number: number, headRef: string) =>
     invoke<void>("checkout_pull_request", { id, number, headRef }),
-  createPullRequest: (id: string) => invoke<void>("create_pull_request", { id }),
+  createPullRequest: (id: string, base?: string) => invoke<void>("create_pull_request", { id, base }),
+  pullRequestPreview: (id: string, base?: string) => invoke<PullRequestPreview>("pull_request_preview", { id, base }),
+  betweenFileDiff: (id: string, from: string, to: string, path: string, oldPath: string | null, highlight = true) =>
+    invoke("between_file_diff", { id, from, to, path, oldPath, highlight }).then(wire(decodeDiff)),
   branchChecks: (id: string) => invoke<ChecksSummary | null>("branch_checks", { id }),
   commitWarnings: (id: string) => invoke<CommitWarnings>("commit_warnings", { id }),
   rerunFailedChecks: (id: string, suites: number[]) => invoke<void>("rerun_failed_checks", { id, suites }),

@@ -93,6 +93,13 @@ impl Repository {
         })
     }
 
+    pub fn files_between(&self, base: &str, head: &str) -> Result<Vec<CommitFile>> {
+        let repo = self.local();
+        let base = repo.rev_parse_single(base).git()?.detach();
+        let head = repo.rev_parse_single(head).git()?.detach();
+        tree_changes(&repo, Some(base), head)
+    }
+
     pub fn range_files(&self, oldest: &str, newest: &str) -> Result<Vec<CommitFile>> {
         let repo = self.local();
         let newest = repo.rev_parse_single(newest).git()?.detach();

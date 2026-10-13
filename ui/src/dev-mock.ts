@@ -169,6 +169,10 @@ export function installDevMock() {
         return { protectedBranch: false, unlinkedEmail: null, login: "octocat" };
       case "commit_signature":
         return a.sha === history[0].id ? { state: "verified", reason: null } : null;
+      case "pull_request_preview":
+        return { base: a.base ?? "main", bases: ["main", "release"], mergeBase: history[3].id, commits: history.slice(0, 3), files: [{ path: "crates/blink-core/src/engine.rs", oldPath: null, kind: "modified" }] };
+      case "between_file_diff":
+        return diff;
       case "whats_new":
         return [];
       case "release_notes":

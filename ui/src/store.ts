@@ -54,6 +54,7 @@ export type Dialog =
   | { type: "mergeEditor"; path: string }
   | { type: "checks" }
   | { type: "checkLog"; jobId: number; name: string }
+  | { type: "previewPullRequest" }
   | { type: "whatsNew"; notes: ReleaseNote[] };
 
 export interface Banner {

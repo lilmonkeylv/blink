@@ -113,6 +113,8 @@ pub fn run() {
             commands::inspect::history_graph,
             commands::inspect::range_files,
             commands::inspect::range_file_diff,
+            commands::inspect::between_file_diff,
+            commands::inspect::pull_request_preview,
             commands::inspect::compare_branch,
             commands::inspect::worktrees,
             commands::inspect::add_worktree,
