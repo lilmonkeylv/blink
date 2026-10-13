@@ -10,6 +10,7 @@ pub struct Repository {
     shared: gix::ThreadSafeRepository,
     workdir: PathBuf,
     git_dir: PathBuf,
+    common_dir: PathBuf,
 }
 
 impl std::fmt::Debug for Repository {
@@ -26,7 +27,8 @@ impl Repository {
         let local = shared.to_thread_local();
         let workdir = local.workdir().ok_or(Error::Bare)?.to_path_buf();
         let git_dir = local.git_dir().to_path_buf();
-        Ok(Self { shared, workdir: dunce(workdir), git_dir: dunce(git_dir) })
+        let common_dir = local.common_dir().to_path_buf();
+        Ok(Self { shared, workdir: dunce(workdir), git_dir: dunce(git_dir), common_dir: dunce(common_dir) })
     }
 
     pub fn is_repository(path: impl AsRef<Path>) -> bool {
@@ -39,6 +41,10 @@ impl Repository {
 
     pub fn git_dir(&self) -> &Path {
         &self.git_dir
+    }
+
+    pub fn common_dir(&self) -> &Path {
+        &self.common_dir
     }
 
     pub fn name(&self) -> String {

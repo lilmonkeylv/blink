@@ -49,6 +49,7 @@ impl FileChange {
 pub struct RepoStatus {
     pub files: Vec<FileChange>,
     pub conflicted: usize,
+    pub tracked: usize,
 }
 
 fn worktree_kind(item: &WorktreeItem) -> Option<ChangeKind> {
@@ -111,7 +112,8 @@ impl Repository {
 
         let files: Vec<FileChange> = files.into_values().collect();
         let conflicted = files.iter().filter(|f| f.kind() == ChangeKind::Conflicted).count();
-        Ok(RepoStatus { files, conflicted })
+        let tracked = repo.index_or_empty().map(|index| index.entries().len()).unwrap_or_default();
+        Ok(RepoStatus { files, conflicted, tracked })
     }
 }
 

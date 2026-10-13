@@ -62,6 +62,7 @@ export interface Banner {
   message: string;
   detail?: string | null;
   action?: { label: string; run: () => void };
+  onDismiss?: () => void;
   sticky?: boolean;
 }
 
@@ -305,11 +306,34 @@ export async function openRepo(path: string, asNewTab = store.pickingNewTab) {
     tabViews.set(path, view);
     if (cached && store.repo?.id === path) applyRepoView(view);
     else showRepo(view);
+    void offerFsmonitor(view.id);
   } catch (e) {
     if (store.repo?.id !== path) setTabs(previousTabs);
     reportError(e, "Could not open repository");
   } finally {
     if (store.opening === path) setStore("opening", null);
+  }
+}
+
+const fsmonitorOffered = new Set<string>();
+
+async function offerFsmonitor(id: string) {
+  if (fsmonitorOffered.has(id)) return;
+  fsmonitorOffered.add(id);
+  if (!(await api.fsmonitorSuggestion(id).catch(() => false))) return;
+  notify("info", "This repository is large. Turn on Git's file system monitor to speed up status?", {
+    sticky: true,
+    action: { label: "Turn on", run: () => void enableFsmonitor(id) },
+    onDismiss: () => void api.dismissFsmonitorSuggestion(id).catch(() => {}),
+  });
+}
+
+async function enableFsmonitor(id: string) {
+  try {
+    await api.enableFsmonitor(id);
+    notify("success", "Git's file system monitor is on for this repository.");
+  } catch (e) {
+    reportError(e, "Could not turn on the file system monitor");
   }
 }
 

@@ -61,7 +61,13 @@ function Banners() {
                 </a>
               )}
             </Show>
-            <a class="muted" onClick={() => dismiss(b.id)}>
+            <a
+              class="muted"
+              onClick={() => {
+                b.onDismiss?.();
+                dismiss(b.id);
+              }}
+            >
               Dismiss
             </a>
           </div>
