@@ -42,6 +42,7 @@ Blink keeps the workflow and rebuilds the engine:
 - Pull requests: list, check out (including forks), create, CI check status with re-run, failure notifications
 - Merge conflict resolution with a built-in conflict editor
 - External editor and shell integration
+- Import the repository list straight from GitHub Desktop
 - Same settings tabs as Desktop: Accounts, Integrations, Git, Appearance, Notifications, Prompts, Advanced, Accessibility
 
 ### Beyond GitHub Desktop

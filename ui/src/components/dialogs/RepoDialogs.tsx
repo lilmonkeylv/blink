@@ -1,6 +1,6 @@
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { createMemo, createResource, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
-import { api, onSyncProgress, type GithubRepo, type RepoSettings } from "../../api";
+import { api, onSyncProgress, type GithubRepo, type RepoRecord, type RepoSettings } from "../../api";
 import { fuzzyFilter } from "../../lib/fuzzy";
 import { currentBranch, notify, openRepo, reloadRepositories, reportError, run, setStore, store } from "../../store";
 import { Checkbox, Field, Select } from "../Controls";
@@ -467,6 +467,45 @@ export function RepoSettingsDialog() {
 export function ImportDialog() {
   const [root, setRoot] = createSignal("");
   const [busy, setBusy] = createSignal(false);
+  const [fromDesktop, setFromDesktop] = createSignal<RepoRecord[] | null>(null);
+  const [picked, setPicked] = createSignal<Set<string>>(new Set());
+  const findDesktop = async () => {
+    setBusy(true);
+    try {
+      const found = await api.desktopRepositories();
+      setFromDesktop(found);
+      setPicked(new Set(found.map((r) => r.path)));
+    } catch (e) {
+      reportError(e, "Could not read GitHub Desktop's repository list");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const togglePicked = (path: string, on: boolean) =>
+    setPicked((prev) => {
+      const next = new Set(prev);
+      if (on) next.add(path);
+      else next.delete(path);
+      return next;
+    });
+  const addPicked = async () => {
+    setBusy(true);
+    const paths = [...picked()];
+    let added = 0;
+    for (const path of paths) {
+      try {
+        await api.addRepository(path);
+        added++;
+      } catch (e) {
+        reportError(e, `Could not add ${path}`);
+      }
+    }
+    await reloadRepositories();
+    notify("success", `Added ${added} repositor${added === 1 ? "y" : "ies"}`);
+    if (paths[0] && !store.repo) await openRepo(paths[0]);
+    setBusy(false);
+    closeDialog();
+  };
   const scan = async () => {
     setBusy(true);
     try {
@@ -490,22 +529,63 @@ export function ImportDialog() {
           <button class="btn" onClick={closeDialog}>
             Cancel
           </button>
-          <button class="btn primary" disabled={!root() || busy()} onClick={scan}>
-            {busy() ? "Scanning…" : "Import"}
-          </button>
+          <Show
+            when={fromDesktop()}
+            fallback={
+              <button class="btn primary" disabled={!root() || busy()} onClick={scan}>
+                {busy() ? "Scanning…" : "Import"}
+              </button>
+            }
+          >
+            <button class="btn primary" disabled={!picked().size || busy()} onClick={addPicked}>
+              {busy() ? "Adding…" : `Add ${picked().size} selected`}
+            </button>
+          </Show>
         </>
       }
     >
-      <span class="muted">
-        Pick a folder and Blink adds every Git repository inside it. Coming from GitHub Desktop? Choose its clone folder
-        (usually Documents/GitHub).
-      </span>
-      <div class="summary-row">
-        <input class="input" value={root()} onInput={(e) => setRoot(e.currentTarget.value)} placeholder="Folder" />
-        <button class="btn" onClick={async () => setRoot((await chooseFolder("Import from")) ?? root())}>
-          Choose…
-        </button>
-      </div>
+      <Show
+        when={fromDesktop()}
+        fallback={
+          <>
+            <span class="muted">Pick a folder and Blink adds every Git repository inside it.</span>
+            <div class="summary-row">
+              <input class="input" value={root()} onInput={(e) => setRoot(e.currentTarget.value)} placeholder="Folder" />
+              <button class="btn" onClick={async () => setRoot((await chooseFolder("Import from")) ?? root())}>
+                Choose…
+              </button>
+            </div>
+            <div class="summary-row">
+              <span class="muted grow">Coming from GitHub Desktop? Blink can read its repository list.</span>
+              <button class="btn" disabled={busy()} onClick={findDesktop}>
+                From GitHub Desktop
+              </button>
+            </div>
+          </>
+        }
+      >
+        {(found) => (
+          <Show when={found().length} fallback={<span class="muted">No GitHub Desktop repositories that aren't already in Blink.</span>}>
+            <span class="muted">These are in GitHub Desktop but not in Blink yet.</span>
+            <div class="import-list">
+              <For each={found()}>
+                {(r) => (
+                  <Checkbox
+                    checked={picked().has(r.path)}
+                    onChange={(on) => togglePicked(r.path, on)}
+                    label={
+                      <span class="import-item" title={r.path}>
+                        <span>{r.owner ? `${r.owner}/${r.name}` : r.name}</span>
+                        <span class="muted">{r.path}</span>
+                      </span>
+                    }
+                  />
+                )}
+              </For>
+            </div>
+          </Show>
+        )}
+      </Show>
     </Dialog>
   );
 }

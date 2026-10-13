@@ -285,6 +285,22 @@ pub async fn import_repositories(state: State<'_, AppState>, root: String) -> Cm
 }
 
 #[tauri::command]
+pub async fn desktop_repositories(state: State<'_, AppState>) -> CmdResult<Vec<RepoRecord>> {
+    let known: std::collections::HashSet<String> = state.cache.repositories()?.into_iter().map(|r| r.path).collect();
+    tauri::async_runtime::spawn_blocking(move || {
+        let Some(dir) = blink_store::desktop_indexeddb_dir() else { return Vec::new() };
+        blink_store::desktop_repositories(&dir)
+            .into_iter()
+            .filter_map(|path| Repository::open(&path).ok())
+            .map(|repo| record_for(&repo))
+            .filter(|record| !known.contains(&record.path))
+            .collect()
+    })
+    .await
+    .map_err(|e| CommandError::new("core", e.to_string()))
+}
+
+#[tauri::command]
 pub fn remove_repository(state: State<'_, AppState>, path: String) -> CmdResult<()> {
     stop_watcher(&state, &path);
     state.engine.close(&path);

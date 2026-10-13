@@ -573,6 +573,8 @@ export const api = {
   takePendingLaunch: () => invoke<Launch[]>("take_pending_launch"),
   repoSettings: (id: string) => invoke<RepoSettings>("repo_settings", { id }),
   saveRepoSettings: (id: string, settings: RepoSettings) => invoke<void>("save_repo_settings", { id, settings }),
+  importRepositories: (root: string) => invoke<RepoRecord[]>("import_repositories", { root }),
+  desktopRepositories: () => invoke<RepoRecord[]>("desktop_repositories"),
   importRepositories: (root: string) => invokeShared<RepoRecord[]>("import_repositories", { root }),
 
   signIn: () => invokeShared<{ account: Account; primaryEmail: string | null }>("sign_in"),
