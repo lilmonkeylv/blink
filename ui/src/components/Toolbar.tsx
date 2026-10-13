@@ -189,6 +189,9 @@ function PullRequestList(p: { query: string }) {
                   {pr.draft ? " · draft" : ""}
                 </span>
               </span>
+              <Show when={pr.checks && pr.checks !== "none"}>
+                <span class={`dot ${pr.checks}`} title={`Checks: ${pr.checks}`} />
+              </Show>
             </div>
           )}
         </For>
