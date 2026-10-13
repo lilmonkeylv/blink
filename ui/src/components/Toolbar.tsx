@@ -482,7 +482,7 @@ export function Toolbar() {
     if (head.type === "detached") return `Detached at ${head.id.slice(0, 7)}`;
     return head.name;
   };
-  const progressWidth = () => `${store.sync?.progress?.percent ?? 8}%`;
+  const percent = () => store.sync?.progress?.percent ?? null;
   const state = () => syncState();
 
   return (
@@ -548,7 +548,15 @@ export function Toolbar() {
             ])
           }
         >
-          {state().kind === "push" || state().kind === "publish" ? <UpIcon /> : state().kind === "pull" ? <DownIcon /> : <SyncIcon />}
+          {store.sync ? (
+            <SyncIcon class="spinning" />
+          ) : state().kind === "push" || state().kind === "publish" ? (
+            <UpIcon />
+          ) : state().kind === "pull" ? (
+            <DownIcon />
+          ) : (
+            <SyncIcon />
+          )}
           <span class="labels">
             <span class="value">{store.sync ? `${store.sync.action[0].toUpperCase()}${store.sync.action.slice(1)}ing…` : state().label}</span>
             <span class="title">
@@ -575,7 +583,7 @@ export function Toolbar() {
             )}
           </Show>
           <Show when={store.sync}>
-            <span class="toolbar-progress" style={{ width: progressWidth() }} />
+            <span class="toolbar-progress" classList={{ indeterminate: percent() === null }} style={{ width: percent() === null ? undefined : `${percent()}%` }} />
           </Show>
         </button>
         <span class="toolbar-spacer" data-tauri-drag-region={customTitleBar || undefined} />

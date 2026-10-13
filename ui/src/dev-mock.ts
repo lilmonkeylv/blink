@@ -192,6 +192,8 @@ export function installDevMock() {
           reviewComments: [{ id: 2, path: "crates/blink-core/src/engine.rs", line: 12, original_line: 12, side: "RIGHT", body: "Why 256?", user: { login: "hubot" }, created_at: new Date().toISOString(), in_reply_to_id: null }],
           reviews: [],
         };
+      case "sync":
+        return new Promise((resolve) => setTimeout(() => resolve(null), 1500));
       case "whats_new":
         return [];
       case "release_notes":
