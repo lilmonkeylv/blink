@@ -108,6 +108,11 @@ jobs:
       - uses: actions/checkout@v5
         with:
           ref: ${{ inputs.tag || github.ref }}
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+      - run: bun install --frozen-lockfile
+      - name: Release notes
+        run: bunx git-cliff --latest --strip all > notes.md && cat notes.md
       - uses: actions/download-artifact@v4
         with:
           pattern: bundles-*
@@ -121,7 +126,7 @@ jobs:
         run: |
           find dist -type f | sort
           if ! gh release view "$TAG" > /dev/null 2>&1; then
-            flags=(--draft --title "Blink $VERSION" --notes "Release notes coming soon.")
+            flags=(--draft --title "Blink $VERSION" --notes-file notes.md)
             [ "$PRERELEASE" = "true" ] && flags+=(--prerelease)
             gh release create "$TAG" "${flags[@]}" --verify-tag
           fi

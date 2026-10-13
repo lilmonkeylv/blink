@@ -59,7 +59,8 @@ async function set(version: string | undefined) {
   writeFileSync(cargoPath, withCargoVersion(readFileSync(cargoPath, "utf8"), version));
   writeFileSync(packagePath, withPackageVersion(readFileSync(packagePath, "utf8"), version));
   await Bun.$`cargo update --workspace --offline`.cwd(root).quiet().nothrow();
-  console.log(`version set to ${version}`);
+  await Bun.$`bunx git-cliff --tag v${version} -o CHANGELOG.md`.cwd(root).quiet();
+  console.log(`version set to ${version}, CHANGELOG.md updated`);
 }
 
 if (import.meta.main) {

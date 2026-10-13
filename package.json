@@ -9,6 +9,7 @@
     "preview": "vite preview",
     "tauri": "tauri",
     "test": "bun test ui scripts",
+    "changelog": "git-cliff -o CHANGELOG.md",
     "version:check": "bun scripts/version.ts check",
     "version:set": "bun scripts/version.ts set",
     "lint": "tsc --noEmit -p ui"
@@ -22,6 +23,7 @@
   "devDependencies": {
     "@tauri-apps/cli": "^2.12.2",
     "@types/bun": "latest",
+    "git-cliff": "2.14.2",
     "typescript": "^5.9.3",
     "vite": "^8.3.4",
     "vite-plugin-solid": "^2.11.14"

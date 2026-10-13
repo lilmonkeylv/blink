@@ -168,6 +168,8 @@ git tag v0.2.0
 git push origin master v0.2.0
 ```
 
+`version:set` also regenerates `CHANGELOG.md` from the commit history with [git-cliff](https://git-cliff.org), so write commits in [conventional](https://www.conventionalcommits.org) style (`feat:`, `fix:`, `perf:`). `ci:`, `chore:`, `build:` and `test:` commits are left out of the notes.
+
 Pushing a `v*` tag runs `.github/workflows/release.yml`. It builds the Windows, macOS and Linux installers and attaches them to a draft release. Check it over and publish it from the Releases page. Tags with a suffix like `-beta.1` or `-rc.1` are marked as prereleases. To rebuild an existing tag, run the workflow by hand from the Actions tab.
 
 ### GitHub OAuth for local development
