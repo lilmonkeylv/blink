@@ -73,3 +73,8 @@ pub fn sign_out(state: State<'_, AppState>) -> CmdResult<()> {
     *state.github.lock() = None;
     Ok(())
 }
+
+#[tauri::command]
+pub fn revoke_url(state: State<'_, AppState>) -> Option<String> {
+    state.oauth.client_id.as_ref().map(|id| format!("https://github.com/settings/connections/applications/{id}"))
+}

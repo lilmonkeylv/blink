@@ -46,7 +46,15 @@ function AccountsTab() {
   const signOut = async () => {
     await api.signOut().catch(reportError);
     setStore({ account: null, checks: null });
-    notify("info", "Signed out of GitHub.com");
+    const revoke = await api.revokeUrl().catch(() => null);
+    notify(
+      "info",
+      "Signed out of GitHub.com. Blink's token is deleted, but GitHub still lists the grant until you revoke it. Git keeps its own GitHub login for push and pull.",
+      {
+        sticky: true,
+        action: revoke ? { label: "Revoke on GitHub", run: () => api.openExternal(revoke).catch(reportError) } : undefined,
+      },
+    );
   };
   return (
     <Pane>

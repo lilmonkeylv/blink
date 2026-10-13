@@ -141,6 +141,7 @@ pub fn run() {
             commands::auth::device_start,
             commands::auth::device_complete,
             commands::auth::sign_out,
+            commands::auth::revoke_url,
             commands::settings::get_settings,
             commands::settings::save_settings,
             commands::settings::open_logs_folder,

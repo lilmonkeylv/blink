@@ -531,6 +531,7 @@ export const api = {
   deviceStart: () => invoke<DeviceCode>("device_start"),
   deviceComplete: (code: DeviceCode) => invoke<{ account: Account; primaryEmail: string | null }>("device_complete", { code }),
   signOut: () => invoke<void>("sign_out"),
+  revokeUrl: () => invoke<string | null>("revoke_url"),
 
   getSettings: () => invoke<Settings>("get_settings"),
   saveSettings: (settings: Settings) => invoke<void>("save_settings", { settings }),
