@@ -9,8 +9,8 @@ static NEXT_LABEL: AtomicU32 = AtomicU32::new(1);
 static REPO_WINDOWS: Mutex<Vec<(String, String)>> = Mutex::new(Vec::new());
 
 fn fitted(window: (u32, u32), area_size: (u32, u32), area_origin: (i32, i32)) -> ((u32, u32), (i32, i32)) {
-    let width = window.0.min(area_size.0 * 9 / 10);
-    let height = window.1.min(area_size.1 * 9 / 10);
+    let width = window.0.max(area_size.0 * 3 / 4).min(area_size.0 * 9 / 10);
+    let height = window.1.max(area_size.1 * 3 / 4).min(area_size.1 * 9 / 10);
     let x = area_origin.0 + (area_size.0.saturating_sub(width) / 2) as i32;
     let y = area_origin.1 + (area_size.1.saturating_sub(height) / 2) as i32;
     ((width, height), (x, y))
@@ -64,9 +64,10 @@ mod tests {
 
     #[test]
     fn windows_fit_inside_the_work_area_and_center() {
-        assert_eq!(fitted((1200, 780), (1920, 1040), (0, 0)), ((1200, 780), (360, 130)));
+        assert_eq!(fitted((1200, 780), (1920, 1040), (0, 0)), ((1440, 780), (240, 130)));
         assert_eq!(fitted((1200, 780), (1280, 680), (0, 0)), ((1152, 612), (64, 34)));
-        assert_eq!(fitted((1200, 780), (1920, 1040), (-1920, 40)), ((1200, 780), (-1560, 170)));
+        assert_eq!(fitted((1200, 780), (2560, 1400), (-2560, 40)), ((1920, 1050), (-2240, 215)));
+        assert_eq!(fitted((1500, 975), (1920, 1040), (0, 0)), ((1500, 936), (210, 52)));
     }
 
     #[test]
