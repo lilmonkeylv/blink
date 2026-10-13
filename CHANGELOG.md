@@ -2,6 +2,13 @@
 
 All notable changes to Blink are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.1.0-alpha.5] - 2026-10-13
+
+### Fixes
+
+- **ui:** Keep the sync button text on one line ([e3b2636](https://github.com/lilmonkeylv/blink/commit/e3b2636d9d5021068a7867a31fc179ef24d5a59c))
+- **windows:** Center and fit the window on launch, put the menu with the window buttons ([8e09428](https://github.com/lilmonkeylv/blink/commit/8e0942864e05c01af3cb43b0157b0542678051c4))
+
 ## [0.1.0-alpha.4] - 2026-10-13
 
 ### Fixes
