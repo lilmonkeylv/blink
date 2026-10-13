@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { decodeDiff, decodeGraph, decodeHistory, type WirePayload } from "./lib/wire";
+import { invoke, type InvokeArgs } from "@tauri-apps/api/core";
+import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 export type ChangeKind =
   | "added"
@@ -201,7 +203,6 @@ export interface Settings {
     backgroundFetch: boolean;
     backgroundFetchMinutes: number;
     useSystemOpenssh: boolean;
-    usageStats: boolean;
     watcher: "fsmonitor" | "native" | "polling";
     cacheLimitMb: number;
     logLevel: string;
@@ -427,12 +428,24 @@ function wire<T>(decode: (payload: WirePayload) => T) {
     // the browser dev mock answers with plain objects
     return binary ? decode(payload as WirePayload) : (payload as T);
   };
+const SHARED_CHANGED = "shared-changed";
+
+function invokeShared<T>(cmd: string, args?: InvokeArgs): Promise<T> {
+  return invoke<T>(cmd, args).then((result) => {
+    void emit(SHARED_CHANGED);
+    return result;
+  });
+}
+
+export function onSharedChanged(handler: () => void): Promise<UnlistenFn> {
+  return listen(SHARED_CHANGED, () => handler());
 }
 
 export const api = {
   bootstrap: () => invoke<Bootstrap>("bootstrap"),
-  addRepository: (path: string) => invoke<RepoRecord>("add_repository", { path }),
-  initRepository: (path: string) => invoke<RepoRecord>("init_repository", { path }),
+  sharedState: () => invoke<Pick<Bootstrap, "repositories" | "settings" | "account">>("shared_state"),
+  addRepository: (path: string) => invokeShared<RepoRecord>("add_repository", { path }),
+  initRepository: (path: string) => invokeShared<RepoRecord>("init_repository", { path }),
   createRepository: (
     parent: string,
     name: string,
@@ -440,8 +453,8 @@ export const api = {
     readme: boolean,
     gitignore?: string,
     license?: string,
-  ) => invoke<RepoRecord>("create_repository", { parent, name, description, readme, gitignore, license }),
-  removeRepository: (path: string) => invoke<void>("remove_repository", { path }),
+  ) => invokeShared<RepoRecord>("create_repository", { parent, name, description, readme, gitignore, license }),
+  removeRepository: (path: string) => invokeShared<void>("remove_repository", { path }),
   openRepository: (path: string) => invoke<RepoView>("open_repository", { path }),
   openWindow: (path: string) => invoke<void>("open_window", { path }),
   refreshRepository: (id: string) => invoke<RepoView>("refresh_repository", { id }),
@@ -535,9 +548,9 @@ export const api = {
   githubOrgs: () => invoke<{ login: string; avatar_url: string }[]>("github_orgs"),
   gitignoreTemplates: () => invoke<string[]>("gitignore_templates"),
   clone: (url: string, parent: string, name: string, depth?: number) =>
-    invoke<RepoRecord>("clone_repository", { url, parent, name, depth }),
+    invokeShared<RepoRecord>("clone_repository", { url, parent, name, depth }),
   publish: (id: string, name: string, description: string, isPrivate: boolean, org?: string) =>
-    invoke<GithubRepo>("publish_repository", { id, name, description, private: isPrivate, org }),
+    invokeShared<GithubRepo>("publish_repository", { id, name, description, private: isPrivate, org }),
   pullRequests: (id: string) => invoke<PullRequest[]>("pull_requests", { id }),
   checkoutPullRequest: (id: string, number: number, headRef: string) =>
     invoke<void>("checkout_pull_request", { id, number, headRef }),
@@ -560,19 +573,19 @@ export const api = {
   takePendingLaunch: () => invoke<Launch[]>("take_pending_launch"),
   repoSettings: (id: string) => invoke<RepoSettings>("repo_settings", { id }),
   saveRepoSettings: (id: string, settings: RepoSettings) => invoke<void>("save_repo_settings", { id, settings }),
-  importRepositories: (root: string) => invoke<RepoRecord[]>("import_repositories", { root }),
+  importRepositories: (root: string) => invokeShared<RepoRecord[]>("import_repositories", { root }),
 
-  signIn: () => invoke<{ account: Account; primaryEmail: string | null }>("sign_in"),
+  signIn: () => invokeShared<{ account: Account; primaryEmail: string | null }>("sign_in"),
   deviceStart: () => invoke<DeviceCode>("device_start"),
-  deviceComplete: (code: DeviceCode) => invoke<{ account: Account; primaryEmail: string | null }>("device_complete", { code }),
-  signOut: () => invoke<void>("sign_out"),
+  deviceComplete: (code: DeviceCode) => invokeShared<{ account: Account; primaryEmail: string | null }>("device_complete", { code }),
+  signOut: () => invokeShared<void>("sign_out"),
   revokeUrl: () => invoke<string | null>("revoke_url"),
   enterpriseAccounts: () => invoke<EnterpriseAccount[]>("enterprise_accounts"),
-  enterpriseSignIn: (host: string, token: string) => invoke<EnterpriseAccount>("enterprise_sign_in", { host, token }),
-  enterpriseSignOut: (host: string) => invoke<void>("enterprise_sign_out", { host }),
+  enterpriseSignIn: (host: string, token: string) => invokeShared<EnterpriseAccount>("enterprise_sign_in", { host, token }),
+  enterpriseSignOut: (host: string) => invokeShared<void>("enterprise_sign_out", { host }),
 
   getSettings: () => invoke<Settings>("get_settings"),
-  saveSettings: (settings: Settings) => invoke<void>("save_settings", { settings }),
+  saveSettings: (settings: Settings) => invokeShared<void>("save_settings", { settings }),
 };
 
 export function onRepoChanged(handler: (view: RepoView) => void): Promise<UnlistenFn> {

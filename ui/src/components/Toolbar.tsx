@@ -6,8 +6,10 @@ import { relativeTime } from "../lib/time";
 import {
   addRepository,
   checkForUpdates,
+  closeRepoTab,
   currentBranch,
   notify,
+  openInNewTab,
   openInNewWindow,
   openRepo,
   reloadRepositories,
@@ -45,6 +47,7 @@ function RepoPopover() {
   const [query, setQuery] = createSignal("");
   const [active, setActive] = createSignal(-1);
   usePopoverDismiss(() => setStore("popover", null));
+  onCleanup(() => setStore("pickingNewTab", false));
 
   const filtered = createMemo(() => fuzzyFilter(store.repositories, query(), (r) => `${r.owner ?? ""}/${r.name}`));
   const groups = createMemo(() => {
@@ -63,7 +66,8 @@ function RepoPopover() {
       if (!ok) return;
     }
     await run("Remove repository", () => api.removeRepository(r.path));
-    if (store.repo?.id === r.path) setStore("repo", null);
+    if (store.tabs.includes(r.path)) closeRepoTab(r.path);
+    else if (store.repo?.id === r.path) setStore("repo", null);
     await reloadRepositories();
   };
 
@@ -74,10 +78,9 @@ function RepoPopover() {
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setActive(Math.max(active() - 1, 0));
-    } else if (e.key === "Enter" && active() < 0 && flat()[0] && query()) {
-      openRepo(flat()[0].path);
-    } else if (e.key === "Enter" && flat()[active()]) {
-      openRepo(flat()[active()].path);
+    } else if (e.key === "Enter") {
+      const target = active() < 0 && query() ? flat()[0] : flat()[active()];
+      if (target) openRepo(target.path, e.ctrlKey || e.metaKey || store.pickingNewTab);
     }
   };
 
@@ -86,7 +89,7 @@ function RepoPopover() {
       <div class="filter">
         <input
           class="input"
-          placeholder="Filter"
+          placeholder={store.pickingNewTab ? "Open in a new tab" : "Filter"}
           ref={(el) => setTimeout(() => el.focus())}
           value={query()}
           onInput={(e) => {
@@ -109,9 +112,11 @@ function RepoPopover() {
                   <div
                     class="static-row"
                     classList={{ current: store.repo?.id === r.path, active: flat()[active()] === r }}
-                    onClick={() => openRepo(r.path)}
+                    onClick={(e) => openRepo(r.path, e.ctrlKey || e.metaKey || store.pickingNewTab)}
+                    onAuxClick={(e) => e.button === 1 && openInNewTab(r.path)}
                     onContextMenu={(e) =>
                       openContextMenu(e, [
+                        { label: "Open in new tab", run: () => openInNewTab(r.path) },
                         { label: "Open in new window", run: () => openInNewWindow(r.path) },
                         { label: "Copy repository path", run: () => navigator.clipboard.writeText(r.path) },
                         "separator",

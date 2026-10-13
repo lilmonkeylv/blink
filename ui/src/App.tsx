@@ -1,23 +1,28 @@
 import { createEffect, createMemo, createSignal, For, Match, on, onCleanup, onMount, Show, Switch } from "solid-js";
-import { api, onChecksChanged, onLaunch, onRepoChanged, onSyncProgress, onUpdateAvailable } from "./api";
+import { api, onChecksChanged, onLaunch, onRepoChanged, onSharedChanged, onSyncProgress, onUpdateAvailable } from "./api";
 import { ChangesDiff, ChangesList } from "./components/ChangesPane";
 import { ContextMenuHost } from "./components/ContextMenu";
 import { Dialog } from "./components/Dialog";
 import { Dialogs } from "./components/Dialogs";
 import { CommitView, HistoryList } from "./components/HistoryPane";
 import { GearIcon } from "./components/Icons";
+import { TabStrip } from "./components/TabStrip";
 import { appMenu, doSync, pickAndAddRepository, Toolbar } from "./components/Toolbar";
 import { fuzzyFilter } from "./lib/fuzzy";
 import {
   applyRepoView,
   applyTheme,
   bootstrap,
+  closeRepoTab,
+  cycleRepoTab,
   dismiss,
   handleLaunches,
   offerUpdate,
   openRepo,
+  pickNewTab,
   refreshChecks,
   refreshRepo,
+  reloadSharedState,
   reportError,
   run,
   setStore,
@@ -254,7 +259,12 @@ export function App() {
     };
     const id = repo?.id;
     const call = (fn: (id: string) => Promise<unknown>) => () => id && fn(id).catch(reportError);
-    if (key === "k") hit(() => setPalette(true));
+    if (key === "tab" && store.tabs.length > 1) hit(() => cycleRepoTab(e.shiftKey ? -1 : 1));
+    else if (key === "pagedown" && store.tabs.length > 1) hit(() => cycleRepoTab(1));
+    else if (key === "pageup" && store.tabs.length > 1) hit(() => cycleRepoTab(-1));
+    else if (key === "w" && store.tabs.length > 1 && repo) hit(() => closeRepoTab(repo.id));
+    else if (key === "t" && e.altKey) hit(pickNewTab);
+    else if (key === "k") hit(() => setPalette(true));
     else if (key === "1") hit(() => setStore("tab", "changes"));
     else if (key === "2") hit(() => setStore("tab", "history"));
     else if (key === "z" && !e.shiftKey && repo && !inTextField(e) && !store.dialog) hit(undoLastOperation);
@@ -280,6 +290,7 @@ export function App() {
 
   const listeners = Promise.all([
     onRepoChanged(applyRepoView),
+    onSharedChanged(() => reloadSharedState().catch(reportError)),
     onSyncProgress((e) => {
       if (store.sync && store.repo?.id === e.repo) setStore("sync", "progress", e.progress);
     }),
@@ -321,6 +332,7 @@ export function App() {
       onMouseDown={(e) => store.popover && !(e.target as HTMLElement).closest(".popover, .toolbar-button, .menu") && setStore("popover", null)}
     >
       <Toolbar />
+      <TabStrip />
       <Banners />
       <Show when={store.ready} fallback={<Loading label="Starting Blink" />}>
         <Show when={store.repo} fallback={store.opening ? <Loading label="Opening repository" /> : <Welcome />}>

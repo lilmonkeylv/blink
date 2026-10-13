@@ -172,7 +172,7 @@ a {
 
 .app {
   display: grid;
-  grid-template-rows: var(--toolbar) auto 1fr;
+  grid-template-rows: var(--toolbar) auto auto 1fr;
   height: 100%;
 }
 
@@ -181,6 +181,89 @@ a {
   background: var(--toolbar-bg);
   color: var(--toolbar-fg);
   border-bottom: 1px solid #000;
+}
+
+.tab-strip {
+  display: flex;
+  min-width: 0;
+  overflow-x: auto;
+  background: var(--toolbar-bg);
+  scrollbar-width: none;
+}
+
+.tab-strip.shown {
+  border-bottom: 1px solid #000;
+}
+
+.repo-tab {
+  display: flex;
+  flex: 0 1 200px;
+  align-items: center;
+  gap: 6px;
+  min-width: 90px;
+  height: 30px;
+  padding: 0 6px 0 12px;
+  border-right: 1px solid #000;
+  color: var(--toolbar-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background-color 0.12s, color 0.12s;
+}
+
+.repo-tab .grow {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repo-tab:hover {
+  background: var(--toolbar-hover);
+  color: var(--toolbar-fg);
+}
+
+.repo-tab.active {
+  background: var(--bg);
+  color: var(--fg);
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.tab-close,
+.tab-new {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  transition: background-color 0.12s, opacity 0.12s;
+}
+
+.tab-close {
+  opacity: 0;
+}
+
+.repo-tab:hover .tab-close,
+.repo-tab.active .tab-close {
+  opacity: 1;
+}
+
+.tab-close:hover {
+  background: var(--bg-hover);
+}
+
+.tab-new {
+  align-self: center;
+  margin: 0 6px;
+  color: var(--toolbar-muted);
+}
+
+.tab-new:hover {
+  background: var(--toolbar-hover);
+  color: var(--toolbar-fg);
 }
 
 .toolbar-button {

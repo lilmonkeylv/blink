@@ -55,6 +55,7 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![
             commands::repo::bootstrap,
+            commands::repo::shared_state,
             commands::repo::add_repository,
             commands::repo::init_repository,
             commands::repo::create_repository,

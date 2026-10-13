@@ -53,7 +53,7 @@ Blink keeps the workflow and rebuilds the engine:
 - Built-in conflict editor (ours, theirs, both)
 - Interactive rebase screen
 - Worktrees
-- A window per repository; tabbed repositories _(planned)_
+- A window per repository, or several repositories as tabs in one window
 - Command palette (`Ctrl/Cmd+K`)
 - History search by message, author, path or content
 - Compare branches, multi-commit diffs, copy and apply patches
@@ -178,18 +178,9 @@ git push origin master v0.2.0
 
 Pushing a `v*` tag runs `.github/workflows/release.yml`. It builds the Windows, macOS and Linux installers and attaches them to a draft release. Check it over and publish it from the Releases page. Tags with a suffix like `-beta.1` or `-rc.1` are marked as prereleases. To rebuild an existing tag, run the workflow by hand from the Actions tab.
 
-### Windows code signing
+### Windows builds
 
-Windows builds are signed through [SignPath Foundation](https://signpath.org). Once the project is approved, set these in the repository settings and the release workflow switches over on its own:
-
-| Kind | Name | Value |
-| --- | --- | --- |
-| secret | `SIGNPATH_API_TOKEN` | API token of the CI user in SignPath |
-| variable | `SIGNPATH_ORGANIZATION_ID` | SignPath organization ID |
-| variable | `SIGNPATH_PROJECT_SLUG` | optional, defaults to `blink` |
-| variable | `SIGNPATH_SIGNING_POLICY` | optional, defaults to `release-signing` |
-
-The SignPath project needs two artifact configurations, `exe` and `installers`. Their definitions are in [`.signpath/artifact-configurations`](.signpath/artifact-configurations). The workflow signs `blink.exe` first, bundles the NSIS and MSI installers around the signed exe, then signs the installers and regenerates the updater signatures. Without the secret, Windows builds are unsigned.
+Windows installers are not code signed, so SmartScreen may warn the first time you run one. Choose "More info", then "Run anyway". Updates are still verified against the updater signature below.
 
 ### macOS signing and notarization
 
@@ -259,15 +250,6 @@ Contributions are welcome. Before opening a pull request:
 3. Make sure tests and benchmarks pass. Performance regressions are treated as bugs.
 
 Correctness comes first: any change touching Git write paths needs a test comparing the result against the Git CLI.
-
-## Code signing policy
-
-Free code signing on Windows is provided by [SignPath.io](https://about.signpath.io), with a certificate by [SignPath Foundation](https://signpath.org).
-
-- Committers and reviewers: [@lilmonkeylv](https://github.com/lilmonkeylv)
-- Approvers: [@lilmonkeylv](https://github.com/lilmonkeylv)
-
-Only builds produced by the release workflow in this repository from a version tag are signed. Every signing request is approved by hand.
 
 ## Privacy
 
