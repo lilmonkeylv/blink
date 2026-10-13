@@ -178,6 +178,7 @@ a {
 
 .toolbar {
   display: flex;
+  overflow: hidden;
   background: var(--toolbar-bg);
   color: var(--toolbar-fg);
   border-bottom: 1px solid #000;
@@ -301,8 +302,11 @@ a {
 }
 
 .toolbar-button .title {
+  overflow: hidden;
   font-size: 11px;
   color: var(--toolbar-muted);
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .toolbar-button.open .title {
@@ -317,15 +321,16 @@ a {
 }
 
 .toolbar-button.repo {
+  flex: none;
   width: var(--sidebar);
 }
 
 .toolbar-button.branch {
-  width: 260px;
+  flex: 0 1 260px;
 }
 
 .toolbar-button.sync {
-  width: 230px;
+  flex: 0 1 230px;
 }
 
 .toolbar-spacer {
