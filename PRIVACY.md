@@ -69,7 +69,7 @@ Links you click in Blink (a commit, a pull request, "View on GitHub", release no
 - No access to repositories you haven't added to Blink
 - No selling or sharing of data, because we never receive any
 
-Settings > Advanced has a "submit usage stats" checkbox. It is off by default, and right now nothing is wired up to it, so it sends nothing whether it's on or off. If usage statistics are ever added, they will stay opt-in and this policy will be updated before they ship.
+There is no usage statistics setting because there are no usage statistics. If that ever changes, it will be opt-in, off by default, and this policy will be updated before it ships.
 
 ## Removing your data
 
