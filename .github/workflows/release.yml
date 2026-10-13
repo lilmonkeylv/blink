@@ -110,8 +110,79 @@ jobs:
             target/${{ matrix.target }}/release/bundle/macos/*.app.tar.gz
             target/${{ matrix.target }}/release/bundle/*/*.sig
 
+  smoke:
+    needs: build
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: macos-latest
+            target: universal-apple-darwin
+          - os: ubuntu-22.04
+            target: x86_64-unknown-linux-gnu
+    runs-on: ${{ matrix.os }}
+    env:
+      BLINK_LOG: info
+      SMOKE_SECONDS: "20"
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: bundles-${{ matrix.target }}
+          path: dist
+      - name: Launch on Windows
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $installer = Get-ChildItem dist -Recurse -Filter *-setup.exe | Select-Object -First 1
+          Start-Process $installer.FullName -ArgumentList '/S' -Wait
+          $exe = Join-Path $env:LOCALAPPDATA 'Blink/blink.exe'
+          if (-not (Test-Path $exe)) {
+            $exe = (Get-ChildItem $env:LOCALAPPDATA, $env:ProgramFiles -Recurse -Depth 3 -Filter blink.exe -ErrorAction SilentlyContinue | Select-Object -First 1).FullName
+          }
+          if (-not $exe) { throw 'blink.exe not found after install' }
+          Write-Host "installed at $exe"
+          $app = Start-Process $exe -PassThru
+          Start-Sleep -Seconds $env:SMOKE_SECONDS
+          if ($app.HasExited) { throw "Blink exited with code $($app.ExitCode)" }
+          Stop-Process -Id $app.Id -Force
+          $log = Join-Path $env:LOCALAPPDATA 'Blink/data/logs/blink.log'
+          if ((Test-Path $log) -and (Select-String -Path $log -Pattern ' ERROR ' -Quiet)) { Get-Content $log; throw 'errors in blink.log' }
+          $uninstaller = Join-Path (Split-Path $exe) 'uninstall.exe'
+          if (Test-Path $uninstaller) { Start-Process $uninstaller -ArgumentList '/S' -Wait }
+      - name: Launch on macOS
+        if: runner.os == 'macOS'
+        run: |
+          dmg=$(find dist -name '*.dmg' | head -1)
+          hdiutil attach "$dmg" -nobrowse -mountpoint /Volumes/blink
+          /Volumes/blink/Blink.app/Contents/MacOS/blink &
+          pid=$!
+          sleep "$SMOKE_SECONDS"
+          kill -0 "$pid" || { echo "Blink exited early"; exit 1; }
+          kill "$pid"
+          hdiutil detach /Volumes/blink
+          log="$HOME/Library/Application Support/Blink/logs/blink.log"
+          if [ -f "$log" ] && grep -q ' ERROR ' "$log"; then cat "$log"; exit 1; fi
+      - name: Launch on Linux
+        if: runner.os == 'Linux'
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1"
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y xvfb libwebkit2gtk-4.1-0 libayatana-appindicator3-1
+          appimage=$(find dist -name '*.AppImage' | head -1)
+          chmod +x "$appimage"
+          set +e
+          timeout "$SMOKE_SECONDS" xvfb-run -a "$appimage"
+          code=$?
+          set -e
+          [ "$code" -eq 124 ] || { echo "Blink exited early with code $code"; exit 1; }
+          log="$HOME/.local/share/blink/logs/blink.log"
+          if [ -f "$log" ] && grep -q ' ERROR ' "$log"; then cat "$log"; exit 1; fi
+
   publish:
-    needs: [prepare, build]
+    needs: [prepare, build, smoke]
     if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     permissions:
