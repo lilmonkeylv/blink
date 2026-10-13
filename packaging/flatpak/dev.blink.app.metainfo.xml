@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>dev.blink.app</id>
+  <name>Blink</name>
+  <summary>A fast Git client for GitHub</summary>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>MIT</project_license>
+  <developer id="dev.blink">
+    <name>lilmonkeylv</name>
+  </developer>
+  <description>
+    <p>
+      Blink is a GitHub Desktop style Git client with a native Rust core. Status, history, diffs and blame run
+      in-process, so large repositories stay responsive.
+    </p>
+    <p>
+      Blink runs Git on the host system, so Git needs to be installed outside the sandbox.
+    </p>
+  </description>
+  <launchable type="desktop-id">dev.blink.app.desktop</launchable>
+  <url type="homepage">https://github.com/lilmonkeylv/blink</url>
+  <url type="bugtracker">https://github.com/lilmonkeylv/blink/issues</url>
+  <categories>
+    <category>Development</category>
+    <category>RevisionControl</category>
+  </categories>
+  <content_rating type="oars-1.1" />
+  <releases>
+    <release version="0.1.0-alpha.1" date="2026-10-13" type="development" />
+  </releases>
+</component>
