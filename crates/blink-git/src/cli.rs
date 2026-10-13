@@ -2,6 +2,7 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio};
 use std::sync::OnceLock;
+use std::time::Duration;
 
 use serde::Serialize;
 
@@ -94,6 +95,7 @@ impl GitCli {
             .args(self.config.iter().flat_map(|c| ["-c", c.as_str()]))
             .args(args)
             .env("GIT_TERMINAL_PROMPT", "0")
+            .env("GIT_OPTIONAL_LOCKS", "0")
             .env("LC_ALL", "C")
             .envs(self.env.iter().map(|(k, v)| (k, v)))
             .stdin(Stdio::null())
@@ -128,8 +130,10 @@ impl GitCli {
     }
 
     pub fn run(&self, args: &[&str]) -> Result<String> {
-        let output = self.command(args).output().map_err(Self::spawn_error)?;
-        Self::finish(args, output)
+        retry_when_locked(|| {
+            let output = self.command(args).output().map_err(Self::spawn_error)?;
+            Self::finish(args, output)
+        })
     }
 
     pub fn run_bytes(&self, args: &[&str]) -> Result<Vec<u8>> {
@@ -141,13 +145,15 @@ impl GitCli {
     }
 
     pub fn run_with_stdin(&self, args: &[&str], input: &[u8]) -> Result<String> {
-        let mut child = self.command(args).stdin(Stdio::piped()).spawn().map_err(Self::spawn_error)?;
-        let mut stdin = child.stdin.take().expect("stdin piped");
-        let payload = input.to_vec();
-        let writer = std::thread::spawn(move || stdin.write_all(&payload));
-        let output = child.wait_with_output()?;
-        writer.join().map_err(|_| Error::Git("stdin writer panicked".into()))??;
-        Self::finish(args, output)
+        retry_when_locked(|| {
+            let mut child = self.command(args).stdin(Stdio::piped()).spawn().map_err(Self::spawn_error)?;
+            let mut stdin = child.stdin.take().expect("stdin piped");
+            let payload = input.to_vec();
+            let writer = std::thread::spawn(move || stdin.write_all(&payload));
+            let output = child.wait_with_output()?;
+            writer.join().map_err(|_| Error::Git("stdin writer panicked".into()))??;
+            Self::finish(args, output)
+        })
     }
 
     pub fn run_with_progress(&self, args: &[&str], mut on_progress: impl FnMut(Progress)) -> Result<String> {
@@ -424,9 +430,57 @@ fn parse_pruned(output: &str) -> Vec<String> {
     output.lines().filter_map(|l| l.trim().strip_prefix("* [pruned] ")).map(str::to_string).collect()
 }
 
+const LOCK_RETRY_DELAYS_MS: [u64; 5] = [100, 200, 400, 800, 1500];
+
+pub fn is_lock_error(stderr: &str) -> bool {
+    stderr.contains(".lock") && (stderr.contains("File exists") || stderr.contains("Another git process"))
+}
+
+pub fn locked_file(stderr: &str) -> Option<&str> {
+    let start = stderr.find("Unable to create '")? + "Unable to create '".len();
+    let end = start + stderr[start..].find('\'')?;
+    Some(&stderr[start..end]).filter(|p| p.ends_with(".lock"))
+}
+
+fn retry_when_locked<T>(mut attempt: impl FnMut() -> Result<T>) -> Result<T> {
+    for delay in LOCK_RETRY_DELAYS_MS {
+        match attempt() {
+            Err(Error::Cli { stderr, .. }) if is_lock_error(&stderr) => {
+                std::thread::sleep(Duration::from_millis(delay))
+            }
+            other => return other,
+        }
+    }
+    attempt()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    const LOCKED: &str = "fatal: Unable to create 'C:/work/repo/.git/index.lock': File exists.\n\nAnother git process seems to be running in this repository";
+
+    #[test]
+    fn recognises_lock_contention() {
+        assert!(is_lock_error(LOCKED));
+        assert_eq!(locked_file(LOCKED), Some("C:/work/repo/.git/index.lock"));
+        assert!(!is_lock_error("error: pathspec 'x' did not match any file(s) known to git"));
+        assert_eq!(locked_file("fatal: Unable to create '/tmp/x': File exists."), None);
+    }
+
+    #[test]
+    fn retries_until_the_lock_is_released() {
+        let mut calls = 0;
+        let result = retry_when_locked(|| {
+            calls += 1;
+            if calls < 3 {
+                Err(Error::Cli { command: "checkout".into(), stderr: LOCKED.into(), code: Some(128) })
+            } else {
+                Ok(calls)
+            }
+        });
+        assert_eq!(result.unwrap(), 3);
+    }
 
     #[test]
     fn parses_pruned_refs() {

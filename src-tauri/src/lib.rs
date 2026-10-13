@@ -51,6 +51,7 @@ pub fn run() {
             commands::repo::open_repository,
             commands::repo::cached_repository,
             commands::repo::refresh_repository,
+            commands::repo::remove_stale_lock,
             commands::repo::fsmonitor_suggestion,
             commands::repo::enable_fsmonitor,
             commands::repo::dismiss_fsmonitor_suggestion,

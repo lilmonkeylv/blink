@@ -39,6 +39,11 @@ impl From<blink_git::Error> for CommandError {
     fn from(e: blink_git::Error) -> Self {
         match e {
             blink_git::Error::Cli { stderr, .. } if mentions_sso(&stderr) => Self::sso(sso_link(&stderr)),
+            blink_git::Error::Cli { stderr, .. } if blink_git::is_lock_error(&stderr) => Self {
+                kind: "locked",
+                message: "Another Git process is using this repository".into(),
+                detail: Some(blink_git::locked_file(&stderr).map(str::to_string).unwrap_or(stderr)),
+            },
             blink_git::Error::Cli { command, stderr, .. } => {
                 Self { kind: "git", message: format!("git {command} failed"), detail: Some(stderr) }
             }

@@ -187,3 +187,26 @@ fn sparse_checkout_round_trip() {
     assert_eq!(cli.sparse_folders(), None);
     assert!(dir.path().join("drop/f").exists());
 }
+
+#[test]
+fn checkout_waits_out_a_short_lived_index_lock() {
+    let (dir, repo, _) = fixture(&[("f", "x\n", "first")]);
+    let cli = repo.cli();
+    cli.create_branch("other", None, false).unwrap();
+    let lock = dir.path().join(".git").join("index.lock");
+    fs::write(&lock, "").unwrap();
+    let releaser = {
+        let lock = lock.clone();
+        std::thread::spawn(move || {
+            std::thread::sleep(std::time::Duration::from_millis(250));
+            fs::remove_file(lock).unwrap();
+        })
+    };
+    cli.checkout("other").unwrap();
+    releaser.join().unwrap();
+    assert_eq!(repo.head().unwrap().branch_name(), Some("other"));
+
+    fs::write(&lock, "").unwrap();
+    let err = cli.checkout("main").unwrap_err();
+    assert!(matches!(err, blink_git::Error::Cli { ref stderr, .. } if blink_git::is_lock_error(stderr)));
+}

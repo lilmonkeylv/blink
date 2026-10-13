@@ -574,6 +574,7 @@ export const api = {
   ) => invokeShared<RepoRecord>("create_repository", { parent, name, description, readme, gitignore, license }),
   removeRepository: (path: string) => invokeShared<void>("remove_repository", { path }),
   openRepository: (path: string) => invoke<RepoView>("open_repository", { path }),
+  removeStaleLock: (id: string, path: string) => invoke<void>("remove_stale_lock", { id, path }),
   cachedRepository: (path: string) => invoke<RepoView | null>("cached_repository", { path }),
   openWindow: (path: string) => invoke<void>("open_window", { path }),
   refreshRepository: (id: string) => invoke<RepoView>("refresh_repository", { id }),
