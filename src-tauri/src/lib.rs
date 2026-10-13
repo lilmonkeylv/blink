@@ -49,6 +49,7 @@ pub fn run() {
             commands::repo::create_repository,
             commands::repo::remove_repository,
             commands::repo::open_repository,
+            commands::repo::cached_repository,
             commands::repo::refresh_repository,
             commands::repo::reveal_in_file_manager,
             commands::repo::open_on_github,

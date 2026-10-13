@@ -463,6 +463,7 @@ export const api = {
   ) => invokeShared<RepoRecord>("create_repository", { parent, name, description, readme, gitignore, license }),
   removeRepository: (path: string) => invokeShared<void>("remove_repository", { path }),
   openRepository: (path: string) => invoke<RepoView>("open_repository", { path }),
+  cachedRepository: (path: string) => invoke<RepoView | null>("cached_repository", { path }),
   openWindow: (path: string) => invoke<void>("open_window", { path }),
   refreshRepository: (id: string) => invoke<RepoView>("refresh_repository", { id }),
   reveal: (id: string, path?: string) => invoke<void>("reveal_in_file_manager", { id, path }),

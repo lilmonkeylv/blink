@@ -292,7 +292,12 @@ export async function openRepo(path: string, asNewTab = store.pickingNewTab) {
   const previousTabs = store.tabs;
   setTabs(placeTab(store.tabs, current, path, asNewTab));
   setStore({ popover: null, opening: path, pickingNewTab: false });
-  const cached = tabViews.get(path);
+  let cached = tabViews.get(path);
+  if (!cached && current !== path) {
+    const remembered = await api.cachedRepository(path).catch(() => null);
+    // generations restart every session, so a remembered view must never outrank a fresh one
+    if (remembered && store.opening === path) cached = { ...remembered, generation: -1 };
+  }
   if (cached && current !== path) showRepo(cached);
   try {
     const view = await api.openRepository(path);
