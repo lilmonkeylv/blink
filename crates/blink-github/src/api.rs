@@ -415,11 +415,11 @@ impl Client {
         Ok((value, next))
     }
 
-    async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
+    pub(crate) async fn get<T: DeserializeOwned>(&self, path: &str) -> Result<T> {
         Ok(self.get_url(&format!("{}{path}", self.api_base)).await?.0)
     }
 
-    async fn get_all<T: DeserializeOwned>(&self, path: &str, max_pages: usize) -> Result<Vec<T>> {
+    pub(crate) async fn get_all<T: DeserializeOwned>(&self, path: &str, max_pages: usize) -> Result<Vec<T>> {
         let mut url = Some(format!("{}{path}", self.api_base));
         let mut out = Vec::new();
         let mut pages = 0;
@@ -434,7 +434,12 @@ impl Client {
         Ok(out)
     }
 
-    async fn send<B: Serialize, T: DeserializeOwned>(&self, method: Method, path: &str, body: &B) -> Result<T> {
+    pub(crate) async fn send<B: Serialize, T: DeserializeOwned>(
+        &self,
+        method: Method,
+        path: &str,
+        body: &B,
+    ) -> Result<T> {
         let response = self.request(method, &format!("{}{path}", self.api_base)).json(body).send().await?;
         Ok(Self::check(response).await?.json().await?)
     }

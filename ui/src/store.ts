@@ -57,6 +57,7 @@ export type Dialog =
   | { type: "checks" }
   | { type: "checkLog"; jobId: number; name: string }
   | { type: "previewPullRequest" }
+  | { type: "review"; number: number; title: string }
   | { type: "whatsNew"; notes: ReleaseNote[] };
 
 export interface Banner {

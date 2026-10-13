@@ -156,7 +156,7 @@ pub fn hosted_repo(state: &AppState, repo: &Repository, remote: Option<&str>) ->
     known.then_some(HostedRepo { host, owner, name })
 }
 
-fn hosted(state: &AppState, repo: &Repository) -> CmdResult<HostedRepo> {
+pub(crate) fn hosted(state: &AppState, repo: &Repository) -> CmdResult<HostedRepo> {
     hosted_repo(state, repo, None).ok_or_else(|| {
         CommandError::new(
             "notGithub",
@@ -165,7 +165,7 @@ fn hosted(state: &AppState, repo: &Repository) -> CmdResult<HostedRepo> {
     })
 }
 
-fn host_client(state: &AppState, host: &str) -> CmdResult<Client> {
+pub(crate) fn host_client(state: &AppState, host: &str) -> CmdResult<Client> {
     state.client_for_host(host).ok_or_else(|| CommandError::new("signedOut", format!("Sign in to {host} first")))
 }
 

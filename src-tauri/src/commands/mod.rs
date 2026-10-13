@@ -8,6 +8,7 @@ pub mod inspect;
 pub mod integrations;
 pub mod notes;
 pub mod repo;
+pub mod review;
 pub mod rewrite;
 pub mod settings;
 pub mod sync;

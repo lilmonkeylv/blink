@@ -31,6 +31,7 @@ import {
   WorktreesDialog,
 } from "./dialogs/ToolDialogs";
 import { SettingsDialog } from "./Settings";
+import { ReviewDialog } from "./dialogs/ReviewDialog";
 
 function of<T extends Dialog["type"]>(type: T): Extract<Dialog, { type: T }> | false {
   const d = store.dialog;
@@ -92,6 +93,7 @@ export function Dialogs() {
         <Match when={of("fetchAll")}>
           <FetchAllDialog />
         </Match>
+        <Match when={of("review")}>{(r) => <ReviewDialog number={r().number} title={r().title} />}</Match>
         <Match when={of("checks")}>
           <ChecksDialog />
         </Match>

@@ -126,6 +126,61 @@ export interface DesktopPreferences {
   useSystemOpenssh: boolean | null;
 }
 
+export interface GithubUser {
+  login: string;
+}
+
+export interface ReviewFile {
+  path: string;
+  oldPath: string | null;
+  status: string;
+  diff: FileDiff;
+}
+
+export interface ReviewComment {
+  id: number;
+  path: string;
+  line: number | null;
+  original_line: number | null;
+  side: "LEFT" | "RIGHT" | null;
+  body: string;
+  user: GithubUser;
+  created_at: string;
+  in_reply_to_id: number | null;
+}
+
+export interface IssueComment {
+  id: number;
+  body: string;
+  user: GithubUser;
+  created_at: string;
+}
+
+export interface PullReview {
+  id: number;
+  user: GithubUser;
+  state: string;
+  body: string | null;
+  submitted_at: string | null;
+}
+
+export interface PullRequestReview {
+  detail: { number: number; title: string; body: string | null; html_url: string; user: GithubUser };
+  files: ReviewFile[];
+  comments: IssueComment[];
+  reviewComments: ReviewComment[];
+  reviews: PullReview[];
+}
+
+export interface DraftComment {
+  path: string;
+  line: number;
+  side: "LEFT" | "RIGHT";
+  body: string;
+}
+
+export type ReviewEvent = "APPROVE" | "REQUEST_CHANGES" | "COMMENT";
+
 export interface CommitSummary {
   id: string;
   shortId: string;
@@ -631,6 +686,10 @@ export const api = {
   pullRequestPreview: (id: string, base?: string) => invoke<PullRequestPreview>("pull_request_preview", { id, base }),
   betweenFileDiff: (id: string, from: string, to: string, path: string, oldPath: string | null, highlight = true) =>
     invoke("between_file_diff", { id, from, to, path, oldPath, highlight }).then(wire(decodeDiff)),
+  pullRequestReview: (id: string, number: number) => invoke<PullRequestReview>("pull_request_review", { id, number }),
+  submitPullRequestReview: (id: string, number: number, event: ReviewEvent, body: string, comments: DraftComment[]) =>
+    invoke<PullReview>("submit_pull_request_review", { id, number, event, body, comments }),
+  commentOnPullRequest: (id: string, number: number, body: string) => invoke<IssueComment>("comment_on_pull_request", { id, number, body }),
   branchChecks: (id: string) => invoke<ChecksSummary | null>("branch_checks", { id }),
   commitWarnings: (id: string) => invoke<CommitWarnings>("commit_warnings", { id }),
   rerunFailedChecks: (id: string, suites: number[]) => invoke<void>("rerun_failed_checks", { id, suites }),

@@ -175,6 +175,7 @@ function PullRequestList(p: { query: string }) {
               onClick={() => checkout(pr)}
               onContextMenu={(e) =>
                 openContextMenu(e, [
+                  { label: "Review…", run: () => setStore({ popover: null, dialog: { type: "review", number: pr.number, title: pr.title } }) },
                   { label: "Check out", run: () => checkout(pr) },
                   { label: "Copy link", run: () => navigator.clipboard.writeText(pr.html_url) },
                   { label: "Refresh list", run: () => refetch() },
