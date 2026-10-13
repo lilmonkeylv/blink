@@ -1,6 +1,6 @@
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { createMemo, createResource, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
-import { api, onSyncProgress, type GithubRepo, type RepoRecord, type RepoSettings } from "../../api";
+import { api, onFetchAllProgress, onSyncProgress, type FetchAllRow, type GithubRepo, type RepoRecord, type RepoSettings } from "../../api";
 import { fuzzyFilter } from "../../lib/fuzzy";
 import { currentBranch, notify, openRepo, reloadRepositories, reportError, run, setStore, store } from "../../store";
 import { Checkbox, Field, Select } from "../Controls";
@@ -616,6 +616,69 @@ export function ImportDialog() {
           </Show>
         )}
       </Show>
+    </Dialog>
+  );
+}
+
+export function FetchAllDialog() {
+  const [rows, setRows] = createSignal<Record<string, FetchAllRow>>({});
+  const [running, setRunning] = createSignal(true);
+  const unlisten = onFetchAllProgress((row) => setRows((r) => ({ ...r, [row.path]: row })));
+  onCleanup(() => unlisten.then((u) => u()));
+  api
+    .fetchAll()
+    .then((all) => setRows(Object.fromEntries(all.map((r) => [r.path, r]))))
+    .catch((e) => reportError(e, "Fetch all failed"))
+    .finally(() => setRunning(false));
+  const done = () => Object.keys(rows()).length;
+  const status = (row: FetchAllRow | undefined) => {
+    if (!row) return running() ? "Fetching…" : "";
+    if (row.error) return row.error.split("\n")[0];
+    const parts = [];
+    if (row.ahead) parts.push(`${row.ahead} ahead`);
+    if (row.behind) parts.push(`${row.behind} behind`);
+    if (row.changes) parts.push(`${row.changes} changed file${row.changes === 1 ? "" : "s"}`);
+    if (!parts.length) parts.push(row.fetched ? "Up to date" : "No remote");
+    return parts.join(", ");
+  };
+  return (
+    <Dialog
+      title="Fetch all repositories"
+      onClose={closeDialog}
+      wide
+      footer={
+        <>
+          <span class="muted grow">
+            {running() ? `Fetched ${done()} of ${store.repositories.length}` : `Fetched ${done()} repositor${done() === 1 ? "y" : "ies"}`}
+          </span>
+          <button class="btn primary" onClick={closeDialog}>
+            Close
+          </button>
+        </>
+      }
+    >
+      <div class="fetch-all">
+        <For each={store.repositories}>
+          {(repo) => {
+            const row = () => rows()[repo.path];
+            return (
+              <div
+                class="static-row"
+                classList={{ failed: !!row()?.error, behind: !!row()?.behind }}
+                title={row()?.error ?? repo.path}
+                onClick={() => {
+                  closeDialog();
+                  openRepo(repo.path);
+                }}
+              >
+                <RepoIcon />
+                <span class="grow">{repo.owner ? `${repo.owner}/${repo.name}` : repo.name}</span>
+                <span class="muted fetch-status">{status(row())}</span>
+              </div>
+            );
+          }}
+        </For>
+      </div>
     </Dialog>
   );
 }

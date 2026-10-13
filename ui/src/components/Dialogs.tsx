@@ -19,7 +19,7 @@ import {
   TagDialog,
   UndoHistoryDialog,
 } from "./dialogs/HistoryDialogs";
-import { CloneDialog, CreateRepoDialog, ImportDialog, InitRepoDialog, PublishDialog, RepoSettingsDialog } from "./dialogs/RepoDialogs";
+import { CloneDialog, CreateRepoDialog, FetchAllDialog, ImportDialog, InitRepoDialog, PublishDialog, RepoSettingsDialog } from "./dialogs/RepoDialogs";
 import {
   ApplyPatchDialog,
   CheckLogDialog,
@@ -88,6 +88,9 @@ export function Dialogs() {
         </Match>
         <Match when={of("applyPatch")}>
           <ApplyPatchDialog />
+        </Match>
+        <Match when={of("fetchAll")}>
+          <FetchAllDialog />
         </Match>
         <Match when={of("checks")}>
           <ChecksDialog />

@@ -2006,6 +2006,26 @@ input[type="range"] {
   font-size: 12px;
 }
 
+.fetch-all {
+  display: flex;
+  flex-direction: column;
+  max-height: 60vh;
+  overflow: auto;
+}
+
+.fetch-status {
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.fetch-all .failed .fetch-status {
+  color: var(--del-fg);
+}
+
+.fetch-all .behind .fetch-status {
+  color: var(--accent);
+}
+
 .import-list {
   display: flex;
   flex-direction: column;

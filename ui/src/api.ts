@@ -107,6 +107,16 @@ export interface PullRequestPreview {
   files: CommitFile[];
 }
 
+export interface FetchAllRow {
+  path: string;
+  name: string;
+  fetched: boolean;
+  error: string | null;
+  ahead: number;
+  behind: number;
+  changes: number;
+}
+
 export interface CommitSummary {
   id: string;
   shortId: string;
@@ -452,6 +462,10 @@ export function onUpdateProgress(handler: (p: { downloaded: number; total: numbe
   return listen<{ downloaded: number; total: number | null }>("update-progress", (e) => handler(e.payload));
 }
 
+export function onFetchAllProgress(handler: (row: FetchAllRow) => void): Promise<UnlistenFn> {
+  return listen<FetchAllRow>("fetch-all-progress", (e) => handler(e.payload));
+}
+
 export function onLaunch(handler: () => void): Promise<UnlistenFn> {
   return listen("launch", () => handler());
 }
@@ -630,6 +644,7 @@ export const api = {
   takePendingLaunch: () => invoke<Launch[]>("take_pending_launch"),
   repoSettings: (id: string) => invoke<RepoSettings>("repo_settings", { id }),
   saveRepoSettings: (id: string, settings: RepoSettings) => invoke<void>("save_repo_settings", { id, settings }),
+  fetchAll: () => invoke<FetchAllRow[]>("fetch_all"),
   importRepositories: (root: string) => invokeShared<RepoRecord[]>("import_repositories", { root }),
   desktopRepositories: () => invoke<RepoRecord[]>("desktop_repositories"),
 

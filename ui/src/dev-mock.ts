@@ -173,6 +173,11 @@ export function installDevMock() {
         return { base: a.base ?? "main", bases: ["main", "release"], mergeBase: history[3].id, commits: history.slice(0, 3), files: [{ path: "crates/blink-core/src/engine.rs", oldPath: null, kind: "modified" }] };
       case "between_file_diff":
         return diff;
+      case "fetch_all":
+        return [
+          { path: repo.id, name: "blink", fetched: true, error: null, ahead: 2, behind: 0, changes: 4 },
+          { path: "C:/dev/desktop", name: "desktop", fetched: false, error: "fatal: could not read Username for 'https://github.com'", ahead: 0, behind: 0, changes: 0 },
+        ];
       case "whats_new":
         return [];
       case "release_notes":
