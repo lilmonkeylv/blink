@@ -1,6 +1,7 @@
 import { createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
-import type { DiffHunk, DiffLine, FileDiff } from "../api";
+import type { DiffHunk, DiffLine, FileDiff, LfsDiff, LfsPointer, SubmoduleDiff } from "../api";
 import { isLineIncluded, lineKey, type FileSel } from "../lib/selection";
+import { formatBytes } from "../lib/size";
 import { pairLines, type Cell } from "../lib/split";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { Segmented } from "./Controls";
@@ -247,6 +248,8 @@ export function DiffView(p: {
 
   return (
     <Switch>
+      <Match when={p.diff.submodule}>{(s) => <SubmodulePanel diff={s()} />}</Match>
+      <Match when={p.diff.lfs}>{(l) => <LfsPanel diff={l()} />}</Match>
       <Match when={p.diff.binary}>
         <div class="empty">Binary file changed</div>
       </Match>
@@ -353,5 +356,78 @@ export function DiffView(p: {
         />
       </Match>
     </Switch>
+  );
+}
+
+const short = (sha: string | null) => sha?.slice(0, 7) ?? "";
+
+function SubmodulePanel(p: { diff: SubmoduleDiff }) {
+  const title = () => {
+    if (!p.diff.old) return "Submodule added";
+    if (!p.diff.new) return "Submodule removed";
+    if (p.diff.old === p.diff.new) return "Submodule has local changes";
+    return "Submodule updated";
+  };
+  return (
+    <div class="empty">
+      <div class="special-diff">
+        <h2>{title()}</h2>
+        <Show when={p.diff.old && p.diff.new && p.diff.old !== p.diff.new}>
+          <p class="mono">
+            {short(p.diff.old)} → {short(p.diff.new)}
+          </p>
+        </Show>
+        <Show when={!p.diff.old || !p.diff.new}>
+          <p class="mono">{short(p.diff.old ?? p.diff.new)}</p>
+        </Show>
+        <Show when={p.diff.dirty}>
+          <p>The submodule's working tree has uncommitted changes.</p>
+        </Show>
+        <Show when={p.diff.commits.length > 0}>
+          <ul class="special-list">
+            <For each={p.diff.commits}>
+              {([sha, summary]) => (
+                <li>
+                  <span class="mono">{sha}</span> {summary}
+                </li>
+              )}
+            </For>
+          </ul>
+        </Show>
+        <Show when={p.diff.old && p.diff.new && p.diff.old !== p.diff.new && p.diff.commits.length === 0}>
+          <p>Moved to a commit that isn't ahead of the old one, or isn't checked out locally.</p>
+        </Show>
+      </div>
+    </div>
+  );
+}
+
+function LfsSide(p: { label: string; pointer: LfsPointer | null }) {
+  return (
+    <Show when={p.pointer}>
+      {(ptr) => (
+        <p>
+          {p.label}: {formatBytes(ptr().size)} <span class="mono">{ptr().oid.slice(0, 12)}</span>
+        </p>
+      )}
+    </Show>
+  );
+}
+
+function LfsPanel(p: { diff: LfsDiff }) {
+  const title = () => {
+    if (!p.diff.old) return "Git LFS file added";
+    if (!p.diff.new) return "Git LFS file removed";
+    if (p.diff.old.oid === p.diff.new.oid) return "Git LFS file unchanged";
+    return "Git LFS file changed";
+  };
+  return (
+    <div class="empty">
+      <div class="special-diff">
+        <h2>{title()}</h2>
+        <LfsSide label="Before" pointer={p.diff.old} />
+        <LfsSide label="After" pointer={p.diff.new} />
+      </div>
+    </div>
   );
 }

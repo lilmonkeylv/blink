@@ -34,6 +34,7 @@ Blink keeps the workflow and rebuilds the engine:
 - Changes view with line- and hunk-level staging, discard, ignore
 - Unified and split diffs with syntax highlighting; image diffs (2-up, swipe, onion skin, difference)
 - Syntax highlighting for most languages, including TypeScript/TSX, Vue, Svelte, Lua, Kotlin, Swift, Dockerfile, TOML and GraphQL
+- Submodule changes show the commit range and new commits; Git LFS files show size and object id instead of the pointer text
 - Commit with co-authors, amend, undo
 - History with revert, cherry-pick, reorder and squash by drag-and-drop
 - Branches: create, rename, delete, merge, rebase, squash-merge, compare

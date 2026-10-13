@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import type { FileDiff } from "../api";
 import { fuzzyFilter, fuzzyScore } from "./fuzzy";
 import { checkState, defaultSel, lineKey, reconcile, setLines, toggleFile, toPayload } from "./selection";
+import { formatBytes } from "./size";
 import { relativeTime } from "./time";
 
 const diff: FileDiff = {
@@ -83,5 +84,13 @@ describe("time", () => {
     expect(relativeTime(now - 10, now)).toBe("just now");
     expect(relativeTime(now - 3 * 3600, now)).toBe("3 hours ago");
     expect(relativeTime(now - 86400, now)).toBe("yesterday");
+  });
+});
+
+describe("formatBytes", () => {
+  test("picks a readable unit", () => {
+    expect(formatBytes(512)).toBe("512 B");
+    expect(formatBytes(1536)).toBe("1.5 KB");
+    expect(formatBytes(48 * 1024 * 1024)).toBe("48 MB");
   });
 });

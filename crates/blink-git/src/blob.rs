@@ -30,6 +30,14 @@ impl Repository {
         }
     }
 
+    pub fn gitlink_at(&self, rev: &str, path: &str) -> Result<Option<String>> {
+        let repo = self.local();
+        let Ok(id) = repo.rev_parse_single(rev) else { return Ok(None) };
+        let tree = id.object().git()?.peel_to_tree().git()?;
+        let Some(entry) = tree.lookup_entry_by_path(path).git()? else { return Ok(None) };
+        Ok(entry.mode().is_commit().then(|| entry.object_id().to_string()))
+    }
+
     fn blob_at_revision(&self, repo: &gix::Repository, rev: &str, path: &str) -> Result<Option<Vec<u8>>> {
         let Ok(id) = repo.rev_parse_single(format!("{rev}:{path}").as_str()) else { return Ok(None) };
         let object = id.object().git()?;

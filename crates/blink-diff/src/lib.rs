@@ -59,6 +59,59 @@ pub struct FileDiff {
     pub additions: u32,
     pub deletions: u32,
     pub hunks: Vec<DiffHunk>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub submodule: Option<SubmoduleDiff>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub lfs: Option<LfsDiff>,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SubmoduleDiff {
+    pub old: Option<String>,
+    pub new: Option<String>,
+    pub dirty: bool,
+    pub commits: Vec<(String, String)>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct LfsPointer {
+    pub oid: String,
+    pub size: u64,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize)]
+pub struct LfsDiff {
+    pub old: Option<LfsPointer>,
+    pub new: Option<LfsPointer>,
+}
+
+const LFS_SPEC: &str = "version https://git-lfs.github.com/spec/v1";
+
+pub fn parse_lfs_pointer(data: &[u8]) -> Option<LfsPointer> {
+    if data.len() > 1024 || !data.starts_with(LFS_SPEC.as_bytes()) {
+        return None;
+    }
+    let text = std::str::from_utf8(data).ok()?;
+    let mut oid = None;
+    let mut size = None;
+    for line in text.lines() {
+        if let Some(v) = line.strip_prefix("oid sha256:") {
+            oid = Some(v.trim().to_string());
+        } else if let Some(v) = line.strip_prefix("size ") {
+            size = v.trim().parse().ok();
+        }
+    }
+    Some(LfsPointer { oid: oid?, size: size? })
+}
+
+fn lfs_object(data: &[u8]) -> Option<LfsPointer> {
+    use sha2::{Digest, Sha256};
+    if data.is_empty() {
+        return None;
+    }
+    let oid = Sha256::digest(data).iter().map(|b| format!("{b:02x}")).collect();
+    Some(LfsPointer { oid, size: data.len() as u64 })
 }
 
 impl FileDiff {
@@ -138,6 +191,12 @@ pub fn diff_bytes(old: &[u8], new: &[u8], opts: DiffOptions) -> FileDiff {
 }
 
 pub fn diff_file(path: &str, old: &[u8], new: &[u8], opts: DiffOptions) -> FileDiff {
+    let (old_lfs, new_lfs) = (parse_lfs_pointer(old), parse_lfs_pointer(new));
+    if old_lfs.is_some() || new_lfs.is_some() {
+        let old = old_lfs.or_else(|| lfs_object(old));
+        let new = new_lfs.or_else(|| lfs_object(new));
+        return FileDiff { lfs: Some(LfsDiff { old, new }), ..Default::default() };
+    }
     let mut diff = diff_bytes(old, new, opts);
     if diff.hunks.is_empty() || !opts.highlight {
         return diff;
@@ -347,6 +406,22 @@ mod tests {
             DiffOptions::default(),
         );
         assert!(diff.hunks[0].lines.iter().all(|l| !l.tokens.is_empty()));
+    }
+
+    #[test]
+    fn recognises_lfs_pointers() {
+        let pointer = b"version https://git-lfs.github.com/spec/v1\noid sha256:abc123\nsize 4096\n";
+        assert_eq!(parse_lfs_pointer(pointer), Some(LfsPointer { oid: "abc123".into(), size: 4096 }));
+        assert_eq!(parse_lfs_pointer(b"just text"), None);
+        let diff = diff_file("big.psd", b"", pointer, DiffOptions::default());
+        assert!(diff.hunks.is_empty());
+        assert_eq!(diff.lfs.unwrap().new.unwrap().size, 4096);
+
+        let smudged = diff_file("big.psd", pointer, b"abc", DiffOptions::default()).lfs.unwrap();
+        assert_eq!(smudged.old.unwrap().oid, "abc123");
+        let new = smudged.new.unwrap();
+        assert_eq!(new.size, 3);
+        assert_eq!(new.oid, "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     }
 
     #[test]

@@ -66,6 +66,25 @@ export interface FileDiff {
   additions: number;
   deletions: number;
   hunks: DiffHunk[];
+  submodule?: SubmoduleDiff;
+  lfs?: LfsDiff;
+}
+
+export interface SubmoduleDiff {
+  old: string | null;
+  new: string | null;
+  dirty: boolean;
+  commits: [string, string][];
+}
+
+export interface LfsPointer {
+  oid: string;
+  size: number;
+}
+
+export interface LfsDiff {
+  old: LfsPointer | null;
+  new: LfsPointer | null;
 }
 
 export interface CommitSummary {

@@ -419,6 +419,28 @@ a {
   font-size: 18px;
 }
 
+.special-diff {
+  max-width: 520px;
+}
+
+.special-diff .mono {
+  font-family: var(--font-mono);
+}
+
+.special-list {
+  margin: 12px 0 0;
+  padding: 0;
+  list-style: none;
+  text-align: left;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.special-list li {
+  padding: 4px 0;
+  border-top: 1px solid var(--border);
+}
+
 
 .commit-box {
   display: flex;
