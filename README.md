@@ -176,6 +176,19 @@ git push origin master v0.2.0
 
 Pushing a `v*` tag runs `.github/workflows/release.yml`. It builds the Windows, macOS and Linux installers and attaches them to a draft release. Check it over and publish it from the Releases page. Tags with a suffix like `-beta.1` or `-rc.1` are marked as prereleases. To rebuild an existing tag, run the workflow by hand from the Actions tab.
 
+### Windows code signing
+
+Windows builds are signed through [SignPath Foundation](https://signpath.org). Once the project is approved, set these in the repository settings and the release workflow switches over on its own:
+
+| Kind | Name | Value |
+| --- | --- | --- |
+| secret | `SIGNPATH_API_TOKEN` | API token of the CI user in SignPath |
+| variable | `SIGNPATH_ORGANIZATION_ID` | SignPath organization ID |
+| variable | `SIGNPATH_PROJECT_SLUG` | optional, defaults to `blink` |
+| variable | `SIGNPATH_SIGNING_POLICY` | optional, defaults to `release-signing` |
+
+The SignPath project needs two artifact configurations, `exe` and `installers`. Their definitions are in [`.signpath/artifact-configurations`](.signpath/artifact-configurations). The workflow signs `blink.exe` first, bundles the NSIS and MSI installers around the signed exe, then signs the installers and regenerates the updater signatures. Without the secret, Windows builds are unsigned.
+
 ### Updater signing
 
 Installed copies of Blink check `releases/latest/download/latest.json` every few hours and offer to restart into the new version. Update bundles are signed with a minisign key whose public half lives in `tauri.conf.json` (`plugins.updater.pubkey`). The release workflow needs the private half as repository secrets:
@@ -229,6 +242,25 @@ Contributions are welcome. Before opening a pull request:
 3. Make sure tests and benchmarks pass. Performance regressions are treated as bugs.
 
 Correctness comes first: any change touching Git write paths needs a test comparing the result against the Git CLI.
+
+## Code signing policy
+
+Free code signing on Windows is provided by [SignPath.io](https://about.signpath.io), with a certificate by [SignPath Foundation](https://signpath.org).
+
+- Committers and reviewers: [@lilmonkeylv](https://github.com/lilmonkeylv)
+- Approvers: [@lilmonkeylv](https://github.com/lilmonkeylv)
+
+Only builds produced by the release workflow in this repository from a version tag are signed. Every signing request is approved by hand.
+
+## Privacy
+
+Blink does not collect telemetry. It talks to other systems only in these cases:
+
+- **GitHub**, when you sign in: your account, repositories, pull requests and check status, using the token you granted
+- **Your Git remotes**, when you fetch, pull, push or clone, and during background fetch if it is turned on in Settings
+- **Update checks**, a request to `github.com` for the latest release a few hours apart
+
+There are no usage statistics or crash reports.
 
 ## License
 
