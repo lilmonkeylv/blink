@@ -21,6 +21,7 @@ import {
 import { CloneDialog, CreateRepoDialog, ImportDialog, InitRepoDialog, PublishDialog, RepoSettingsDialog } from "./dialogs/RepoDialogs";
 import {
   ApplyPatchDialog,
+  CheckLogDialog,
   ChecksDialog,
   MergeEditorDialog,
   ShortcutsDialog,
@@ -90,6 +91,7 @@ export function Dialogs() {
         <Match when={of("checks")}>
           <ChecksDialog />
         </Match>
+        <Match when={of("checkLog")}>{(d) => <CheckLogDialog jobId={d().jobId} name={d().name} />}</Match>
         <Match when={of("mergeEditor")}>{(d) => <MergeEditorDialog path={d().path} />}</Match>
         <Match when={of("settings")}>{(d) => <SettingsDialog tab={d().tab} />}</Match>
         <Match when={of("whatsNew")}>{(d) => <WhatsNewDialog notes={d().notes} />}</Match>

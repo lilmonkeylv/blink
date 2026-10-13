@@ -92,6 +92,11 @@ pub struct CheckSuiteRef {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct CheckApp {
+    pub slug: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct CheckRun {
     pub id: u64,
     pub name: String,
@@ -99,11 +104,38 @@ pub struct CheckRun {
     pub conclusion: Option<String>,
     pub html_url: Option<String>,
     pub check_suite: Option<CheckSuiteRef>,
+    #[serde(default)]
+    pub app: Option<CheckApp>,
 }
 
 #[derive(Deserialize)]
 struct CheckRuns {
     check_runs: Vec<CheckRun>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct JobStep {
+    pub number: u64,
+    pub name: String,
+    pub status: String,
+    pub conclusion: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Job {
+    pub id: u64,
+    pub run_id: u64,
+    pub name: String,
+    pub status: String,
+    pub conclusion: Option<String>,
+    pub html_url: Option<String>,
+    #[serde(default)]
+    pub steps: Vec<JobStep>,
+}
+
+#[derive(Deserialize)]
+struct Jobs {
+    jobs: Vec<Job>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -340,6 +372,20 @@ impl Client {
         Self::check(response).await.map(drop)
     }
 
+    pub async fn run_jobs(&self, owner: &str, name: &str, run_id: u64) -> Result<Vec<Job>> {
+        Ok(self.get::<Jobs>(&format!("/repos/{owner}/{name}/actions/runs/{run_id}/jobs?per_page=100")).await?.jobs)
+    }
+
+    pub async fn job(&self, owner: &str, name: &str, job_id: u64) -> Result<Job> {
+        self.get(&format!("/repos/{owner}/{name}/actions/jobs/{job_id}")).await
+    }
+
+    pub async fn job_log(&self, owner: &str, name: &str, job_id: u64) -> Result<String> {
+        let url = format!("{}/repos/{owner}/{name}/actions/jobs/{job_id}/logs", self.api_base);
+        let response = self.request(Method::GET, &url).send().await?;
+        Ok(Self::check(response).await?.text().await?)
+    }
+
     pub async fn license_text(&self, key: &str) -> Result<String> {
         #[derive(Deserialize)]
         struct License {
@@ -416,6 +462,7 @@ mod tests {
             conclusion: conclusion.map(Into::into),
             html_url: None,
             check_suite: None,
+            app: None,
         }
     }
 

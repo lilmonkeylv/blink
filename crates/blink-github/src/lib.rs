@@ -6,8 +6,8 @@ mod oauth;
 mod pkce;
 
 pub use api::{
-    Account, CheckRun, CheckState, ChecksSummary, Client, CommitStatus, Email, Org, PullRequest, Repo, parse_remote,
-    summarize_checks,
+    Account, CheckApp, CheckRun, CheckState, ChecksSummary, Client, CommitStatus, Email, Job, JobStep, Org,
+    PullRequest, Repo, parse_remote, summarize_checks,
 };
 pub use device::{DeviceCode, DevicePoll};
 pub use error::{Error, Result};
