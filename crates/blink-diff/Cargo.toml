@@ -7,4 +7,5 @@ license.workspace = true
 [dependencies]
 imara-diff.workspace = true
 syntect.workspace = true
+two-face.workspace = true
 serde.workspace = true

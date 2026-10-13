@@ -24,7 +24,8 @@ dashmap = "6.2"
 directories = "6"
 gix = { version = "0.89", default-features = false, features = ["sha1", "max-performance-safe", "status", "revision", "index", "dirwalk", "blob-diff", "parallel"] }
 imara-diff = "0.2"
-syntect = { version = "5.3", default-features = false, features = ["default-syntaxes", "regex-fancy"] }
+syntect = { version = "5.3", default-features = false, features = ["default-syntaxes", "regex-onig"] }
+two-face = { version = "0.5", default-features = false, features = ["syntect-onig"] }
 keyring = "3"
 notify-debouncer-full = "0.7"
 parking_lot = "0.12"

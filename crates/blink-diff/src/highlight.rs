@@ -9,7 +9,7 @@ use syntect::parsing::{ParseState, Scope, ScopeStack, SyntaxReference, SyntaxSet
 const MAX_LINES: usize = 20_000;
 const MAX_LINE_LEN: usize = 2_000;
 
-static SYNTAXES: LazyLock<SyntaxSet> = LazyLock::new(SyntaxSet::load_defaults_newlines);
+static SYNTAXES: LazyLock<SyntaxSet> = LazyLock::new(two_face::syntax::extra_newlines);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub struct Span(pub u32, pub u32, pub u8);
@@ -133,6 +133,30 @@ mod tests {
     #[test]
     fn unknown_extension_is_not_highlighted() {
         assert!(highlight("notes.unknownext", "hello\n", usize::MAX).is_none());
+    }
+
+    #[test]
+    fn covers_common_languages() {
+        let samples = [
+            ("a.ts", "const x: number = 1; // c\n"),
+            ("a.tsx", "export const A = () => <div className=\"x\">hi</div>;\n"),
+            ("a.vue", "<template><div class=\"x\"></div></template>\n"),
+            ("a.svelte", "<script>let x = 1;</script>\n"),
+            ("Cargo.toml", "[package]\nname = \"x\"\n"),
+            ("Dockerfile", "FROM rust:1 AS build\n"),
+            ("a.kt", "fun main() { val s = \"x\" }\n"),
+            ("a.swift", "let s = \"x\"\n"),
+            ("a.graphql", "query { viewer { login } }\n"),
+            ("a.lua", "local x = \"y\" -- c\n"),
+            ("a.go", "package main // c\n"),
+            ("a.cs", "public class A { string s = \"x\"; }\n"),
+            ("a.yaml", "key: \"value\"\n"),
+            ("a.sh", "echo \"hi\" # c\n"),
+        ];
+        for (path, text) in samples {
+            let lines = highlight(path, text, usize::MAX).unwrap_or_else(|| panic!("no grammar for {path}"));
+            assert!(lines.iter().any(|l| !l.is_empty()), "nothing highlighted in {path}");
+        }
     }
 
     #[test]
