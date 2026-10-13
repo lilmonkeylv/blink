@@ -102,6 +102,19 @@ pub async fn git_identity(state: State<'_, AppState>, id: Option<String>) -> Cmd
 }
 
 #[tauri::command]
+pub async fn commit_template(state: State<'_, AppState>, id: String) -> CmdResult<Option<String>> {
+    let handle = state.engine.get(&id)?;
+    let repo = handle.repo();
+    let Ok(path) = repo.cli().run(&["config", "--path", "--get", "commit.template"]) else { return Ok(None) };
+    let Ok(text) = std::fs::read_to_string(repo.workdir().join(path.trim())) else { return Ok(None) };
+    Ok(Some(template_body(&text)).filter(|t| !t.is_empty()))
+}
+
+fn template_body(text: &str) -> String {
+    text.lines().filter(|l| !l.starts_with('#')).collect::<Vec<_>>().join("\n").trim().to_string()
+}
+
+#[tauri::command]
 pub async fn set_git_identity(state: State<'_, AppState>, identity: GitIdentity) -> CmdResult<()> {
     let cli = blink_git::GitCli::new(&state.paths.data_dir);
     if let Some(name) = identity.name.filter(|n| !n.trim().is_empty()) {
@@ -111,4 +124,15 @@ pub async fn set_git_identity(state: State<'_, AppState>, identity: GitIdentity)
         cli.config_set_global("user.email", email.trim())?;
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn template_drops_comment_lines() {
+        assert_eq!(template_body("\n# Why:\nTicket: \n\n# end\n"), "Ticket:");
+        assert_eq!(template_body("# only comments\n"), "");
+    }
 }

@@ -77,6 +77,7 @@ pub fn run() {
             commands::changes::ignore_path,
             commands::changes::undo_last_commit,
             commands::changes::git_identity,
+            commands::changes::commit_template,
             commands::changes::set_git_identity,
             commands::history::history,
             commands::history::commit_detail,

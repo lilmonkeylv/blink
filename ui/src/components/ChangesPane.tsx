@@ -1,6 +1,7 @@
 import { ask } from "@tauri-apps/plugin-dialog";
 import { createEffect, createMemo, createSignal, on, Show } from "solid-js";
 import { api, type FileChange, type FileDiff, type FileSelection } from "../api";
+import { recentMessages, rememberMessage } from "../lib/messages";
 import { checkState, diffSignature, setLines, toggleFile, toPayload, type CheckState, type FileSel } from "../lib/selection";
 import { cachedDiff, currentBranch, notify, refreshRepo, reportError, run, sameDiff, setStore, store, storeDiff } from "../store";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
@@ -210,6 +211,8 @@ function CommitBox() {
   const [showCoAuthors, setShowCoAuthors] = createSignal(false);
   const [amend, setAmend] = createSignal(false);
   const [committing, setCommitting] = createSignal(false);
+  const [template, setTemplate] = createSignal("");
+  const [recall, setRecall] = createSignal(-1);
 
   const branch = () => currentBranch() ?? "detached HEAD";
   const anySelected = () =>
@@ -218,6 +221,39 @@ function CommitBox() {
   const midOperation = () => !!store.repo?.operation;
   const canCommit = () =>
     !committing() && summary().trim().length > 0 && (anySelected() || amend()) && !conflicted() && !midOperation();
+
+  createEffect(
+    on(
+      () => store.repo?.id,
+      async (id) => {
+        setTemplate("");
+        if (!id) return;
+        const text = (await api.commitTemplate(id).catch(() => null)) ?? "";
+        if (store.repo?.id !== id) return;
+        setTemplate(text);
+        if (text && !summary() && !description()) setDescription(text);
+      },
+    ),
+  );
+
+  const recallMessage = (step: number) => {
+    const list = store.repo ? recentMessages(store.repo.id) : [];
+    const next = Math.min(recall() + step, list.length - 1);
+    if (next === recall()) return;
+    setRecall(next);
+    setSummary(next < 0 ? "" : list[next].summary);
+    setDescription(next < 0 ? template() : list[next].description);
+  };
+
+  const onSummaryKey = (e: KeyboardEvent) => {
+    if (e.key === "ArrowUp" && (recall() >= 0 || !summary())) {
+      e.preventDefault();
+      recallMessage(1);
+    } else if (e.key === "ArrowDown" && recall() >= 0) {
+      e.preventDefault();
+      recallMessage(-1);
+    }
+  };
 
   createEffect(
     on(amend, async (enabled) => {
@@ -265,8 +301,10 @@ function CommitBox() {
       await api.commit(repo.id, files, { summary: summary(), description: description(), coAuthors: authors }, amend());
       const count = files.length;
       const amended = amend();
+      rememberMessage(repo.id, { summary: summary(), description: description() });
+      setRecall(-1);
       setSummary("");
-      setDescription("");
+      setDescription(template());
       setAmend(false);
       setStore("checkedPaths", {});
       notify(
@@ -294,8 +332,13 @@ function CommitBox() {
         <input
           class="input"
           placeholder={amend() ? "Summary (amending last commit)" : "Summary (required)"}
+          title="Up arrow brings back recent messages"
           value={summary()}
-          onInput={(e) => setSummary(e.currentTarget.value)}
+          onInput={(e) => {
+            setRecall(-1);
+            setSummary(e.currentTarget.value);
+          }}
+          onKeyDown={onSummaryKey}
         />
         <span class="char-count" classList={{ over: summary().length > SUMMARY_SOFT_LIMIT }}>
           {summary().length > 50 ? SUMMARY_SOFT_LIMIT - summary().length : ""}

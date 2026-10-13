@@ -470,6 +470,7 @@ export const api = {
     invoke<void>("discard_lines", { id, path, lines }),
   ignore: (id: string, pattern: string) => invoke<void>("ignore_path", { id, pattern }),
   undoLastCommit: (id: string) => invoke<void>("undo_last_commit", { id }),
+  commitTemplate: (id: string) => invoke<string | null>("commit_template", { id }),
   gitIdentity: (id?: string) => invoke<{ name: string | null; email: string | null }>("git_identity", { id }),
   setGitIdentity: (name: string, email: string) => invoke<void>("set_git_identity", { identity: { name, email } }),
 
