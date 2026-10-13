@@ -25,6 +25,7 @@ import { customTitleBar, WindowControls } from "./WindowControls";
 import { DRAG_TYPE } from "./HistoryPane";
 import { BranchIcon, CheckIcon, ChevronDown, DownIcon, MenuIcon, PlusIcon, PullRequestIcon, RepoIcon, SyncIcon, UpIcon } from "./Icons";
 import { ask, choose, message } from "./Prompt";
+import { transferPercent } from "../lib/progress";
 
 export async function pickAndAddRepository() {
   const dir = await openDialog({ directory: true, multiple: false, title: "Add local repository" });
@@ -482,7 +483,7 @@ export function Toolbar() {
     if (head.type === "detached") return `Detached at ${head.id.slice(0, 7)}`;
     return head.name;
   };
-  const percent = () => store.sync?.progress?.percent ?? null;
+  const percent = () => transferPercent(store.sync?.progress);
   const state = () => syncState();
 
   return (
