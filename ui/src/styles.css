@@ -378,8 +378,7 @@ a {
 .window-control.app-menu-button svg {
   width: 16px;
   height: 16px;
-  fill: currentColor;
-  stroke: none;
+  stroke-width: 2;
 }
 
 .window-control.close:hover {
@@ -422,7 +421,6 @@ a {
   width: 16px;
   height: 16px;
   flex: none;
-  fill: currentColor;
 }
 
 .badge {
@@ -802,7 +800,8 @@ select.input {
 
 .commit-options {
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 6px 16px;
   align-items: center;
 }
 
@@ -1385,7 +1384,6 @@ select.input {
 .menu button.submenu svg {
   width: 14px;
   height: 14px;
-  fill: currentColor;
   opacity: 0.7;
 }
 
