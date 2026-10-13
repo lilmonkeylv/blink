@@ -594,11 +594,15 @@ export function Toolbar() {
           </Show>
         </button>
         <span class="toolbar-spacer" data-tauri-drag-region={customTitleBar || undefined} />
-        <button class="toolbar-button app-menu" aria-label="Menu" title="Menu" onClick={(e) => openContextMenu(e, appMenu())}>
-          <MenuIcon />
-        </button>
-        <Show when={customTitleBar}>
-          <WindowControls />
+        <Show
+          when={customTitleBar}
+          fallback={
+            <button class="toolbar-button app-menu" aria-label="Menu" title="Menu" onClick={(e) => openContextMenu(e, appMenu())}>
+              <MenuIcon />
+            </button>
+          }
+        >
+          <WindowControls onMenu={(e) => openContextMenu(e, appMenu())} />
         </Show>
       </div>
       <Show when={store.opening || store.busy}>

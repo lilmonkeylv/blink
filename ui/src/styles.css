@@ -368,6 +368,13 @@ a {
   background: var(--toolbar-hover);
 }
 
+.window-control.menu svg {
+  width: 16px;
+  height: 16px;
+  fill: currentColor;
+  stroke: none;
+}
+
 .window-control.close:hover {
   background: #c42b1c;
   color: #fff;

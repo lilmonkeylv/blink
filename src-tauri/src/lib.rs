@@ -33,6 +33,9 @@ pub fn run() {
             let state = AppState::initialize().map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
             state.engine.pools().background().spawn(blink_diff::warm_up);
             app.manage(state);
+            if let Some(main) = app.get_webview_window("main") {
+                commands::window::fit_to_screen(&main);
+            }
             let handle = app.handle().clone();
             launch::handle_args(&handle, &std::env::args().collect::<Vec<_>>(), None);
             launch::register_deep_links(&handle);
