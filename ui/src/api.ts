@@ -1,5 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { decodeDiff, decodeGraph, decodeHistory, type WirePayload } from "./lib/wire";
+import { invoke, type InvokeArgs } from "@tauri-apps/api/core";
+import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 
 export type ChangeKind =
   | "added"
@@ -200,7 +203,6 @@ export interface Settings {
     backgroundFetch: boolean;
     backgroundFetchMinutes: number;
     useSystemOpenssh: boolean;
-    usageStats: boolean;
     watcher: "fsmonitor" | "native" | "polling";
     cacheLimitMb: number;
     logLevel: string;
@@ -420,10 +422,30 @@ export function isCommandError(e: unknown): e is CommandError {
   return typeof e === "object" && e !== null && "kind" in e && "message" in e;
 }
 
+function wire<T>(decode: (payload: WirePayload) => T) {
+  return (payload: unknown): T => {
+    const binary = Array.isArray(payload) ? typeof payload[0] === "number" : payload instanceof ArrayBuffer || ArrayBuffer.isView(payload);
+    // the browser dev mock answers with plain objects
+    return binary ? decode(payload as WirePayload) : (payload as T);
+  };
+const SHARED_CHANGED = "shared-changed";
+
+function invokeShared<T>(cmd: string, args?: InvokeArgs): Promise<T> {
+  return invoke<T>(cmd, args).then((result) => {
+    void emit(SHARED_CHANGED);
+    return result;
+  });
+}
+
+export function onSharedChanged(handler: () => void): Promise<UnlistenFn> {
+  return listen(SHARED_CHANGED, () => handler());
+}
+
 export const api = {
   bootstrap: () => invoke<Bootstrap>("bootstrap"),
-  addRepository: (path: string) => invoke<RepoRecord>("add_repository", { path }),
-  initRepository: (path: string) => invoke<RepoRecord>("init_repository", { path }),
+  sharedState: () => invoke<Pick<Bootstrap, "repositories" | "settings" | "account">>("shared_state"),
+  addRepository: (path: string) => invokeShared<RepoRecord>("add_repository", { path }),
+  initRepository: (path: string) => invokeShared<RepoRecord>("init_repository", { path }),
   createRepository: (
     parent: string,
     name: string,
@@ -431,8 +453,8 @@ export const api = {
     readme: boolean,
     gitignore?: string,
     license?: string,
-  ) => invoke<RepoRecord>("create_repository", { parent, name, description, readme, gitignore, license }),
-  removeRepository: (path: string) => invoke<void>("remove_repository", { path }),
+  ) => invokeShared<RepoRecord>("create_repository", { parent, name, description, readme, gitignore, license }),
+  removeRepository: (path: string) => invokeShared<void>("remove_repository", { path }),
   openRepository: (path: string) => invoke<RepoView>("open_repository", { path }),
   openWindow: (path: string) => invoke<void>("open_window", { path }),
   refreshRepository: (id: string) => invoke<RepoView>("refresh_repository", { id }),
@@ -440,7 +462,7 @@ export const api = {
   openOnGithub: (id: string) => invoke<void>("open_on_github", { id }),
 
   fileDiff: (id: string, path: string, ignoreWhitespace = false, full = false, highlight = true) =>
-    invoke<FileDiff>("file_diff", { id, path, ignoreWhitespace, full, highlight }),
+    invoke("file_diff", { id, path, ignoreWhitespace, full, highlight }).then(wire(decodeDiff)),
   commit: (id: string, files: FileSelection[], message: CommitMessage, amend = false) =>
     invoke<string>("commit", { id, files, message, amend }),
   discardFiles: (id: string, paths: string[]) => invoke<void>("discard_files", { id, paths }),
@@ -452,10 +474,10 @@ export const api = {
   setGitIdentity: (name: string, email: string) => invoke<void>("set_git_identity", { identity: { name, email } }),
 
   history: (id: string, offset: number, limit: number, rev?: string) =>
-    invoke<CommitSummary[]>("history", { id, offset, limit, rev }),
+    invoke("history", { id, offset, limit, rev }).then(wire(decodeHistory)),
   commitDetail: (id: string, sha: string) => invoke<CommitDetail>("commit_detail", { id, sha }),
   commitFileDiff: (id: string, sha: string, path: string, oldPath: string | null, ignoreWhitespace = false, highlight = true) =>
-    invoke<FileDiff>("commit_file_diff", { id, sha, path, oldPath, ignoreWhitespace, highlight }),
+    invoke("commit_file_diff", { id, sha, path, oldPath, ignoreWhitespace, highlight }).then(wire(decodeDiff)),
 
   branches: (id: string) => invoke<Branch[]>("branches", { id }),
   checkout: (id: string, name: string, kind: BranchKind, changes?: "bringAlong" | "stashOnCurrent") =>
@@ -501,10 +523,11 @@ export const api = {
   searchHistory: (id: string, kind: SearchKind, query: string) =>
     invoke<CommitSummary[]>("search_history", { id, kind, query }),
   reflog: (id: string) => invoke<ReflogEntry[]>("reflog", { id }),
-  historyGraph: (id: string, offset: number, limit: number) => invoke<GraphPage>("history_graph", { id, offset, limit }),
+  historyGraph: (id: string, offset: number, limit: number) =>
+    invoke("history_graph", { id, offset, limit }).then(wire(decodeGraph)),
   rangeFiles: (id: string, oldest: string, newest: string) => invoke<CommitFile[]>("range_files", { id, oldest, newest }),
   rangeFileDiff: (id: string, oldest: string, newest: string, path: string, oldPath: string | null, highlight = true) =>
-    invoke<FileDiff>("range_file_diff", { id, oldest, newest, path, oldPath, highlight }),
+    invoke("range_file_diff", { id, oldest, newest, path, oldPath, highlight }).then(wire(decodeDiff)),
   compare: (id: string, other: string) =>
     invoke<{ ahead: CommitSummary[]; behind: CommitSummary[] }>("compare_branch", { id, other }),
   worktrees: (id: string) => invoke<Worktree[]>("worktrees", { id }),
@@ -525,9 +548,9 @@ export const api = {
   githubOrgs: () => invoke<{ login: string; avatar_url: string }[]>("github_orgs"),
   gitignoreTemplates: () => invoke<string[]>("gitignore_templates"),
   clone: (url: string, parent: string, name: string, depth?: number) =>
-    invoke<RepoRecord>("clone_repository", { url, parent, name, depth }),
+    invokeShared<RepoRecord>("clone_repository", { url, parent, name, depth }),
   publish: (id: string, name: string, description: string, isPrivate: boolean, org?: string) =>
-    invoke<GithubRepo>("publish_repository", { id, name, description, private: isPrivate, org }),
+    invokeShared<GithubRepo>("publish_repository", { id, name, description, private: isPrivate, org }),
   pullRequests: (id: string) => invoke<PullRequest[]>("pull_requests", { id }),
   checkoutPullRequest: (id: string, number: number, headRef: string) =>
     invoke<void>("checkout_pull_request", { id, number, headRef }),
@@ -552,18 +575,19 @@ export const api = {
   saveRepoSettings: (id: string, settings: RepoSettings) => invoke<void>("save_repo_settings", { id, settings }),
   importRepositories: (root: string) => invoke<RepoRecord[]>("import_repositories", { root }),
   desktopRepositories: () => invoke<RepoRecord[]>("desktop_repositories"),
+  importRepositories: (root: string) => invokeShared<RepoRecord[]>("import_repositories", { root }),
 
-  signIn: () => invoke<{ account: Account; primaryEmail: string | null }>("sign_in"),
+  signIn: () => invokeShared<{ account: Account; primaryEmail: string | null }>("sign_in"),
   deviceStart: () => invoke<DeviceCode>("device_start"),
-  deviceComplete: (code: DeviceCode) => invoke<{ account: Account; primaryEmail: string | null }>("device_complete", { code }),
-  signOut: () => invoke<void>("sign_out"),
+  deviceComplete: (code: DeviceCode) => invokeShared<{ account: Account; primaryEmail: string | null }>("device_complete", { code }),
+  signOut: () => invokeShared<void>("sign_out"),
   revokeUrl: () => invoke<string | null>("revoke_url"),
   enterpriseAccounts: () => invoke<EnterpriseAccount[]>("enterprise_accounts"),
-  enterpriseSignIn: (host: string, token: string) => invoke<EnterpriseAccount>("enterprise_sign_in", { host, token }),
-  enterpriseSignOut: (host: string) => invoke<void>("enterprise_sign_out", { host }),
+  enterpriseSignIn: (host: string, token: string) => invokeShared<EnterpriseAccount>("enterprise_sign_in", { host, token }),
+  enterpriseSignOut: (host: string) => invokeShared<void>("enterprise_sign_out", { host }),
 
   getSettings: () => invoke<Settings>("get_settings"),
-  saveSettings: (settings: Settings) => invoke<void>("save_settings", { settings }),
+  saveSettings: (settings: Settings) => invokeShared<void>("save_settings", { settings }),
 };
 
 export function onRepoChanged(handler: (view: RepoView) => void): Promise<UnlistenFn> {

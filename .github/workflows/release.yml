@@ -69,7 +69,6 @@ jobs:
     env:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-      SIGNPATH: ${{ matrix.os == 'windows-latest' && secrets.SIGNPATH_API_TOKEN != '' && vars.SIGNPATH_ORGANIZATION_ID != '' }}
       BUNDLE_DIR: target/${{ matrix.target }}/release/bundle
     steps:
       - uses: actions/checkout@v5
@@ -131,74 +130,9 @@ jobs:
             echo "::warning::APPLE_API_PRIVATE_KEY is not set, the macOS build is signed but not notarized"
           fi
       - name: Build
-        if: env.SIGNPATH != 'true'
         shell: bash
         run: |
           bun tauri build --ci --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --config "$UPDATER_CONFIG" --config "$PLATFORM_CONFIG"
-
-      - name: Build blink.exe
-        if: env.SIGNPATH == 'true'
-        shell: bash
-        run: bun tauri build --ci --target ${{ matrix.target }} --no-bundle
-      - id: unsigned-exe
-        if: env.SIGNPATH == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: unsigned-exe
-          path: target/${{ matrix.target }}/release/blink.exe
-          if-no-files-found: error
-      - name: Sign blink.exe
-        if: env.SIGNPATH == 'true'
-        uses: signpath/github-action-submit-signing-request@v3
-        with:
-          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
-          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'blink' }}
-          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY || 'release-signing' }}
-          artifact-configuration-slug: exe
-          github-artifact-id: ${{ steps.unsigned-exe.outputs.artifact-id }}
-          wait-for-completion: true
-          wait-for-completion-timeout-in-seconds: 3600
-          output-artifact-directory: signed-exe
-      - name: Bundle installers
-        if: env.SIGNPATH == 'true'
-        shell: bash
-        run: |
-          cp signed-exe/blink.exe target/${{ matrix.target }}/release/blink.exe
-          bun tauri bundle --ci --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --config "$UPDATER_CONFIG" --config "$PLATFORM_CONFIG"
-      - id: unsigned-installers
-        if: env.SIGNPATH == 'true'
-        uses: actions/upload-artifact@v4
-        with:
-          name: unsigned-installers
-          if-no-files-found: error
-          path: |
-            ${{ env.BUNDLE_DIR }}/nsis/*.exe
-            ${{ env.BUNDLE_DIR }}/msi/*.msi
-      - name: Sign installers
-        if: env.SIGNPATH == 'true'
-        uses: signpath/github-action-submit-signing-request@v3
-        with:
-          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
-          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
-          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG || 'blink' }}
-          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY || 'release-signing' }}
-          artifact-configuration-slug: installers
-          github-artifact-id: ${{ steps.unsigned-installers.outputs.artifact-id }}
-          wait-for-completion: true
-          wait-for-completion-timeout-in-seconds: 3600
-          output-artifact-directory: signed-installers
-      - name: Re-sign updater bundles
-        if: env.SIGNPATH == 'true'
-        shell: bash
-        run: |
-          cp -r signed-installers/. "$BUNDLE_DIR/"
-          if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
-            for f in "$BUNDLE_DIR"/nsis/*.exe "$BUNDLE_DIR"/msi/*.msi; do
-              rm -f "$f.sig"
-              bun tauri signer sign --app-version "${{ needs.prepare.outputs.version }}" "$f"
-            done
-          fi
 
       - uses: actions/upload-artifact@v4
         with:

@@ -230,7 +230,6 @@ pub struct Advanced {
     pub background_fetch: bool,
     pub background_fetch_minutes: u32,
     pub use_system_openssh: bool,
-    pub usage_stats: bool,
     pub watcher: WatcherMode,
     pub cache_limit_mb: u32,
     pub log_level: String,
@@ -245,7 +244,6 @@ impl Default for Advanced {
             background_fetch: true,
             background_fetch_minutes: 60,
             use_system_openssh: false,
-            usage_stats: false,
             watcher: WatcherMode::Native,
             cache_limit_mb: 512,
             log_level: "info".into(),
@@ -309,5 +307,11 @@ mod tests {
         let s: Settings = toml::from_str("[appearance]\ntheme = \"light\"\n").unwrap();
         assert_eq!(s.appearance.theme, Theme::Light);
         assert_eq!(s.git.default_branch, "main");
+    }
+
+    #[test]
+    fn removed_keys_are_ignored() {
+        let s: Settings = toml::from_str("[advanced]\nusageStats = true\nbackgroundFetch = false\n").unwrap();
+        assert!(!s.advanced.background_fetch);
     }
 }
