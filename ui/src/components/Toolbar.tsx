@@ -484,6 +484,11 @@ export function Toolbar() {
     return head.name;
   };
   const percent = () => transferPercent(store.sync?.progress);
+  const syncPhase = createMemo<string>((previous) => {
+    const progress = store.sync?.progress;
+    if (!store.sync) return "";
+    return progress && progress.percent !== null ? `${progress.phase} ${progress.percent}%` : previous;
+  }, "");
   const state = () => syncState();
 
   return (
@@ -561,8 +566,9 @@ export function Toolbar() {
           <span class="labels">
             <span class="value">{store.sync ? `${store.sync.action[0].toUpperCase()}${store.sync.action.slice(1)}ing…` : state().label}</span>
             <span class="title">
-              {store.sync?.progress?.phase ??
-                (state().kind === "publish" ? "Publish this repository to GitHub" : !store.repo?.aheadBehind && store.repo?.head?.type === "branch" ? "Not on remote yet" : "")}
+              {store.sync
+                ? syncPhase()
+                : (state().kind === "publish" ? "Publish this repository to GitHub" : !store.repo?.aheadBehind && store.repo?.head?.type === "branch" ? "Not on remote yet" : "")}
             </span>
           </span>
           <Show when={store.repo?.aheadBehind}>
