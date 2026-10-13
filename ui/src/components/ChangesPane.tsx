@@ -328,6 +328,21 @@ function CommitBox() {
       <Show when={conflicted()}>
         <div class="warning">Resolve all conflicts before committing.</div>
       </Show>
+      <Show when={store.commitWarnings?.protectedBranch && !amend()}>
+        <div class="warning">
+          <strong>{branch()}</strong> is a protected branch on GitHub, so pushing to it will probably be rejected.{" "}
+          <a onClick={() => setStore("dialog", { type: "newBranch" })}>Create a branch</a>
+        </div>
+      </Show>
+      <Show when={store.commitWarnings?.unlinkedEmail}>
+        {(email) => (
+          <div class="warning">
+            {email()} isn't linked to {store.commitWarnings?.login ?? "your GitHub account"}, so GitHub won't attribute
+            this commit to you.{" "}
+            <a onClick={() => setStore("dialog", { type: "settings", tab: "Git" })}>Change email</a>
+          </div>
+        )}
+      </Show>
       <button class="btn primary block" disabled={!canCommit()} onClick={commit} title="Ctrl+Enter">
         {committing() ? "Committing…" : amend() ? "Amend last commit" : `Commit to ${branch()}`}
       </button>

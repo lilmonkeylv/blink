@@ -71,6 +71,7 @@ pub fn sign_out(state: State<'_, AppState>) -> CmdResult<()> {
     }
     state.cache.put_app_state(ACCOUNT_KEY, &Option::<Account>::None)?;
     *state.github.lock() = None;
+    crate::commands::github::forget_linked_emails(crate::state::GITHUB_HOST);
     Ok(())
 }
 
@@ -122,5 +123,6 @@ pub fn enterprise_sign_out(state: State<'_, AppState>, host: String) -> CmdResul
     }
     accounts.retain(|a| a.host != host);
     state.save_enterprise_accounts(&accounts)?;
+    crate::commands::github::forget_linked_emails(&host);
     Ok(())
 }

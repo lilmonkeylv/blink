@@ -291,6 +291,18 @@ impl Client {
         self.get_all("/user/orgs?per_page=100", 5).await
     }
 
+    pub async fn branch_protected(&self, owner: &str, name: &str, branch: &str) -> Result<bool> {
+        #[derive(Deserialize)]
+        struct Branch {
+            protected: bool,
+        }
+        match self.get::<Branch>(&format!("/repos/{owner}/{name}/branches/{branch}")).await {
+            Ok(b) => Ok(b.protected),
+            Err(Error::Api { status: 404, .. }) => Ok(false),
+            Err(e) => Err(e),
+        }
+    }
+
     pub async fn repo(&self, owner: &str, name: &str) -> Result<Repo> {
         self.get(&format!("/repos/{owner}/{name}")).await
     }

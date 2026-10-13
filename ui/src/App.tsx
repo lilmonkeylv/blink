@@ -21,6 +21,7 @@ import {
   openRepo,
   pickNewTab,
   refreshChecks,
+  refreshCommitWarnings,
   refreshRepo,
   reloadSharedState,
   reportError,
@@ -307,7 +308,10 @@ export function App() {
   createEffect(
     on(
       () => [store.repo?.id, store.repo?.head?.type === "branch" ? store.repo.head.id : null, store.account?.login] as const,
-      () => refreshChecks(),
+      () => {
+        refreshChecks();
+        refreshCommitWarnings();
+      },
     ),
   );
 

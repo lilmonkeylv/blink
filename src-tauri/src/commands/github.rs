@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 use std::time::Duration;
 
+use parking_lot::Mutex;
+
 use blink_git::{GitCli, HeadState, Repository, SyncAction};
 use blink_github::{CheckState, ChecksSummary, Client, Org, PullRequest, Repo, parse_remote};
 use blink_store::RepoRecord;
@@ -28,6 +30,72 @@ pub struct HostedRepo {
     pub host: String,
     pub owner: String,
     pub name: String,
+}
+
+#[derive(Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct CommitWarnings {
+    protected_branch: bool,
+    unlinked_email: Option<String>,
+    login: Option<String>,
+}
+
+struct LinkedEmails {
+    host: String,
+    login: String,
+    id: u64,
+    emails: Vec<String>,
+}
+
+static LINKED_EMAILS: Mutex<Vec<LinkedEmails>> = Mutex::new(Vec::new());
+
+fn email_is_linked(email: &str, linked: &LinkedEmails) -> bool {
+    let email = email.trim().to_ascii_lowercase();
+    if linked.emails.iter().any(|e| e.eq_ignore_ascii_case(&email)) {
+        return true;
+    }
+    let Some((local, domain)) = email.split_once('@') else { return false };
+    let login = linked.login.to_ascii_lowercase();
+    domain == format!("users.noreply.{}", linked.host) && (local == login || local == format!("{}+{login}", linked.id))
+}
+
+async fn load_linked_emails(host: &str, gh: &Client) {
+    if LINKED_EMAILS.lock().iter().any(|l| l.host == host) {
+        return;
+    }
+    let (Ok(user), Ok(emails)) = (gh.user().await, gh.emails().await) else { return };
+    let emails = emails.into_iter().filter(|e| e.verified).map(|e| e.email).collect();
+    LINKED_EMAILS.lock().push(LinkedEmails { host: host.to_string(), login: user.login, id: user.id, emails });
+}
+
+pub fn forget_linked_emails(host: &str) {
+    LINKED_EMAILS.lock().retain(|l| l.host != host);
+}
+
+#[tauri::command]
+pub async fn commit_warnings(state: State<'_, AppState>, id: String) -> CmdResult<CommitWarnings> {
+    let handle = state.engine.get(&id)?;
+    let Some(HostedRepo { host, owner, name }) = hosted_repo(&state, handle.repo(), None) else {
+        return Ok(CommitWarnings::default());
+    };
+    let Some(gh) = state.client_for_host(&host) else { return Ok(CommitWarnings::default()) };
+    let protected_branch = match handle.snapshot().head.clone() {
+        Some(HeadState::Branch { name: branch, .. }) => {
+            gh.branch_protected(&owner, &name, &branch).await.unwrap_or(false)
+        }
+        _ => false,
+    };
+    load_linked_emails(&host, &gh).await;
+    let email = handle.repo().cli().config_get("user.email");
+    let linked = LINKED_EMAILS.lock();
+    let Some(account) = linked.iter().find(|l| l.host == host) else {
+        return Ok(CommitWarnings { protected_branch, ..Default::default() });
+    };
+    Ok(CommitWarnings {
+        protected_branch,
+        unlinked_email: email.filter(|e| !email_is_linked(e, account)),
+        login: Some(account.login.clone()),
+    })
 }
 
 pub fn hosted_repo(state: &AppState, repo: &Repository, remote: Option<&str>) -> Option<HostedRepo> {
@@ -284,4 +352,24 @@ pub fn spawn_checks_poller(app: AppHandle) {
             }
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn noreply_and_verified_emails_count_as_linked() {
+        let linked = LinkedEmails {
+            host: "github.com".into(),
+            login: "Octo".into(),
+            id: 42,
+            emails: vec!["octo@example.com".into()],
+        };
+        assert!(email_is_linked("Octo@Example.com", &linked));
+        assert!(email_is_linked("42+octo@users.noreply.github.com", &linked));
+        assert!(email_is_linked("octo@users.noreply.github.com", &linked));
+        assert!(!email_is_linked("43+octo@users.noreply.github.com", &linked));
+        assert!(!email_is_linked("someone@else.com", &linked));
+    }
 }
