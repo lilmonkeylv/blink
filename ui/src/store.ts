@@ -16,6 +16,7 @@ import {
   type SyncAction,
   type UpdateInfo,
 } from "./api";
+import { applySidebarWidth, lastSidebarWidth, repoLayout } from "./lib/layout";
 import { reconcile, type FileSel } from "./lib/selection";
 import { closeTab, cycleTab, placeTab } from "./lib/tabs";
 
@@ -164,7 +165,6 @@ export async function run<T>(label: string, task: () => Promise<T>): Promise<T |
 }
 
 const tabViews = new Map<string, RepoView>();
-const tabMemory = new Map<string, { tab: Tab; selectedPath: string | null }>();
 const TABS_KEY = "blink.tabs";
 
 function saveTabs() {
@@ -199,7 +199,6 @@ export function pickNewTab() {
 
 export function closeRepoTab(path: string) {
   const { tabs, next } = closeTab(store.tabs, path, store.repo?.id ?? null);
-  tabMemory.delete(path);
   setTabs(tabs);
   if (next === null) setStore("repo", null);
   else if (next !== store.repo?.id) void openRepo(next);
@@ -257,13 +256,14 @@ export function openInNewWindow(path: string) {
 }
 
 function showRepo(view: RepoView) {
-  const memory = tabMemory.get(view.id);
-  const selected = memory?.selectedPath;
+  const memory = repoLayout(view.id);
+  const selected = memory.selectedPath;
+  applySidebarWidth(memory.sidebar ?? lastSidebarWidth());
   diffCache.clear();
   batch(() => {
     setStore({
       repo: view,
-      tab: memory?.tab ?? store.tab,
+      tab: memory.tab ?? store.tab,
       checkedPaths: {},
       selectedPath: selected && view.files.some((f) => f.path === selected) ? selected : (view.files[0]?.path ?? null),
       checks: null,
@@ -277,7 +277,6 @@ function showRepo(view: RepoView) {
 export async function openRepo(path: string, asNewTab = store.pickingNewTab) {
   const current = store.repo?.id ?? null;
   const previousTabs = store.tabs;
-  if (current && current !== path) tabMemory.set(current, { tab: store.tab, selectedPath: store.selectedPath });
   setTabs(placeTab(store.tabs, current, path, asNewTab));
   setStore({ popover: null, opening: path, pickingNewTab: false });
   const cached = tabViews.get(path);

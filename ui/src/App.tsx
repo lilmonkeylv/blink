@@ -7,6 +7,7 @@ import { Dialogs } from "./components/Dialogs";
 import { CommitView, HistoryList } from "./components/HistoryPane";
 import { GearIcon } from "./components/Icons";
 import { TabStrip } from "./components/TabStrip";
+import { applySidebarWidth, clampSidebar, saveRepoLayout } from "./lib/layout";
 import { appMenu, doSync, pickAndAddRepository, Toolbar } from "./components/Toolbar";
 import { fuzzyFilter } from "./lib/fuzzy";
 import {
@@ -116,6 +117,31 @@ function Loading(p: { label: string }) {
       </div>
     </div>
   );
+}
+
+function SidebarResizer() {
+  const start = (e: PointerEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const handle = e.currentTarget as HTMLElement;
+    handle.setPointerCapture(e.pointerId);
+    let width = 0;
+    const move = (ev: PointerEvent) => {
+      width = clampSidebar(ev.clientX);
+      applySidebarWidth(width);
+    };
+    const done = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", done);
+      document.documentElement.classList.remove("resizing");
+      const id = store.repo?.id;
+      if (id && width) saveRepoLayout(id, { sidebar: width });
+    };
+    document.documentElement.classList.add("resizing");
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", done);
+  };
+  return <div class="sidebar-resizer" onPointerDown={start} title="Drag to resize" />;
 }
 
 function Sidebar() {
@@ -304,6 +330,11 @@ export function App() {
     listeners.then((fns) => fns.forEach((u) => u()));
   });
 
+  createEffect(() => {
+    const id = store.repo?.id;
+    if (id) saveRepoLayout(id, { tab: store.tab, selectedPath: store.selectedPath });
+  });
+
   createEffect(
     on(
       () => [store.repo?.id, store.repo?.head?.type === "branch" ? store.repo.head.id : null, store.account?.login] as const,
@@ -344,6 +375,7 @@ export function App() {
             }}
           >
             <Sidebar />
+            <SidebarResizer />
             <div class="content">
               <Switch>
                 <Match when={store.tab === "changes"}>

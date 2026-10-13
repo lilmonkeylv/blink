@@ -10,6 +10,7 @@ import {
   type GraphRow,
   type SearchKind,
 } from "../api";
+import { repoLayout, saveRepoLayout } from "../lib/layout";
 import { absoluteTime, relativeTime } from "../lib/time";
 import { currentBranch, notify, reportError, run, setStore, store } from "../store";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
@@ -67,7 +68,11 @@ async function loadMore(reset = false) {
     exhausted = page.commits.length < PAGE;
     setCommits(reset ? page.commits : [...commits(), ...page.commits]);
     setRows(reset ? page.rows : [...rows(), ...page.rows]);
-    if (reset && !page.commits.some((c) => selected().includes(c.id))) setSelected(page.commits[0] ? [page.commits[0].id] : []);
+    if (reset && !page.commits.some((c) => selected().includes(c.id))) {
+      const saved = repoLayout(repo.id).commit;
+      const keep = saved && page.commits.some((c) => c.id === saved) ? saved : page.commits[0]?.id;
+      setSelected(keep ? [keep] : []);
+    }
   } catch (e) {
     reportError(e, "Could not load history");
   } finally {
@@ -238,6 +243,16 @@ function CompareBar() {
 }
 
 export function HistoryList() {
+  createEffect(
+    on(
+      selected,
+      (shas) => {
+        const id = store.repo?.id;
+        if (id && shas.length === 1) saveRepoLayout(id, { commit: shas[0] });
+      },
+      { defer: true },
+    ),
+  );
   createEffect(
     on(
       () => [store.repo?.id, headId()] as const,
