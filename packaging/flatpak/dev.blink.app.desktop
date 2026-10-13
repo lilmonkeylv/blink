@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Blink
+Comment=A fast Git client for GitHub
+Exec=blink %u
+Icon=dev.blink.app
+StartupWMClass=blink
+Terminal=false
+Categories=Development;RevisionControl;
+MimeType=x-scheme-handler/blink;
+Keywords=git;github;version control;

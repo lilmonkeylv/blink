@@ -1,0 +1,37 @@
+id: dev.blink.app
+runtime: org.gnome.Platform
+runtime-version: '49'
+sdk: org.gnome.Sdk
+command: blink
+finish-args:
+  - --share=network
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  - --device=dri
+  - --filesystem=home
+  - --socket=ssh-auth
+  - --talk-name=org.freedesktop.secrets
+  - --talk-name=org.freedesktop.Flatpak
+modules:
+  - name: blink
+    buildsystem: simple
+    sources:
+      - type: dir
+        path: ../../target/release/bundle/deb
+        dest: deb
+      - type: file
+        path: git-host.sh
+      - type: file
+        path: dev.blink.app.desktop
+      - type: file
+        path: dev.blink.app.metainfo.xml
+    build-commands:
+      - cd deb && ar -x *.deb && tar -xf data.tar.*
+      - install -Dm755 deb/usr/bin/blink /app/bin/blink
+      - install -Dm755 git-host.sh /app/bin/git
+      - install -Dm644 dev.blink.app.desktop /app/share/applications/dev.blink.app.desktop
+      - install -Dm644 dev.blink.app.metainfo.xml /app/share/metainfo/dev.blink.app.metainfo.xml
+      - install -Dm644 deb/usr/share/icons/hicolor/32x32/apps/blink.png /app/share/icons/hicolor/32x32/apps/dev.blink.app.png
+      - install -Dm644 deb/usr/share/icons/hicolor/128x128/apps/blink.png /app/share/icons/hicolor/128x128/apps/dev.blink.app.png
+      - install -Dm644 deb/usr/share/icons/hicolor/256x256@2/apps/blink.png /app/share/icons/hicolor/256x256@2/apps/dev.blink.app.png

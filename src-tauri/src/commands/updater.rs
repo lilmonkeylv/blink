@@ -39,6 +39,9 @@ async fn check(app: &AppHandle) -> CmdResult<Option<UpdateInfo>> {
     if cfg!(debug_assertions) && std::env::var_os("BLINK_UPDATER_DEV").is_none() {
         return Ok(None);
     }
+    if std::env::var_os("FLATPAK_ID").is_some() {
+        return Ok(None);
+    }
     let update = app.updater().map_err(updater_error)?.check().await.map_err(updater_error)?;
     let info = update.as_ref().map(|u| UpdateInfo {
         version: u.version.clone(),

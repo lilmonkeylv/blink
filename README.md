@@ -147,6 +147,18 @@ blink/
 
 Releases ship an `.AppImage`, a `.deb` and an `.rpm`. The `.deb` and `.rpm` pull in `git` as a dependency and register the `blink://` link handler, and they're updated through your package manager. The AppImage updates itself like the Windows and macOS builds; just make sure `git` is on your `PATH`.
 
+#### Flatpak
+
+The manifest in `packaging/flatpak` repackages the `.deb` from `bun tauri build`:
+
+```bash
+bun tauri build --bundles deb
+flatpak-builder --user --install --force-clean build-flatpak packaging/flatpak/dev.blink.app.yml
+flatpak run dev.blink.app
+```
+
+The sandbox has no Git of its own. `git` inside it is a small wrapper that runs the host's `git` through `flatpak-spawn --host`, which is why the manifest asks for `--talk-name=org.freedesktop.Flatpak`. Install Git on the host. The other permissions cover your home folder for repositories, the network, the ssh-agent socket and the Secret Service keyring for sign-in tokens. Blink doesn't update itself inside Flatpak; rebuild or update through Flatpak instead.
+
 ### Run in development
 
 ```bash
