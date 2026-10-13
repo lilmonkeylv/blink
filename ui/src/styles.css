@@ -29,6 +29,7 @@
   --toolbar-fg: #f0f3f6;
   --toolbar-muted: #9198a1;
   --toolbar-hover: #32383f;
+  --toolbar-border: #3d444d;
   --add-bg: #e6ffec;
   --add-num: #ccffd8;
   --add-fg: #1a7f37;
@@ -43,19 +44,20 @@
 }
 
 :root[data-theme="dark"] {
-  --bg: #0d1117;
-  --bg-subtle: #161b22;
-  --bg-hover: #1f2630;
-  --bg-selected: #1c2b45;
+  --bg: #151b23;
+  --bg-subtle: #1b222c;
+  --bg-hover: #252d38;
+  --bg-selected: #213452;
   --bg-selected-focus: #2f6feb;
   --fg: #e6edf3;
   --fg-muted: #9198a1;
   --fg-selected-focus: #fff;
-  --border: #30363d;
-  --toolbar-bg: #010409;
+  --border: #363e48;
+  --toolbar-bg: #0c1117;
   --toolbar-fg: #e6edf3;
   --toolbar-muted: #8b949e;
-  --toolbar-hover: #161b22;
+  --toolbar-hover: #1b222c;
+  --toolbar-border: #2d3540;
   --add-bg: rgba(46, 160, 67, 0.15);
   --add-num: rgba(46, 160, 67, 0.3);
   --add-fg: #3fb950;
@@ -188,7 +190,7 @@ a {
   overflow: hidden;
   background: var(--toolbar-bg);
   color: var(--toolbar-fg);
-  border-bottom: 1px solid #000;
+  border-bottom: 1px solid var(--toolbar-border);
 }
 
 .tab-strip {
@@ -200,7 +202,7 @@ a {
 }
 
 .tab-strip.shown {
-  border-bottom: 1px solid #000;
+  border-bottom: 1px solid var(--toolbar-border);
 }
 
 .repo-tab {
@@ -211,7 +213,7 @@ a {
   min-width: 90px;
   height: 30px;
   padding: 0 6px 0 12px;
-  border-right: 1px solid #000;
+  border-right: 1px solid var(--toolbar-border);
   color: var(--toolbar-muted);
   font-size: 12px;
   cursor: pointer;
@@ -281,10 +283,29 @@ a {
   min-width: 0;
   padding: 0 14px;
   border: 0;
-  border-right: 1px solid #000;
+  border-right: 1px solid var(--toolbar-border);
   background: transparent;
   text-align: left;
   cursor: pointer;
+}
+
+.branch-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.branch-actions .btn {
+  justify-content: flex-start;
+  min-width: 0;
+}
+
+.branch-actions .btn span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
 }
 
 .toolbar-button:hover:not(:disabled),
@@ -2036,7 +2057,7 @@ input[type="range"] {
   width: 54px;
   justify-content: center;
   border-right: 0;
-  border-left: 1px solid #000;
+  border-left: 1px solid var(--toolbar-border);
 }
 
 .toolbar-button .dot {
