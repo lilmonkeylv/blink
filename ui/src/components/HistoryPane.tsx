@@ -1,4 +1,3 @@
-import { ask } from "@tauri-apps/plugin-dialog";
 import { createEffect, createMemo, createResource, createSignal, For, on, Show } from "solid-js";
 import {
   api,
@@ -20,6 +19,7 @@ import { DiffLayoutToggle, DiffView } from "./DiffView";
 import { CloseIcon, StatusIcon } from "./Icons";
 import { ImageDiff, isImagePath } from "./ImageDiff";
 import { VirtualList } from "./VirtualList";
+import { ask } from "./Prompt";
 
 const PAGE = 300;
 const ROW = 52;

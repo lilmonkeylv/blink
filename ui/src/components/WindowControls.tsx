@@ -1,7 +1,9 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
 
-export const customTitleBar = "__TAURI_INTERNALS__" in window && navigator.userAgent.includes("Windows");
+// the browser dev mock defines the IPC bridge but no window metadata
+export const nativeWindow = !!(window as { __TAURI_INTERNALS__?: { metadata?: unknown } }).__TAURI_INTERNALS__?.metadata;
+export const customTitleBar = nativeWindow && navigator.userAgent.includes("Windows");
 
 export function WindowControls() {
   const win = getCurrentWindow();

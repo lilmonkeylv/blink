@@ -1,4 +1,4 @@
-import { ask, message, open as openDialog } from "@tauri-apps/plugin-dialog";
+import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
 import { api, type Branch, type PullRequest, type RepoRecord, type SyncAction } from "../api";
 import { fuzzyFilter } from "../lib/fuzzy";
@@ -24,6 +24,7 @@ import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { customTitleBar, WindowControls } from "./WindowControls";
 import { DRAG_TYPE } from "./HistoryPane";
 import { BranchIcon, CheckIcon, ChevronDown, DownIcon, MenuIcon, PlusIcon, PullRequestIcon, RepoIcon, SyncIcon, UpIcon } from "./Icons";
+import { ask, choose, message } from "./Prompt";
 
 export async function pickAndAddRepository() {
   const dir = await openDialog({ directory: true, multiple: false, title: "Add local repository" });
@@ -237,11 +238,16 @@ function BranchPopover() {
       if (mode === "stash-on-current") changes = "stashOnCurrent";
       else if (mode === "bring-changes") changes = "bringAlong";
       else {
-        const stash = await ask(
+        const picked = await choose(
+          "Switch branch",
           `You have changes on this branch. Leave them on ${current() ?? "this branch"} (stash) or bring them to ${b.name}?`,
-          { title: "Switch branch", okLabel: `Leave on ${current() ?? "branch"}`, cancelLabel: `Bring to ${b.name}` },
+          [
+            { label: `Leave on ${current() ?? "branch"}`, value: "stashOnCurrent" as const },
+            { label: `Bring to ${b.name}`, value: "bringAlong" as const, primary: true },
+          ],
         );
-        changes = stash ? "stashOnCurrent" : "bringAlong";
+        if (!picked) return;
+        changes = picked;
       }
     }
     setStore("popover", null);

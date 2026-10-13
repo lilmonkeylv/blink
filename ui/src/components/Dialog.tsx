@@ -1,6 +1,8 @@
 import { onCleanup, onMount, type JSX, Show } from "solid-js";
 import { CloseIcon } from "./Icons";
 
+const open: symbol[] = [];
+
 export function Dialog(p: {
   title: string;
   onClose: () => void;
@@ -10,17 +12,22 @@ export function Dialog(p: {
   children: JSX.Element;
 }) {
   let ref!: HTMLDivElement;
+  const self = Symbol();
   const onKey = (e: KeyboardEvent) => {
-    if (e.key === "Escape") {
+    if (e.key === "Escape" && open[open.length - 1] === self) {
       e.stopPropagation();
       p.onClose();
     }
   };
   onMount(() => {
+    open.push(self);
     window.addEventListener("keydown", onKey, true);
     ref.querySelector<HTMLElement>("[autofocus], input, textarea, select, button.primary")?.focus();
   });
-  onCleanup(() => window.removeEventListener("keydown", onKey, true));
+  onCleanup(() => {
+    open.splice(open.indexOf(self), 1);
+    window.removeEventListener("keydown", onKey, true);
+  });
 
   return (
     <div class="backdrop" onMouseDown={(e) => e.target === e.currentTarget && p.onClose()}>

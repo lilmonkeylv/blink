@@ -1,4 +1,3 @@
-import { ask } from "@tauri-apps/plugin-dialog";
 import { createEffect, createMemo, createSignal, on, Show } from "solid-js";
 import { api, type FileChange, type FileDiff, type FileSelection } from "../api";
 import { recentMessages, rememberMessage } from "../lib/messages";
@@ -12,6 +11,7 @@ import { DiffLayoutToggle, DiffView } from "./DiffView";
 import { StatusIcon } from "./Icons";
 import { ImageDiff, isImagePath } from "./ImageDiff";
 import { VirtualList } from "./VirtualList";
+import { ask } from "./Prompt";
 
 const SUMMARY_SOFT_LIMIT = 72;
 

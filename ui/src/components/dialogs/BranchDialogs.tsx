@@ -1,4 +1,3 @@
-import { ask } from "@tauri-apps/plugin-dialog";
 import { createResource, createSignal, For, Show } from "solid-js";
 import { api, type CommitFile } from "../../api";
 import { currentBranch, notify, run, setStore, store } from "../../store";
@@ -7,6 +6,7 @@ import { DiffView } from "../DiffView";
 import { StatusIcon } from "../Icons";
 import { Dialog } from "../Dialog";
 import { BranchPicker, closeDialog, sanitizeBranchName } from "./common";
+import { ask, message as showMessage } from "../Prompt";
 
 export function NewBranchDialog(p: { start?: string }) {
   const [name, setName] = createSignal("");
@@ -204,7 +204,7 @@ export function CherryPickDialog(p: { shas: string[] }) {
     const target = picked();
     if (!repo || !target) return;
     if (repo.files.length) {
-      await ask("Commit or stash your changes before cherry-picking to another branch.", { title: "Uncommitted changes", kind: "warning" });
+      await showMessage("Commit or stash your changes before cherry-picking to another branch.", { title: "Uncommitted changes", kind: "warning" });
       return;
     }
     closeDialog();

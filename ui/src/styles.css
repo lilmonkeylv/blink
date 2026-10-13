@@ -910,6 +910,21 @@ select.input {
   text-overflow: ellipsis;
 }
 
+.dialog.prompt {
+  width: min(460px, calc(100vw - 32px));
+}
+
+.prompt-message {
+  margin: 0;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.prompt-message.warning {
+  padding-left: 10px;
+  border-left: 3px solid var(--warn);
+}
+
 .backdrop {
   position: fixed;
   inset: 0;
