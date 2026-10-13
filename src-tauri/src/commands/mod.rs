@@ -3,6 +3,7 @@ pub mod branches;
 pub mod changes;
 pub mod github;
 pub mod history;
+pub mod images;
 pub mod inspect;
 pub mod integrations;
 pub mod notes;

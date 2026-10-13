@@ -4,6 +4,7 @@ import { api, type Settings } from "../api";
 import { notify, reportError, saveSettings, setStore, store } from "../store";
 import { Checkbox, Field, Select, type SelectOption } from "./Controls";
 import { Dialog } from "./Dialog";
+import { Avatar } from "./Avatar";
 
 const TABS = ["Accounts", "Integrations", "Git", "Appearance", "Notifications", "Prompts", "Advanced", "Accessibility"] as const;
 type TabName = (typeof TABS)[number];
@@ -128,7 +129,7 @@ function AccountsTab() {
       >
         {(a) => (
           <div class="summary-row">
-            <img src={a().avatar_url} width="40" height="40" style={{ "border-radius": "50%" }} alt="" />
+            <Avatar url={a().avatar_url} />
             <div style={{ flex: 1 }}>
               <div style={{ "font-weight": 600 }}>{a().name ?? a().login}</div>
               <div class="muted">@{a().login}</div>

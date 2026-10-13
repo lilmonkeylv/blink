@@ -133,6 +133,7 @@ pub fn run() {
             commands::github::create_pull_request,
             commands::github::branch_checks,
             commands::github::commit_warnings,
+            commands::images::avatar,
             commands::github::rerun_failed_checks,
             commands::github::workflow_run_jobs,
             commands::github::workflow_job,
