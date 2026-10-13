@@ -152,7 +152,7 @@ export function installDevMock() {
         ].join("\n");
       case "pull_requests":
         return [{ number: 42, title: "Add commit graph lanes", html_url: "", state: "open", draft: false, user: { login: "octocat" },
-          head: { ref: "feature/graph", sha: "", repo: null }, base: { ref: "main", sha: "" }, created_at: new Date().toISOString(), updated_at: new Date().toISOString() }];
+          head: { ref: "feature/graph", sha: "", repo: null }, base: { ref: "main", sha: "" }, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), checks: "success" }];
       case "compare_branch":
         return { ahead: history.slice(0, 2), behind: history.slice(5, 8) };
       case "search_history":

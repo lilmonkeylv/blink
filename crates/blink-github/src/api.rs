@@ -84,6 +84,128 @@ pub struct PullRequest {
     pub base: PullRef,
     pub created_at: String,
     pub updated_at: String,
+    #[serde(default)]
+    pub checks: Option<CheckState>,
+}
+
+const PULLS_QUERY: &str = "query($owner: String!, $name: String!) {
+  repository(owner: $owner, name: $name) {
+    pullRequests(states: OPEN, first: 100, orderBy: {field: CREATED_AT, direction: DESC}) {
+      nodes {
+        number title url isDraft createdAt updatedAt
+        author { login }
+        headRefName headRefOid
+        headRepository { nameWithOwner url }
+        baseRefName baseRefOid
+        commits(last: 1) { nodes { commit { statusCheckRollup { state } } } }
+      }
+    }
+  }
+}";
+
+#[derive(Deserialize)]
+struct PullsData {
+    repository: Option<GqlRepository>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GqlRepository {
+    pull_requests: GqlNodes<GqlPull>,
+}
+
+#[derive(Deserialize)]
+struct GqlNodes<T> {
+    nodes: Vec<T>,
+}
+
+#[derive(Deserialize)]
+struct GqlLogin {
+    login: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GqlHeadRepository {
+    name_with_owner: String,
+    url: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GqlPull {
+    number: u64,
+    title: String,
+    url: String,
+    is_draft: bool,
+    created_at: String,
+    updated_at: String,
+    author: Option<GqlLogin>,
+    head_ref_name: String,
+    head_ref_oid: String,
+    head_repository: Option<GqlHeadRepository>,
+    base_ref_name: String,
+    base_ref_oid: String,
+    commits: GqlNodes<GqlPullCommit>,
+}
+
+#[derive(Deserialize)]
+struct GqlPullCommit {
+    commit: GqlCommit,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct GqlCommit {
+    status_check_rollup: Option<GqlRollup>,
+}
+
+#[derive(Deserialize)]
+struct GqlRollup {
+    state: String,
+}
+
+impl From<GqlPull> for PullRequest {
+    fn from(pr: GqlPull) -> Self {
+        let checks = match pr.commits.nodes.last().and_then(|c| c.commit.status_check_rollup.as_ref()) {
+            None => CheckState::None,
+            Some(rollup) => match rollup.state.as_str() {
+                "SUCCESS" => CheckState::Success,
+                "FAILURE" | "ERROR" => CheckState::Failure,
+                _ => CheckState::Pending,
+            },
+        };
+        PullRequest {
+            number: pr.number,
+            title: pr.title,
+            html_url: pr.url,
+            state: "open".to_string(),
+            draft: pr.is_draft,
+            user: Owner { login: pr.author.map_or_else(|| "ghost".to_string(), |a| a.login) },
+            head: PullRef {
+                name: pr.head_ref_name,
+                sha: pr.head_ref_oid,
+                repo: pr
+                    .head_repository
+                    .map(|r| PullRepo { full_name: r.name_with_owner, clone_url: format!("{}.git", r.url) }),
+            },
+            base: PullRef { name: pr.base_ref_name, sha: pr.base_ref_oid, repo: None },
+            created_at: pr.created_at,
+            updated_at: pr.updated_at,
+            checks: Some(checks),
+        }
+    }
+}
+
+fn pulls_from_graphql(data: PullsData) -> Vec<PullRequest> {
+    data.repository.map(|r| r.pull_requests.nodes.into_iter().map(Into::into).collect()).unwrap_or_default()
+}
+
+#[derive(Deserialize)]
+struct GraphqlReply<T> {
+    data: Option<T>,
+    #[serde(default)]
+    errors: Vec<ApiMessage>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -150,7 +272,7 @@ struct CombinedStatus {
     statuses: Vec<CommitStatus>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum CheckState {
     Success,
@@ -353,8 +475,33 @@ impl Client {
         self.send(Method::POST, &path, &body).await
     }
 
+    fn graphql_url(&self) -> String {
+        match self.api_base.strip_suffix("/api/v3") {
+            Some(web) => format!("{web}/api/graphql"),
+            None => format!("{}/graphql", self.api_base),
+        }
+    }
+
+    pub async fn graphql<T: DeserializeOwned>(&self, query: &str, variables: serde_json::Value) -> Result<T> {
+        let body = serde_json::json!({ "query": query, "variables": variables });
+        let response = self.request(Method::POST, &self.graphql_url()).json(&body).send().await?;
+        let reply: GraphqlReply<T> = Self::check(response).await?.json().await?;
+        if let Some(error) = reply.errors.into_iter().next() {
+            return Err(Error::Graphql(error.message));
+        }
+        reply.data.ok_or_else(|| Error::Graphql("response has no data".to_string()))
+    }
+
     pub async fn pulls(&self, owner: &str, name: &str) -> Result<Vec<PullRequest>> {
-        self.get_all(&format!("/repos/{owner}/{name}/pulls?state=open&per_page=100"), 5).await
+        let variables = serde_json::json!({ "owner": owner, "name": name });
+        match self.graphql::<PullsData>(PULLS_QUERY, variables).await {
+            Ok(data) => Ok(pulls_from_graphql(data)),
+            Err(Error::Unauthorized) => Err(Error::Unauthorized),
+            Err(e) => {
+                tracing::debug!(error = %e, "GraphQL pull request query failed, falling back to REST");
+                self.get_all(&format!("/repos/{owner}/{name}/pulls?state=open&per_page=100"), 5).await
+            }
+        }
     }
 
     pub async fn checks(&self, owner: &str, name: &str, git_ref: &str) -> Result<ChecksSummary> {
@@ -452,6 +599,84 @@ mod tests {
         let h = r#"<https://api.github.com/user/repos?page=2>; rel="next", <https://api.github.com/user/repos?page=5>; rel="last""#;
         assert_eq!(next_link(h).as_deref(), Some("https://api.github.com/user/repos?page=2"));
         assert_eq!(next_link(r#"<x>; rel="prev""#), None);
+    }
+
+    #[test]
+    fn graphql_endpoints() {
+        assert_eq!(Client::github_com("t").graphql_url(), "https://api.github.com/graphql");
+        assert_eq!(Client::new("https://api.acme.ghe.com", "t").graphql_url(), "https://api.acme.ghe.com/graphql");
+        assert_eq!(Client::new("https://ghe.acme.com/api/v3", "t").graphql_url(), "https://ghe.acme.com/api/graphql");
+    }
+
+    #[test]
+    fn maps_graphql_pull_requests() {
+        let json = r#"{
+          "data": {
+            "repository": {
+              "pullRequests": {
+                "nodes": [
+                  {
+                    "number": 42,
+                    "title": "Add commit graph lanes",
+                    "url": "https://github.com/acme/app/pull/42",
+                    "isDraft": false,
+                    "createdAt": "2026-10-01T10:00:00Z",
+                    "updatedAt": "2026-10-02T11:00:00Z",
+                    "author": { "login": "octocat" },
+                    "headRefName": "feature/graph",
+                    "headRefOid": "abc123",
+                    "headRepository": { "nameWithOwner": "octocat/app", "url": "https://github.com/octocat/app" },
+                    "baseRefName": "main",
+                    "baseRefOid": "def456",
+                    "commits": { "nodes": [{ "commit": { "statusCheckRollup": { "state": "FAILURE" } } }] }
+                  },
+                  {
+                    "number": 7,
+                    "title": "Draft from a deleted fork",
+                    "url": "https://github.com/acme/app/pull/7",
+                    "isDraft": true,
+                    "createdAt": "2026-09-01T10:00:00Z",
+                    "updatedAt": "2026-09-01T10:00:00Z",
+                    "author": null,
+                    "headRefName": "wip",
+                    "headRefOid": "111111",
+                    "headRepository": null,
+                    "baseRefName": "main",
+                    "baseRefOid": "def456",
+                    "commits": { "nodes": [{ "commit": { "statusCheckRollup": null } }] }
+                  }
+                ]
+              }
+            }
+          }
+        }"#;
+        let reply: GraphqlReply<PullsData> = serde_json::from_str(json).unwrap();
+        assert!(reply.errors.is_empty());
+        let pulls = pulls_from_graphql(reply.data.unwrap());
+        assert_eq!(pulls.len(), 2);
+        let first = &pulls[0];
+        assert_eq!((first.number, first.state.as_str(), first.draft), (42, "open", false));
+        assert_eq!(first.html_url, "https://github.com/acme/app/pull/42");
+        assert_eq!(first.user.login, "octocat");
+        assert_eq!((first.head.name.as_str(), first.head.sha.as_str()), ("feature/graph", "abc123"));
+        assert_eq!(
+            first.head.repo,
+            Some(PullRepo { full_name: "octocat/app".into(), clone_url: "https://github.com/octocat/app.git".into() })
+        );
+        assert_eq!((first.base.name.as_str(), first.base.sha.as_str()), ("main", "def456"));
+        assert_eq!(first.checks, Some(CheckState::Failure));
+        let second = &pulls[1];
+        assert_eq!((second.user.login.as_str(), second.draft), ("ghost", true));
+        assert_eq!(second.head.repo, None);
+        assert_eq!(second.checks, Some(CheckState::None));
+    }
+
+    #[test]
+    fn graphql_errors_are_reported() {
+        let json = r#"{ "data": null, "errors": [{ "message": "Could not resolve to a Repository" }] }"#;
+        let reply: GraphqlReply<PullsData> = serde_json::from_str(json).unwrap();
+        assert_eq!(reply.errors[0].message, "Could not resolve to a Repository");
+        assert!(reply.data.is_none());
     }
 
     fn run(status: &str, conclusion: Option<&str>) -> CheckRun {

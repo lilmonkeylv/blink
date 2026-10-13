@@ -348,6 +348,7 @@ export interface PullRequest {
   base: { ref: string; sha: string };
   created_at: string;
   updated_at: string;
+  checks: ChecksSummary["state"] | null;
 }
 
 export interface CheckRun {

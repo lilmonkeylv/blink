@@ -16,6 +16,8 @@ pub enum Error {
     Denied,
     #[error("GitHub API {status}: {message}")]
     Api { status: u16, message: String },
+    #[error("GitHub GraphQL: {0}")]
+    Graphql(String),
     #[error("rate limited until {reset}")]
     RateLimited { reset: i64 },
     #[error("this organization requires single sign-on; authorize the token at {url}")]

@@ -1781,6 +1781,10 @@ input[type="range"] {
   align-items: flex-start;
 }
 
+.pr-row .dot {
+  margin-top: 5px;
+}
+
 .pr-row .grow {
   display: flex;
   flex-direction: column;
