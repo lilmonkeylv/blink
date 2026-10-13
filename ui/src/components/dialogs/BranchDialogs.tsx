@@ -2,6 +2,7 @@ import { ask } from "@tauri-apps/plugin-dialog";
 import { createResource, createSignal, For, Show } from "solid-js";
 import { api } from "../../api";
 import { currentBranch, notify, run, setStore, store } from "../../store";
+import { Select } from "../Controls";
 import { Dialog } from "../Dialog";
 import { BranchPicker, closeDialog, sanitizeBranchName } from "./common";
 
@@ -71,6 +72,51 @@ export function RenameBranchDialog(p: { name: string }) {
       }
     >
       <input class="input" autofocus value={name()} onInput={(e) => setName(e.currentTarget.value)} onKeyDown={(e) => e.key === "Enter" && rename()} />
+    </Dialog>
+  );
+}
+
+export function SetUpstreamDialog(p: { branch: string; current: string | null }) {
+  const [branches] = createResource(() => store.repo?.id, (id) => api.branches(id));
+  const remotes = () => (branches() ?? []).filter((b) => b.kind === "remote" && !b.name.endsWith("/HEAD"));
+  const [upstream, setUpstream] = createSignal(p.current ?? "");
+  const save = async (value: string | null) => {
+    const repo = store.repo;
+    if (!repo) return;
+    const ok = await run("Set upstream", () => api.setUpstream(repo.id, p.branch, value).then(() => true));
+    if (!ok) return;
+    notify("success", value ? `${p.branch} now tracks ${value}` : `${p.branch} no longer tracks a remote branch`);
+    closeDialog();
+  };
+  return (
+    <Dialog
+      title={`Upstream for ${p.branch}`}
+      onClose={closeDialog}
+      footer={
+        <>
+          <Show when={p.current}>
+            <button class="btn" onClick={() => save(null)}>
+              Stop tracking
+            </button>
+          </Show>
+          <span class="grow" />
+          <button class="btn" onClick={closeDialog}>
+            Cancel
+          </button>
+          <button class="btn primary" disabled={!upstream() || upstream() === p.current} onClick={() => save(upstream())}>
+            Track
+          </button>
+        </>
+      }
+    >
+      <span class="muted">Pull and push for {p.branch} will use this remote branch.</span>
+      <Select
+        value={upstream()}
+        placeholder={branches.loading ? "Loading…" : "Pick a remote branch"}
+        options={remotes().map((b) => ({ value: b.name, label: b.name }))}
+        onChange={setUpstream}
+        ariaLabel="Remote branch"
+      />
     </Dialog>
   );
 }

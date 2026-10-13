@@ -29,6 +29,7 @@ export type Dialog =
   | { type: "createRepo" }
   | { type: "newBranch"; start?: string }
   | { type: "renameBranch"; name: string }
+  | { type: "setUpstream"; branch: string; current: string | null }
   | { type: "settings"; tab?: string }
   | { type: "signIn" }
   | { type: "merge" }

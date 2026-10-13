@@ -494,6 +494,9 @@ export const api = {
   renameBranch: (id: string, old: string, newName: string) => invoke<void>("rename_branch", { id, old, new: newName }),
   deleteBranch: (id: string, name: string, force: boolean, includeRemote: boolean) =>
     invoke<void>("delete_branch", { id, name, force, includeRemote }),
+  deleteRemoteBranch: (id: string, name: string) => invoke<void>("delete_remote_branch", { id, name }),
+  setUpstream: (id: string, branch: string, upstream: string | null) => invoke<void>("set_upstream", { id, branch, upstream }),
+  pruneRemotes: (id: string) => invoke<string[]>("prune_remotes", { id }),
   merge: (id: string, branch: string, squash = false) =>
     invoke<{ conflicted: boolean; output: string }>("merge_branch", { id, branch, squash }),
   abortMerge: (id: string) => invoke<void>("abort_merge", { id }),

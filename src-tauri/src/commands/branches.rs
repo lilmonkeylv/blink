@@ -3,7 +3,7 @@ use blink_git::{Branch, BranchKind};
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
-use crate::error::CmdResult;
+use crate::error::{CmdResult, CommandError};
 use crate::state::AppState;
 
 #[tauri::command]
@@ -95,6 +95,42 @@ pub async fn delete_branch(
                 cli.delete_remote_branch(remote, branch)?;
             }
             Ok(())
+        })
+        .await?)
+}
+
+#[tauri::command]
+pub async fn delete_remote_branch(state: State<'_, AppState>, id: String, name: String) -> CmdResult<()> {
+    let handle = state.engine.get(&id)?;
+    let cli = state.git_cli(handle.repo());
+    let (remote, branch) =
+        name.split_once('/').ok_or_else(|| CommandError::new("git", format!("{name} is not a remote branch")))?;
+    let (remote, branch) = (remote.to_string(), branch.to_string());
+    Ok(state.engine.write(&id, move |_| cli.delete_remote_branch(&remote, &branch)).await?)
+}
+
+#[tauri::command]
+pub async fn set_upstream(
+    state: State<'_, AppState>,
+    id: String,
+    branch: String,
+    upstream: Option<String>,
+) -> CmdResult<()> {
+    Ok(state.engine.write(&id, move |repo| repo.cli().set_upstream(&branch, upstream.as_deref())).await?)
+}
+
+#[tauri::command]
+pub async fn prune_remotes(state: State<'_, AppState>, id: String) -> CmdResult<Vec<String>> {
+    let handle = state.engine.get(&id)?;
+    let cli = state.git_cli(handle.repo());
+    Ok(state
+        .engine
+        .write(&id, move |_| {
+            let mut pruned = Vec::new();
+            for (remote, _) in cli.remotes()? {
+                pruned.extend(cli.prune_remote(&remote)?);
+            }
+            Ok(pruned)
         })
         .await?)
 }
