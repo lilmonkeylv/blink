@@ -272,6 +272,18 @@ impl GitCli {
         self.run(&["branch", if force { "-D" } else { "-d" }, name]).map(drop)
     }
 
+    pub fn set_upstream(&self, branch: &str, upstream: Option<&str>) -> Result<()> {
+        match upstream {
+            Some(upstream) => self.run(&["branch", &format!("--set-upstream-to={upstream}"), branch]),
+            None => self.run(&["branch", "--unset-upstream", branch]),
+        }
+        .map(drop)
+    }
+
+    pub fn prune_remote(&self, remote: &str) -> Result<Vec<String>> {
+        Ok(parse_pruned(&self.run(&["remote", "prune", remote])?))
+    }
+
     pub fn delete_remote_branch(&self, remote: &str, name: &str) -> Result<()> {
         self.run(&["push", remote, "--delete", name]).map(drop)
     }
@@ -394,9 +406,20 @@ fn parse_progress(line: &str) -> Progress {
     Progress { phase: phase.trim().to_string(), percent, line: line.to_string() }
 }
 
+fn parse_pruned(output: &str) -> Vec<String> {
+    output.lines().filter_map(|l| l.trim().strip_prefix("* [pruned] ")).map(str::to_string).collect()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn parses_pruned_refs() {
+        let out = "Pruning origin\nURL: https://github.com/a/b.git\n * [pruned] origin/old-feature\n * [pruned] origin/fix/x\n";
+        assert_eq!(parse_pruned(out), ["origin/old-feature", "origin/fix/x"]);
+        assert!(parse_pruned("").is_empty());
+    }
 
     #[test]
     fn parses_progress_lines() {

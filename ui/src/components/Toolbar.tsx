@@ -260,6 +260,27 @@ function BranchPopover() {
     refetch();
   };
 
+  const deleteRemote = async (b: Branch) => {
+    const repo = store.repo!;
+    const ok = await ask(`Delete ${b.name} on the remote? Anyone else using it will lose the branch too.`, {
+      title: "Delete remote branch",
+      kind: "warning",
+      okLabel: "Delete",
+    });
+    if (!ok) return;
+    const done = await run("Delete remote branch", () => api.deleteRemoteBranch(repo.id, b.name).then(() => true));
+    if (done) notify("success", `Deleted ${b.name}`);
+    refetch();
+  };
+
+  const prune = async () => {
+    const repo = store.repo!;
+    const pruned = await run("Prune remote branches", () => api.pruneRemotes(repo.id));
+    if (!pruned) return;
+    notify("success", pruned.length ? `Removed ${pruned.length} stale remote branch${pruned.length === 1 ? "" : "es"}` : "No stale remote branches");
+    refetch();
+  };
+
   const merge = async (b: Branch, squash = false) => {
     const repo = store.repo!;
     setStore("popover", null);
@@ -275,8 +296,20 @@ function BranchPopover() {
     { label: `Merge into ${current()}`, run: () => merge(b), disabled: b.name === current() },
     { label: `Squash and merge into ${current()}`, run: () => merge(b, true), disabled: b.name === current() },
     { label: "Compare with current branch", run: () => { setStore({ popover: null, tab: "history", compareWith: b.name }); }, disabled: b.name === current() },
+    { label: b.upstream ? `Tracking ${b.upstream}…` : "Track a remote branch…", run: () => setStore({ popover: null, dialog: { type: "setUpstream", branch: b.name, current: b.upstream } }) },
     "separator",
     { label: "Delete…", run: () => del(b), disabled: b.name === current() },
+  ];
+
+  const remoteMenu = (b: Branch): MenuItem[] => [
+    { label: "Check out as a tracking branch", run: () => checkout(b) },
+    { label: "Copy branch name", run: () => navigator.clipboard.writeText(b.name) },
+    "separator",
+    { label: `Merge into ${current()}`, run: () => merge(b) },
+    { label: "Compare with current branch", run: () => setStore({ popover: null, tab: "history", compareWith: b.name }) },
+    "separator",
+    { label: "Prune stale remote branches", run: prune },
+    { label: "Delete on remote…", run: () => deleteRemote(b) },
   ];
 
   return (
@@ -319,12 +352,7 @@ function BranchPopover() {
                       onContextMenu={(e) =>
                         openContextMenu(
                           e,
-                          b.kind === "local"
-                            ? localMenu(b)
-                            : [
-                                { label: "Copy branch name", run: () => navigator.clipboard.writeText(b.name) },
-                                { label: `Merge into ${current()}`, run: () => merge(b) },
-                              ],
+                          b.kind === "local" ? localMenu(b) : remoteMenu(b),
                         )
                       }
                     >

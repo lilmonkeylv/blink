@@ -1,6 +1,14 @@
 import { Match, Show, Switch } from "solid-js";
 import { store, type Dialog } from "../store";
-import { CherryPickDialog, MergeDialog, NewBranchDialog, RebaseDialog, RenameBranchDialog, StashesDialog } from "./dialogs/BranchDialogs";
+import {
+  CherryPickDialog,
+  MergeDialog,
+  NewBranchDialog,
+  RebaseDialog,
+  RenameBranchDialog,
+  SetUpstreamDialog,
+  StashesDialog,
+} from "./dialogs/BranchDialogs";
 import {
   BlameDialog,
   FileHistoryDialog,
@@ -47,6 +55,7 @@ export function Dialogs() {
         </Match>
         <Match when={of("newBranch")}>{(d) => <NewBranchDialog start={d().start} />}</Match>
         <Match when={of("renameBranch")}>{(d) => <RenameBranchDialog name={d().name} />}</Match>
+        <Match when={of("setUpstream")}>{(d) => <SetUpstreamDialog branch={d().branch} current={d().current} />}</Match>
         <Match when={of("merge")}>
           <MergeDialog />
         </Match>
