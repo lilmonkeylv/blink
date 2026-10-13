@@ -155,9 +155,20 @@ bun tauri dev
 bun tauri build
 ```
 
-Installers are written to `src-tauri/target/release/bundle/`.
+Installers are written to `target/release/bundle/`.
 
 Blink uses Bun everywhere: `src-tauri/tauri.conf.json` runs `bun run dev` and `bun run build` as its `beforeDevCommand` and `beforeBuildCommand`, CI uses `oven-sh/setup-bun`, and only `bun.lock` is committed. Please don't add `package-lock.json` or `pnpm-lock.yaml`.
+
+### Releasing
+
+```bash
+bun run version:set 0.2.0
+git commit -am "chore: release 0.2.0"
+git tag v0.2.0
+git push origin master v0.2.0
+```
+
+Pushing a `v*` tag runs `.github/workflows/release.yml`. It builds the Windows, macOS and Linux installers and attaches them to a draft release. Check it over and publish it from the Releases page. Tags with a suffix like `-beta.1` or `-rc.1` are marked as prereleases. To rebuild an existing tag, run the workflow by hand from the Actions tab.
 
 ### GitHub OAuth for local development
 
