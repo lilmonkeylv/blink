@@ -8,7 +8,9 @@
     "build": "tsc --noEmit -p ui && vite build",
     "preview": "vite preview",
     "tauri": "tauri",
-    "test": "bun test ui",
+    "test": "bun test ui scripts",
+    "version:check": "bun scripts/version.ts check",
+    "version:set": "bun scripts/version.ts set",
     "lint": "tsc --noEmit -p ui"
   },
   "dependencies": {
