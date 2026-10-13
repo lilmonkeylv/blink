@@ -695,6 +695,11 @@ select.input {
 
 .static-row.current {
   font-weight: 600;
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.current-mark {
+  color: var(--accent);
 }
 
 .static-row .grow {

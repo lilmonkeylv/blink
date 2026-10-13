@@ -19,7 +19,7 @@ import {
 } from "../store";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { DRAG_TYPE } from "./HistoryPane";
-import { BranchIcon, ChevronDown, DownIcon, MenuIcon, PlusIcon, PullRequestIcon, RepoIcon, SyncIcon, UpIcon } from "./Icons";
+import { BranchIcon, CheckIcon, ChevronDown, DownIcon, MenuIcon, PlusIcon, PullRequestIcon, RepoIcon, SyncIcon, UpIcon } from "./Icons";
 
 export async function pickAndAddRepository() {
   const dir = await openDialog({ directory: true, multiple: false, title: "Add local repository" });
@@ -42,7 +42,7 @@ const addMenu = (): MenuItem[] => [
 
 function RepoPopover() {
   const [query, setQuery] = createSignal("");
-  const [active, setActive] = createSignal(0);
+  const [active, setActive] = createSignal(-1);
   usePopoverDismiss(() => setStore("popover", null));
 
   const filtered = createMemo(() => fuzzyFilter(store.repositories, query(), (r) => `${r.owner ?? ""}/${r.name}`));
@@ -73,6 +73,8 @@ function RepoPopover() {
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
       setActive(Math.max(active() - 1, 0));
+    } else if (e.key === "Enter" && active() < 0 && flat()[0] && query()) {
+      openRepo(flat()[0].path);
     } else if (e.key === "Enter" && flat()[active()]) {
       openRepo(flat()[active()].path);
     }
@@ -88,7 +90,7 @@ function RepoPopover() {
           value={query()}
           onInput={(e) => {
             setQuery(e.currentTarget.value);
-            setActive(0);
+            setActive(e.currentTarget.value ? 0 : -1);
           }}
           onKeyDown={onKey}
         />
@@ -118,6 +120,9 @@ function RepoPopover() {
                   >
                     <RepoIcon />
                     <span class="grow">{r.name}</span>
+                    <Show when={store.repo?.id === r.path}>
+                      <CheckIcon class="current-mark" />
+                    </Show>
                   </div>
                 )}
               </For>
@@ -321,6 +326,9 @@ function BranchPopover() {
                       <span class="muted" style={{ "font-size": "11px" }}>
                         {b.lastCommitTime ? relativeTime(b.lastCommitTime) : ""}
                       </span>
+                      <Show when={b.kind === "local" && b.name === current()}>
+                        <CheckIcon class="current-mark" />
+                      </Show>
                     </div>
                   )}
                 </For>
