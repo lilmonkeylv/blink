@@ -212,6 +212,7 @@ export interface Settings {
     logLevel: string;
     foregroundThreads: number | null;
     backgroundThreads: number | null;
+    updateChannel: "stable" | "beta";
   };
   accessibility: {
     underlineLinks: boolean;

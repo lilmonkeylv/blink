@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { buildManifest } from "./updater-manifest";
+import { buildManifest, channelFiles } from "./updater-manifest";
 
 const base = "https://github.com/lilmonkeylv/blink/releases/download/v0.2.0";
 
@@ -35,5 +35,11 @@ describe("updater manifest", () => {
   test("encodes file names with spaces", () => {
     const m = buildManifest([{ path: "x/My App.AppImage", signature: "s" }], "1.0.0", "", base);
     expect(m.platforms["linux-x86_64"].url).toBe(`${base}/My%20App.AppImage`);
+  });
+
+  test("stable versions go to both channels, prereleases only to beta", () => {
+    expect(channelFiles("0.2.0")).toEqual(["latest.json", "beta.json"]);
+    expect(channelFiles("0.2.0-beta.1")).toEqual(["beta.json"]);
+    expect(channelFiles("0.1.0-alpha.1")).toEqual(["beta.json"]);
   });
 });

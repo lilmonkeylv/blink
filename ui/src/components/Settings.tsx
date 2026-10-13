@@ -407,6 +407,16 @@ export function SettingsDialog(p: { tab?: string }) {
                 onChange={(v) => set((x) => (x.advanced.watcher = v))}
               />
               <Check label="Use system OpenSSH" checked={s.advanced.useSystemOpenssh} onChange={(v) => set((x) => (x.advanced.useSystemOpenssh = v))} />
+              <Choice
+                label="Update channel"
+                value={s.advanced.updateChannel}
+                options={[
+                  { value: "stable", label: "Stable" },
+                  { value: "beta", label: "Beta (prereleases)" },
+                ]}
+                onChange={(v) => set((x) => (x.advanced.updateChannel = v))}
+                hint="Beta gets prerelease builds before they ship to everyone."
+              />
               <Text
                 label="Foreground threads"
                 type="number"

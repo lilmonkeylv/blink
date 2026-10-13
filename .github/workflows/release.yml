@@ -243,7 +243,7 @@ jobs:
           path: dist
           merge-multiple: true
       - name: Updater manifest
-        run: bun scripts/updater-manifest.ts dist "${{ needs.prepare.outputs.version }}" "$TAG" notes.md dist/latest.json
+        run: bun scripts/updater-manifest.ts dist "${{ needs.prepare.outputs.version }}" "$TAG" notes.md dist
       - name: Draft release
         env:
           GH_TOKEN: ${{ github.token }}
