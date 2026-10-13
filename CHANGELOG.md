@@ -9,6 +9,7 @@ All notable changes to Blink are listed here. The format follows [Keep a Changel
 - **ui:** Animate the sync button while fetch, pull and push run ([475011f](https://github.com/lilmonkeylv/blink/commit/475011fe8a18b7f2abadfcbf61209e20c8e4c90c))
 - **updater:** Prerelease builds follow beta and a missing manifest means no update ([c6b302a](https://github.com/lilmonkeylv/blink/commit/c6b302a10e84901b6bd538c37e9f1684e5a72fc9))
 - **ui:** Wait for a repository to open before asking the backend about it ([eb50b2b](https://github.com/lilmonkeylv/blink/commit/eb50b2bad8b1e1936c578d85a593c37288cf6a63))
+- **ui:** Keep the sync bar moving until Git reports real transfer progress ([a19f707](https://github.com/lilmonkeylv/blink/commit/a19f707e94607688d1a09d423d1768eb3050f516))
 
 ## [0.1.0-alpha.3] - 2026-10-13
 
