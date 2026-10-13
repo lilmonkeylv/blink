@@ -4,6 +4,7 @@ mod launch;
 mod state;
 mod view;
 mod watch;
+mod wire;
 
 use tauri::Manager;
 use tracing_subscriber::layer::SubscriberExt;

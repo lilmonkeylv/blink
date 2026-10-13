@@ -1,7 +1,8 @@
 use blink_core::ops;
-use blink_diff::{DiffOptions, FileDiff};
-use blink_git::{CommitDetail, CommitSummary};
+use blink_diff::DiffOptions;
+use blink_git::CommitDetail;
 use tauri::State;
+use tauri::ipc::Response;
 
 use crate::error::CmdResult;
 use crate::state::AppState;
@@ -15,9 +16,10 @@ pub async fn history(
     offset: usize,
     limit: usize,
     rev: Option<String>,
-) -> CmdResult<Vec<CommitSummary>> {
+) -> CmdResult<Response> {
     let limit = limit.min(MAX_PAGE);
-    Ok(state.engine.read(&id, move |repo| repo.log(rev.as_deref(), offset, limit)).await?)
+    let commits = state.engine.read(&id, move |repo| repo.log(rev.as_deref(), offset, limit)).await?;
+    Ok(Response::new(crate::wire::encode_history(&commits)))
 }
 
 #[tauri::command]
@@ -34,11 +36,13 @@ pub async fn commit_file_diff(
     old_path: Option<String>,
     ignore_whitespace: Option<bool>,
     highlight: Option<bool>,
-) -> CmdResult<FileDiff> {
+) -> CmdResult<Response> {
     let opts = DiffOptions {
         ignore_whitespace: ignore_whitespace.unwrap_or(false),
         highlight: highlight.unwrap_or(true),
         ..Default::default()
     };
-    Ok(state.engine.read(&id, move |repo| ops::commit_diff(repo, &sha, &path, old_path.as_deref(), opts)).await?)
+    let diff =
+        state.engine.read(&id, move |repo| ops::commit_diff(repo, &sha, &path, old_path.as_deref(), opts)).await?;
+    Ok(crate::wire::diff_response(&diff))
 }

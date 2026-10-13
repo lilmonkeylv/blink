@@ -1,8 +1,9 @@
 use blink_core::ops::{self, CommitMessage, FileSelection};
-use blink_diff::{DiffOptions, FileDiff};
+use blink_diff::DiffOptions;
 use blink_git::FileChange;
 use serde::{Deserialize, Serialize};
 use tauri::State;
+use tauri::ipc::Response;
 
 use crate::error::{CmdResult, CommandError};
 use crate::state::AppState;
@@ -28,7 +29,7 @@ pub async fn file_diff(
     ignore_whitespace: Option<bool>,
     full: Option<bool>,
     highlight: Option<bool>,
-) -> CmdResult<FileDiff> {
+) -> CmdResult<Response> {
     let change = change_for(&state, &id, &path)?;
     let opts = DiffOptions {
         ignore_whitespace: ignore_whitespace.unwrap_or(false),
@@ -36,7 +37,8 @@ pub async fn file_diff(
         highlight: highlight.unwrap_or(true),
         ..Default::default()
     };
-    Ok(state.engine.read(&id, move |repo| ops::working_diff(repo, &change, opts)).await?)
+    let diff = state.engine.read(&id, move |repo| ops::working_diff(repo, &change, opts)).await?;
+    Ok(crate::wire::diff_response(&diff))
 }
 
 #[tauri::command]

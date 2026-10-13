@@ -1,3 +1,6 @@
+import { invoke } from "@tauri-apps/api/core";
+import { listen, type UnlistenFn } from "@tauri-apps/api/event";
+import { decodeDiff, decodeGraph, decodeHistory, type WirePayload } from "./lib/wire";
 import { invoke, type InvokeArgs } from "@tauri-apps/api/core";
 import { emit, listen, type UnlistenFn } from "@tauri-apps/api/event";
 
@@ -419,6 +422,12 @@ export function isCommandError(e: unknown): e is CommandError {
   return typeof e === "object" && e !== null && "kind" in e && "message" in e;
 }
 
+function wire<T>(decode: (payload: WirePayload) => T) {
+  return (payload: unknown): T => {
+    const binary = Array.isArray(payload) ? typeof payload[0] === "number" : payload instanceof ArrayBuffer || ArrayBuffer.isView(payload);
+    // the browser dev mock answers with plain objects
+    return binary ? decode(payload as WirePayload) : (payload as T);
+  };
 const SHARED_CHANGED = "shared-changed";
 
 function invokeShared<T>(cmd: string, args?: InvokeArgs): Promise<T> {
@@ -453,7 +462,7 @@ export const api = {
   openOnGithub: (id: string) => invoke<void>("open_on_github", { id }),
 
   fileDiff: (id: string, path: string, ignoreWhitespace = false, full = false, highlight = true) =>
-    invoke<FileDiff>("file_diff", { id, path, ignoreWhitespace, full, highlight }),
+    invoke("file_diff", { id, path, ignoreWhitespace, full, highlight }).then(wire(decodeDiff)),
   commit: (id: string, files: FileSelection[], message: CommitMessage, amend = false) =>
     invoke<string>("commit", { id, files, message, amend }),
   discardFiles: (id: string, paths: string[]) => invoke<void>("discard_files", { id, paths }),
@@ -465,10 +474,10 @@ export const api = {
   setGitIdentity: (name: string, email: string) => invoke<void>("set_git_identity", { identity: { name, email } }),
 
   history: (id: string, offset: number, limit: number, rev?: string) =>
-    invoke<CommitSummary[]>("history", { id, offset, limit, rev }),
+    invoke("history", { id, offset, limit, rev }).then(wire(decodeHistory)),
   commitDetail: (id: string, sha: string) => invoke<CommitDetail>("commit_detail", { id, sha }),
   commitFileDiff: (id: string, sha: string, path: string, oldPath: string | null, ignoreWhitespace = false, highlight = true) =>
-    invoke<FileDiff>("commit_file_diff", { id, sha, path, oldPath, ignoreWhitespace, highlight }),
+    invoke("commit_file_diff", { id, sha, path, oldPath, ignoreWhitespace, highlight }).then(wire(decodeDiff)),
 
   branches: (id: string) => invoke<Branch[]>("branches", { id }),
   checkout: (id: string, name: string, kind: BranchKind, changes?: "bringAlong" | "stashOnCurrent") =>
@@ -514,10 +523,11 @@ export const api = {
   searchHistory: (id: string, kind: SearchKind, query: string) =>
     invoke<CommitSummary[]>("search_history", { id, kind, query }),
   reflog: (id: string) => invoke<ReflogEntry[]>("reflog", { id }),
-  historyGraph: (id: string, offset: number, limit: number) => invoke<GraphPage>("history_graph", { id, offset, limit }),
+  historyGraph: (id: string, offset: number, limit: number) =>
+    invoke("history_graph", { id, offset, limit }).then(wire(decodeGraph)),
   rangeFiles: (id: string, oldest: string, newest: string) => invoke<CommitFile[]>("range_files", { id, oldest, newest }),
   rangeFileDiff: (id: string, oldest: string, newest: string, path: string, oldPath: string | null, highlight = true) =>
-    invoke<FileDiff>("range_file_diff", { id, oldest, newest, path, oldPath, highlight }),
+    invoke("range_file_diff", { id, oldest, newest, path, oldPath, highlight }).then(wire(decodeDiff)),
   compare: (id: string, other: string) =>
     invoke<{ ahead: CommitSummary[]; behind: CommitSummary[] }>("compare_branch", { id, other }),
   worktrees: (id: string) => invoke<Worktree[]>("worktrees", { id }),
