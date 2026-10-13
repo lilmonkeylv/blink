@@ -153,6 +153,8 @@ export function installDevMock() {
           { path: "C:/dev/website", name: "website", owner: "octocat", remoteUrl: null, lastOpened: 0 },
           { path: "C:/dev/notes", name: "notes", owner: null, remoteUrl: null, lastOpened: 0 },
         ];
+      case "commit_warnings":
+        return { protectedBranch: false, unlinkedEmail: null, login: "octocat" };
       case "whats_new":
         return [];
       case "release_notes":

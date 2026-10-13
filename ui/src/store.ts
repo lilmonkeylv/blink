@@ -6,6 +6,7 @@ import {
   type Account,
   type Bootstrap,
   type ChecksSummary,
+  type CommitWarnings,
   type ReleaseNote,
   type FileDiff,
   type Progress,
@@ -79,6 +80,7 @@ interface AppStore {
   busy: string | null;
   opening: string | null;
   checks: ChecksSummary | null;
+  commitWarnings: CommitWarnings | null;
   historySearch: { kind: SearchKind; query: string } | null;
   compareWith: string | null;
   tabs: string[];
@@ -103,6 +105,7 @@ export const [store, setStore] = createStore<AppStore>({
   busy: null,
   opening: null,
   checks: null,
+  commitWarnings: null,
   historySearch: null,
   compareWith: null,
   tabs: [],
@@ -353,6 +356,17 @@ export function currentBranch(): string | null {
   const head = store.repo?.head;
   if (!head) return null;
   return head.type === "detached" ? null : head.name;
+}
+
+export async function refreshCommitWarnings() {
+  const repo = store.repo;
+  if (!repo) return setStore("commitWarnings", null);
+  try {
+    const warnings = await api.commitWarnings(repo.id);
+    if (store.repo?.id === repo.id) setStore("commitWarnings", warnings);
+  } catch {
+    setStore("commitWarnings", null);
+  }
 }
 
 export async function refreshChecks() {
