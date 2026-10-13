@@ -1,53 +1,53 @@
-import type { JSX } from "solid-js";
+import type { Component, JSX } from "solid-js";
+import { Dynamic } from "solid-js/web";
+import type { LucideProps } from "lucide-solid";
+import ArrowDown from "lucide-solid/icons/arrow-down";
+import ArrowUp from "lucide-solid/icons/arrow-up";
+import Check from "lucide-solid/icons/check";
+import ChevronDownGlyph from "lucide-solid/icons/chevron-down";
+import ChevronRightGlyph from "lucide-solid/icons/chevron-right";
+import FolderGit from "lucide-solid/icons/folder-git-2";
+import GitBranch from "lucide-solid/icons/git-branch";
+import GitPullRequest from "lucide-solid/icons/git-pull-request";
+import Menu from "lucide-solid/icons/menu";
+import Plus from "lucide-solid/icons/plus";
+import RefreshCw from "lucide-solid/icons/refresh-cw";
+import SquareArrowRight from "lucide-solid/icons/square-arrow-right";
+import SquareDot from "lucide-solid/icons/square-dot";
+import SquareMinus from "lucide-solid/icons/square-minus";
+import SquarePlus from "lucide-solid/icons/square-plus";
+import TriangleAlert from "lucide-solid/icons/triangle-alert";
+import X from "lucide-solid/icons/x";
 import type { ChangeKind } from "../api";
 
 type P = { class?: string };
 
-const svg = (d: string) => (p: P) => (
-  <svg class={`icon ${p.class ?? ""}`} viewBox="0 0 16 16" aria-hidden="true">
-    <path d={d} />
-  </svg>
-);
+const icon = (Glyph: Component<LucideProps>) => (p: P) => <Glyph class={`icon ${p.class ?? ""}`} aria-hidden="true" />;
 
-export const RepoIcon = svg(
-  "M2 2.5A2.5 2.5 0 0 1 4.5 0h8.75a.75.75 0 0 1 .75.75v12.5a.75.75 0 0 1-.75.75h-2.5a.75.75 0 0 1 0-1.5h1.75v-2h-8a1 1 0 0 0-.71 1.7.75.75 0 1 1-1.07 1.05A2.5 2.5 0 0 1 2 11.5Zm10.5-1h-8a1 1 0 0 0-1 1v6.71a2.5 2.5 0 0 1 1-.21h8ZM5 12.25V16l1.5-1 1.5 1v-3.75a.25.25 0 0 0-.25-.25h-2.5a.25.25 0 0 0-.25.25Z",
-);
-export const BranchIcon = svg(
-  "M9.5 3.25a2.25 2.25 0 1 1 3 2.12V6A2.5 2.5 0 0 1 10 8.5H6a1 1 0 0 0-1 1v1.13a2.25 2.25 0 1 1-1.5 0V5.37a2.25 2.25 0 1 1 1.5 0v1.84A2.5 2.5 0 0 1 6 7h4a1 1 0 0 0 1-1v-.63A2.25 2.25 0 0 1 9.5 3.25Zm-6 0a.75.75 0 1 0 1.5 0 .75.75 0 0 0-1.5 0Zm8.25-.75a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5ZM4.25 12a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Z",
-);
-export const SyncIcon = svg(
-  "M1.7 8a6.3 6.3 0 0 1 11.1-4.1l1.2-1.2V6.5h-3.8l1.5-1.5A4.8 4.8 0 0 0 3.2 8Zm12.6 0a6.3 6.3 0 0 1-11.1 4.1L2 13.3V9.5h3.8L4.3 11a4.8 4.8 0 0 0 8.5-3Z",
-);
-export const UpIcon = svg("M8 2 3.5 6.5l1 1L7.3 4.7V14h1.4V4.7l2.8 2.8 1-1Z");
-export const DownIcon = svg("M8 14l4.5-4.5-1-1-2.8 2.8V2H7.3v9.3L4.5 8.5l-1 1Z");
-export const ChevronRight = svg("M6.2 4.2a.75.75 0 0 1 1.06 0l3.27 3.27a.75.75 0 0 1 0 1.06L7.26 11.8a.75.75 0 1 1-1.06-1.06L8.94 8 6.2 5.26a.75.75 0 0 1 0-1.06Z");
-export const ChevronDown = svg("M4.2 6.2a.75.75 0 0 1 1.06 0L8 8.94l2.74-2.74a.75.75 0 1 1 1.06 1.06L8.53 10.53a.75.75 0 0 1-1.06 0L4.2 7.26a.75.75 0 0 1 0-1.06Z");
-export const MenuIcon = svg("M2 3.75h12v1.5H2Zm0 3.5h12v1.5H2Zm0 3.5h12v1.5H2Z");
-export const PullRequestIcon = svg(
-  "M4.25 1a2.25 2.25 0 0 1 .75 4.37v5.26a2.25 2.25 0 1 1-1.5 0V5.37A2.25 2.25 0 0 1 4.25 1Zm0 1.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm0 9.5a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm7.5 0a.75.75 0 1 0 0 1.5.75.75 0 0 0 0-1.5Zm-.75-1.37V5.5a1 1 0 0 0-1-1H8.31l1.22 1.22-1.06 1.06L5.44 3.75l3.03-3.03 1.06 1.06L8.31 3H10a2.5 2.5 0 0 1 2.5 2.5v5.13a2.25 2.25 0 1 1-1.5 0Z",
-);
-export const PlusIcon = svg("M7.25 2h1.5v5.25H14v1.5H8.75V14h-1.5V8.75H2v-1.5h5.25Z");
-export const CheckIcon = svg("M13.78 4.22a.75.75 0 0 1 0 1.06l-7.25 7.25a.75.75 0 0 1-1.06 0L2.22 9.28a.75.75 0 0 1 1.06-1.06L6 10.94l6.72-6.72a.75.75 0 0 1 1.06 0Z");
-export const CloseIcon = svg("M3.7 2.6 8 6.9l4.3-4.3 1.1 1.1L9.1 8l4.3 4.3-1.1 1.1L8 9.1l-4.3 4.3-1.1-1.1L6.9 8 2.6 3.7Z");
-export const GearIcon = svg(
-  "M8 0a1 1 0 0 1 1 .9l.1 1.1c.5.1 1 .3 1.4.6l.9-.7a1 1 0 0 1 1.3.1l.4.4a1 1 0 0 1 .1 1.3l-.7.9c.3.4.5.9.6 1.4l1.1.1a1 1 0 0 1 .9 1v.6a1 1 0 0 1-.9 1l-1.1.1c-.1.5-.3 1-.6 1.4l.7.9a1 1 0 0 1-.1 1.3l-.4.4a1 1 0 0 1-1.3.1l-.9-.7c-.4.3-.9.5-1.4.6L9 15.1a1 1 0 0 1-1 .9h-.6a1 1 0 0 1-1-.9l-.1-1.1c-.5-.1-1-.3-1.4-.6l-.9.7a1 1 0 0 1-1.3-.1l-.4-.4a1 1 0 0 1-.1-1.3l.7-.9a5 5 0 0 1-.6-1.4L1.2 9.9a1 1 0 0 1-.9-1v-.6a1 1 0 0 1 .9-1l1.1-.1c.1-.5.3-1 .6-1.4l-.7-.9a1 1 0 0 1 .1-1.3l.4-.4a1 1 0 0 1 1.3-.1l.9.7c.4-.3.9-.5 1.4-.6L6.4.9a1 1 0 0 1 1-.9Zm-.3 5a3 3 0 1 0 0 6 3 3 0 0 0 0-6Z",
-);
+export const RepoIcon = icon(FolderGit);
+export const BranchIcon = icon(GitBranch);
+export const SyncIcon = icon(RefreshCw);
+export const UpIcon = icon(ArrowUp);
+export const DownIcon = icon(ArrowDown);
+export const ChevronRight = icon(ChevronRightGlyph);
+export const ChevronDown = icon(ChevronDownGlyph);
+export const MenuIcon = icon(Menu);
+export const PullRequestIcon = icon(GitPullRequest);
+export const PlusIcon = icon(Plus);
+export const CheckIcon = icon(Check);
+export const CloseIcon = icon(X);
 
-const statusPaths: Record<ChangeKind, string> = {
-  added: "M2 1h12a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1Zm.5 1.5v11h11v-11ZM7.25 4.5h1.5v2.75h2.75v1.5H8.75v2.75h-1.5V8.75H4.5v-1.5h2.75Z",
-  untracked: "M2 1h12a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1Zm.5 1.5v11h11v-11ZM7.25 4.5h1.5v2.75h2.75v1.5H8.75v2.75h-1.5V8.75H4.5v-1.5h2.75Z",
-  modified: "M2 1h12a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1Zm.5 1.5v11h11v-11ZM8 5.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Z",
-  typechange: "M2 1h12a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1Zm.5 1.5v11h11v-11ZM8 5.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5Z",
-  deleted: "M2 1h12a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1Zm.5 1.5v11h11v-11ZM4.5 7.25h7v1.5h-7Z",
-  renamed: "M2 1h12a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1Zm.5 1.5v11h11v-11Zm6 2.25L11.75 8 8.5 11.25 7.44 10.2l1.45-1.45H4.5v-1.5h4.39L7.44 5.8Z",
-  copied: "M2 1h12a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V2a1 1 0 0 1 1-1Zm.5 1.5v11h11v-11Zm6 2.25L11.75 8 8.5 11.25 7.44 10.2l1.45-1.45H4.5v-1.5h4.39L7.44 5.8Z",
-  conflicted: "M8 1.5 15 14H1Zm0 3L3.6 12.5h8.8ZM7.25 7h1.5v3h-1.5Zm0 3.75h1.5v1.25h-1.5Z",
+const statusGlyphs: Record<ChangeKind, Component<LucideProps>> = {
+  added: SquarePlus,
+  untracked: SquarePlus,
+  modified: SquareDot,
+  typechange: SquareDot,
+  deleted: SquareMinus,
+  renamed: SquareArrowRight,
+  copied: SquareArrowRight,
+  conflicted: TriangleAlert,
 };
 
 export function StatusIcon(p: { kind: ChangeKind }): JSX.Element {
-  return (
-    <svg class={`icon status ${p.kind}`} viewBox="0 0 16 16" aria-label={p.kind}>
-      <path d={statusPaths[p.kind]} />
-    </svg>
-  );
+  return <Dynamic component={statusGlyphs[p.kind]} class={`icon status ${p.kind}`} aria-label={p.kind} />;
 }

@@ -8,6 +8,7 @@
         "@tanstack/solid-virtual": "^3.13.44",
         "@tauri-apps/api": "^2.12.3",
         "@tauri-apps/plugin-dialog": "^2.8.2",
+        "lucide-solid": "^1.56.0",
         "solid-js": "^1.9.17",
       },
       "devDependencies": {
@@ -288,6 +289,8 @@
     "lightningcss-win32-x64-msvc": ["lightningcss-win32-x64-msvc@1.33.0", "", { "os": "win32", "cpu": "x64" }, "sha512-OlEICDx/Xl0FqSp4bry8zFnCvGpig3Gl4gCquvYwHuqJKEC1+n9NgDniFvqHGmMv1ZkqDJrDqKKSykTDX+ehuA=="],
 
     "lru-cache": ["lru-cache@5.1.1", "", { "dependencies": { "yallist": "^3.0.2" } }, "sha512-KpNARQA3Iwv+jTA0utUVVbrh+Jlrr1Fv0e56GGzAFOXN7dk/FviaDW8LHmK52DlcH4WP2n6gI8vN1aesBFgo9w=="],
+
+    "lucide-solid": ["lucide-solid@1.56.0", "", { "peerDependencies": { "solid-js": "^1.4.7" } }, "sha512-46IoxC1COfO82eQjQlWAUnMHUQ977Pb+bniHh38UzbOe6YF04gdYYzAMpKwWi+VUC+wSeOLMoQvlWGg4mY3gSA=="],
 
     "merge-anything": ["merge-anything@5.1.7", "", { "dependencies": { "is-what": "^4.1.8" } }, "sha512-eRtbOb1N5iyH0tkQDAoQ4Ipsp/5qSR79Dzrz8hEPxRX10RWWR/iQXdoKmBSRCThY1Fh5EhISDtpSc93fpxUniQ=="],
 

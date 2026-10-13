@@ -18,6 +18,7 @@
     "@tanstack/solid-virtual": "^3.13.44",
     "@tauri-apps/api": "^2.12.3",
     "@tauri-apps/plugin-dialog": "^2.8.2",
+    "lucide-solid": "^1.56.0",
     "solid-js": "^1.9.17"
   },
   "devDependencies": {
