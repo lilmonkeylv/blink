@@ -53,7 +53,7 @@ Blink keeps the workflow and rebuilds the engine:
 - Built-in conflict editor (ours, theirs, both)
 - Interactive rebase screen
 - Worktrees
-- A window per repository; tabbed repositories _(planned)_
+- A window per repository, or several repositories as tabs in one window
 - Command palette (`Ctrl/Cmd+K`)
 - History search by message, author, path or content
 - Compare branches, multi-commit diffs, copy and apply patches

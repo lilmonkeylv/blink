@@ -87,8 +87,9 @@ export function installDevMock() {
       case "bootstrap":
         return { ...boot, settings: defaultSettings() };
       case "open_repository":
+        return { ...repo, id: a.path, name: String(a.path).split("/").pop() };
       case "refresh_repository":
-        return repo;
+        return { ...repo, id: a.id, name: String(a.id).split("/").pop() };
       case "file_diff":
       case "commit_file_diff":
         return diff;
