@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, For, Match, on, onCleanup, onMount, Show, Switch } from "solid-js";
-import { api, onChecksChanged, onLaunch, onRepoChanged, onSyncProgress } from "./api";
+import { api, onChecksChanged, onLaunch, onRepoChanged, onSyncProgress, onUpdateAvailable } from "./api";
 import { ChangesDiff, ChangesList } from "./components/ChangesPane";
 import { ContextMenuHost } from "./components/ContextMenu";
 import { Dialog } from "./components/Dialog";
@@ -14,6 +14,8 @@ import {
   bootstrap,
   dismiss,
   handleLaunches,
+  offerUpdate,
+  showWhatsNew,
   openRepo,
   refreshChecks,
   refreshRepo,
@@ -284,6 +286,7 @@ export function App() {
       if (store.repo?.id === e.repo) setStore("checks", e.summary);
     }),
     onLaunch(handleLaunches),
+    onUpdateAvailable(offerUpdate),
   ]);
   onCleanup(() => {
     window.removeEventListener("keydown", onKey);
@@ -303,6 +306,7 @@ export function App() {
     try {
       await bootstrap();
       await handleLaunches();
+      if (!store.dialog) await showWhatsNew();
     } catch (e) {
       reportError(e, "Startup failed");
       setStore("ready", true);

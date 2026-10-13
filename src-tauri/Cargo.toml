@@ -24,12 +24,14 @@ crossbeam-channel.workspace = true
 parking_lot.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+semver = "1"
 tauri = { version = "2.12", features = [] }
 tauri-plugin-deep-link = "2.6"
 tauri-plugin-dialog = "2.8"
 tauri-plugin-notification = "2.6"
 tauri-plugin-opener = "2.7"
 tauri-plugin-single-instance = "2.5"
+tauri-plugin-updater = "2.13"
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true

@@ -140,6 +140,10 @@ blink/
   - macOS: Xcode Command Line Tools
   - Linux: `webkit2gtk-4.1`, `libssl-dev`, `librsvg2-dev` and friends
 
+### Installing on Linux
+
+Releases ship an `.AppImage`, a `.deb` and an `.rpm`. The `.deb` and `.rpm` pull in `git` as a dependency and register the `blink://` link handler, and they're updated through your package manager. The AppImage updates itself like the Windows and macOS builds; just make sure `git` is on your `PATH`.
+
 ### Run in development
 
 ```bash
@@ -155,9 +159,61 @@ bun tauri dev
 bun tauri build
 ```
 
-Installers are written to `src-tauri/target/release/bundle/`.
+Installers are written to `target/release/bundle/`.
 
 Blink uses Bun everywhere: `src-tauri/tauri.conf.json` runs `bun run dev` and `bun run build` as its `beforeDevCommand` and `beforeBuildCommand`, CI uses `oven-sh/setup-bun`, and only `bun.lock` is committed. Please don't add `package-lock.json` or `pnpm-lock.yaml`.
+
+### Releasing
+
+```bash
+bun run version:set 0.2.0
+git commit -am "chore: release 0.2.0"
+git tag v0.2.0
+git push origin master v0.2.0
+```
+
+`version:set` also regenerates `CHANGELOG.md` from the commit history with [git-cliff](https://git-cliff.org), so write commits in [conventional](https://www.conventionalcommits.org) style (`feat:`, `fix:`, `perf:`). `ci:`, `chore:`, `build:` and `test:` commits are left out of the notes.
+
+Pushing a `v*` tag runs `.github/workflows/release.yml`. It builds the Windows, macOS and Linux installers and attaches them to a draft release. Check it over and publish it from the Releases page. Tags with a suffix like `-beta.1` or `-rc.1` are marked as prereleases. To rebuild an existing tag, run the workflow by hand from the Actions tab.
+
+### Windows code signing
+
+Windows builds are signed through [SignPath Foundation](https://signpath.org). Once the project is approved, set these in the repository settings and the release workflow switches over on its own:
+
+| Kind | Name | Value |
+| --- | --- | --- |
+| secret | `SIGNPATH_API_TOKEN` | API token of the CI user in SignPath |
+| variable | `SIGNPATH_ORGANIZATION_ID` | SignPath organization ID |
+| variable | `SIGNPATH_PROJECT_SLUG` | optional, defaults to `blink` |
+| variable | `SIGNPATH_SIGNING_POLICY` | optional, defaults to `release-signing` |
+
+The SignPath project needs two artifact configurations, `exe` and `installers`. Their definitions are in [`.signpath/artifact-configurations`](.signpath/artifact-configurations). The workflow signs `blink.exe` first, bundles the NSIS and MSI installers around the signed exe, then signs the installers and regenerates the updater signatures. Without the secret, Windows builds are unsigned.
+
+### macOS signing and notarization
+
+macOS releases are a universal `.dmg` (Apple Silicon and Intel). With an Apple Developer account, add these secrets and the workflow signs with your Developer ID and notarizes:
+
+| Secret | Value |
+| --- | --- |
+| `APPLE_CERTIFICATE` | base64 of the exported Developer ID Application `.p12` |
+| `APPLE_CERTIFICATE_PASSWORD` | password of that `.p12` |
+| `APPLE_SIGNING_IDENTITY` | e.g. `Developer ID Application: Your Name (TEAMID)` |
+| `APPLE_API_ISSUER` | App Store Connect API issuer ID |
+| `APPLE_API_KEY` | App Store Connect API key ID |
+| `APPLE_API_PRIVATE_KEY` | contents of the matching `AuthKey_XXXX.p8` |
+
+Without them the app is only ad-hoc signed. It still runs, but people have to right-click it and choose Open the first time.
+
+### Updater signing
+
+Installed copies of Blink check `releases/latest/download/latest.json` every few hours and offer to restart into the new version. Update bundles are signed with a minisign key whose public half lives in `tauri.conf.json` (`plugins.updater.pubkey`). The release workflow needs the private half as repository secrets:
+
+```bash
+gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/blink.key
+gh secret set TAURI_SIGNING_PRIVATE_KEY_PASSWORD --body ""
+```
+
+Without the secret, releases still build, just without updater bundles. Keep a backup of the private key somewhere safe. If it's lost, existing installs can't verify new updates. Local `bun tauri build` doesn't need the key.
 
 ### GitHub OAuth for local development
 
@@ -201,6 +257,25 @@ Contributions are welcome. Before opening a pull request:
 3. Make sure tests and benchmarks pass. Performance regressions are treated as bugs.
 
 Correctness comes first: any change touching Git write paths needs a test comparing the result against the Git CLI.
+
+## Code signing policy
+
+Free code signing on Windows is provided by [SignPath.io](https://about.signpath.io), with a certificate by [SignPath Foundation](https://signpath.org).
+
+- Committers and reviewers: [@lilmonkeylv](https://github.com/lilmonkeylv)
+- Approvers: [@lilmonkeylv](https://github.com/lilmonkeylv)
+
+Only builds produced by the release workflow in this repository from a version tag are signed. Every signing request is approved by hand.
+
+## Privacy
+
+Blink does not collect telemetry. It talks to other systems only in these cases:
+
+- **GitHub**, when you sign in: your account, repositories, pull requests and check status, using the token you granted
+- **Your Git remotes**, when you fetch, pull, push or clone, and during background fetch if it is turned on in Settings
+- **Update checks**, a request to `github.com` for the latest release a few hours apart
+
+There are no usage statistics or crash reports.
 
 ## License
 

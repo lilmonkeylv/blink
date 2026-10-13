@@ -1713,3 +1713,37 @@ input[type="range"] {
 ::-webkit-scrollbar-button {
   display: none;
 }
+
+.release-note h3 {
+  margin: 0 0 6px;
+  font-size: 16px;
+}
+
+.release-note + .release-note {
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.markdown h3,
+.markdown h4,
+.markdown h5 {
+  margin: 12px 0 4px;
+  font-size: 13px;
+}
+
+.markdown ul {
+  margin: 0;
+  padding-left: 20px;
+}
+
+.markdown li {
+  margin: 2px 0;
+  user-select: text;
+}
+
+.markdown code {
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: var(--bg-subtle);
+  font: 12px var(--font-mono);
+}
