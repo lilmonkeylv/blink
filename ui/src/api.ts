@@ -200,7 +200,6 @@ export interface Settings {
     backgroundFetch: boolean;
     backgroundFetchMinutes: number;
     useSystemOpenssh: boolean;
-    usageStats: boolean;
     watcher: "fsmonitor" | "native" | "polling";
     cacheLimitMb: number;
     logLevel: string;

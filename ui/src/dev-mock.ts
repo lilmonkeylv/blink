@@ -185,7 +185,7 @@ function defaultSettings() {
     appearance: { theme: "system", tabSize: 8, accentColor: null, density: "comfortable", diffFont: null, diffFontSize: 12, dateFormat: "relative" },
     notifications: { enabled: true, checksFailed: true, reviewRequested: true, prMerged: false, pushRejected: true, quietHours: null },
     prompts: { removeRepository: true, discardChanges: true, discardChangesPermanently: true, forcePush: true, undoCommit: true, hardReset: true, deleteBranchWithUnpushed: true },
-    advanced: { branchSwitch: "ask", backgroundFetch: true, backgroundFetchMinutes: 60, useSystemOpenssh: false, usageStats: false, watcher: "native", cacheLimitMb: 512, logLevel: "info", foregroundThreads: null, backgroundThreads: null },
+    advanced: { branchSwitch: "ask", backgroundFetch: true, backgroundFetchMinutes: 60, useSystemOpenssh: false, watcher: "native", cacheLimitMb: 512, logLevel: "info", foregroundThreads: null, backgroundThreads: null },
     accessibility: { underlineLinks: false, diffCheckMarks: false, reducedMotion: false, highContrast: false, largeHitTargets: false, keyboardNavigation: false },
   };
 }

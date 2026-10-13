@@ -407,12 +407,6 @@ export function SettingsDialog(p: { tab?: string }) {
                 onChange={(v) => set((x) => (x.advanced.watcher = v))}
               />
               <Check label="Use system OpenSSH" checked={s.advanced.useSystemOpenssh} onChange={(v) => set((x) => (x.advanced.useSystemOpenssh = v))} />
-              <Check
-                label="Help improve Blink by submitting usage stats"
-                checked={s.advanced.usageStats}
-                onChange={(v) => set((x) => (x.advanced.usageStats = v))}
-                hint="Off by default. Nothing is sent unless you turn this on."
-              />
               <Text
                 label="Foreground threads"
                 type="number"
