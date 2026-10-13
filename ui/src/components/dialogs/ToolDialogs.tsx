@@ -1,10 +1,11 @@
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { createMemo, createResource, createSignal, For, Match, Show, Switch } from "solid-js";
-import { api, type DeviceCode } from "../../api";
+import { api, type DeviceCode, type ReleaseNote } from "../../api";
 import { conflictCount, parseConflicts, render, type Resolution, type Segment } from "../../lib/conflicts";
 import { addRepository, notify, refreshChecks, reportError, run, setStore, store } from "../../store";
 import { Checkbox, Field, Segmented } from "../Controls";
 import { Dialog } from "../Dialog";
+import { Markdown } from "../Markdown";
 import { closeDialog, sanitizeBranchName } from "./common";
 
 export function SignInDialog() {
@@ -377,6 +378,35 @@ export function MergeEditorDialog(p: { path: string }) {
           </For>
         </Show>
       </div>
+    </Dialog>
+  );
+}
+
+export function WhatsNewDialog(p: { notes: ReleaseNote[] }) {
+  return (
+    <Dialog
+      title="What's new in Blink"
+      onClose={closeDialog}
+      wide
+      footer={
+        <button class="btn primary" onClick={closeDialog}>
+          Got it
+        </button>
+      }
+    >
+      <For each={p.notes}>
+        {(note) => (
+          <section class="release-note">
+            <h3>
+              {note.version}
+              <Show when={note.date}>
+                <span class="muted small"> · {note.date}</span>
+              </Show>
+            </h3>
+            <Markdown source={note.body} />
+          </section>
+        )}
+      </For>
     </Dialog>
   );
 }

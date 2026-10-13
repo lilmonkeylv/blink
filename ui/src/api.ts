@@ -368,6 +368,26 @@ export function onChecksChanged(handler: (e: { repo: string; summary: ChecksSumm
   return listen<{ repo: string; summary: ChecksSummary }>("checks-changed", (e) => handler(e.payload));
 }
 
+export interface ReleaseNote {
+  version: string;
+  date: string | null;
+  body: string;
+}
+
+export interface UpdateInfo {
+  version: string;
+  currentVersion: string;
+  notes: string | null;
+}
+
+export function onUpdateAvailable(handler: (info: UpdateInfo) => void): Promise<UnlistenFn> {
+  return listen<UpdateInfo>("update-available", (e) => handler(e.payload));
+}
+
+export function onUpdateProgress(handler: (p: { downloaded: number; total: number | null }) => void): Promise<UnlistenFn> {
+  return listen<{ downloaded: number; total: number | null }>("update-progress", (e) => handler(e.payload));
+}
+
 export function onLaunch(handler: () => void): Promise<UnlistenFn> {
   return listen("launch", () => handler());
 }
@@ -497,6 +517,11 @@ export const api = {
   openInShell: (id: string, path?: string) => invoke<void>("open_in_shell", { id, path }),
   openLogsFolder: () => invoke<void>("open_logs_folder"),
   openDevtools: () => invoke<void>("open_devtools"),
+  checkForUpdate: () => invoke<UpdateInfo | null>("check_for_update"),
+  installUpdate: () => invoke<void>("install_update"),
+  whatsNew: () => invoke<ReleaseNote[]>("whats_new"),
+  releaseNotes: () => invoke<ReleaseNote[]>("release_notes"),
+  openExternal: (url: string) => invoke<void>("open_external", { url }),
   takePendingLaunch: () => invoke<Launch[]>("take_pending_launch"),
   repoSettings: (id: string) => invoke<RepoSettings>("repo_settings", { id }),
   saveRepoSettings: (id: string, settings: RepoSettings) => invoke<void>("save_repo_settings", { id, settings }),
