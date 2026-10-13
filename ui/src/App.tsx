@@ -2,7 +2,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { createEffect, createMemo, createSignal, For, Match, on, onCleanup, onMount, Show, Switch } from "solid-js";
 import { api, onChecksChanged, onLaunch, onRepoChanged, onSharedChanged, onSyncProgress, onUpdateAvailable } from "./api";
 import { ChangesDiff, ChangesList } from "./components/ChangesPane";
-import { ContextMenuHost } from "./components/ContextMenu";
+import { ContextMenuHost, menuActions } from "./components/ContextMenu";
 import { PromptHost } from "./components/Prompt";
 import { Dialog } from "./components/Dialog";
 import { Dialogs } from "./components/Dialogs";
@@ -203,7 +203,7 @@ function Palette(p: { onClose: () => void }) {
   const [query, setQuery] = createSignal("");
   const [active, setActive] = createSignal(0);
   const items = createMemo<PaletteItem[]>(() => {
-    const actions = appMenu().filter((m): m is Exclude<typeof m, "separator"> => m !== "separator" && !m.disabled);
+    const actions = menuActions(appMenu());
     const extra: PaletteItem[] = store.repo
       ? [
           { label: "New branch…", hint: keymap().keys["branch.new"], run: () => setStore("dialog", { type: "newBranch" }) },

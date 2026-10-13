@@ -20,6 +20,7 @@ export const SyncIcon = svg(
 );
 export const UpIcon = svg("M8 2 3.5 6.5l1 1L7.3 4.7V14h1.4V4.7l2.8 2.8 1-1Z");
 export const DownIcon = svg("M8 14l4.5-4.5-1-1-2.8 2.8V2H7.3v9.3L4.5 8.5l-1 1Z");
+export const ChevronRight = svg("M6.2 4.2a.75.75 0 0 1 1.06 0l3.27 3.27a.75.75 0 0 1 0 1.06L7.26 11.8a.75.75 0 1 1-1.06-1.06L8.94 8 6.2 5.26a.75.75 0 0 1 0-1.06Z");
 export const ChevronDown = svg("M4.2 6.2a.75.75 0 0 1 1.06 0L8 8.94l2.74-2.74a.75.75 0 1 1 1.06 1.06L8.53 10.53a.75.75 0 0 1-1.06 0L4.2 7.26a.75.75 0 0 1 0-1.06Z");
 export const MenuIcon = svg("M2 3.75h12v1.5H2Zm0 3.5h12v1.5H2Zm0 3.5h12v1.5H2Z");
 export const PullRequestIcon = svg(
