@@ -321,30 +321,35 @@ a {
 }
 
 .toolbar-button.repo {
-  flex: none;
-  width: var(--sidebar);
+  flex: 0 1 var(--sidebar);
+  min-width: 190px;
 }
 
 .toolbar-button.branch {
   flex: 0 1 260px;
+  min-width: 150px;
 }
 
 .toolbar-button.sync {
   flex: 0 1 230px;
+  min-width: 150px;
 }
 
 .toolbar-spacer {
   flex: 1;
+  min-width: 0;
 }
 
 .window-controls {
   display: flex;
+  flex: none;
   align-self: flex-start;
   height: 32px;
 }
 
 .window-control {
   display: grid;
+  flex: none;
   place-items: center;
   width: 46px;
   height: 100%;
@@ -368,7 +373,7 @@ a {
   background: var(--toolbar-hover);
 }
 
-.window-control.menu svg {
+.window-control.app-menu-button svg {
   width: 16px;
   height: 16px;
   fill: currentColor;
@@ -1929,6 +1934,7 @@ input[type="range"] {
 }
 
 .toolbar-button.app-menu {
+  flex: none;
   width: 54px;
   justify-content: center;
   border-right: 0;
