@@ -18,7 +18,7 @@ blink-store = { path = "crates/blink-store" }
 blink-watch = { path = "crates/blink-watch" }
 
 arc-swap = "1.9"
-base64 = "0.22"
+base64 = "0.23"
 crossbeam-channel = "0.5"
 dashmap = "6.2"
 directories = "6"

@@ -336,7 +336,7 @@ dependencies = [
 name = "blink"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "blink-core",
  "blink-diff",
  "blink-git",
@@ -420,7 +420,7 @@ dependencies = [
 name = "blink-github"
 version = "0.1.0"
 dependencies = [
- "base64 0.22.1",
+ "base64 0.23.1",
  "parking_lot",
  "rand 0.10.3",
  "reqwest 0.12.28",
