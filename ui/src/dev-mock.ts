@@ -178,6 +178,8 @@ export function installDevMock() {
           { path: repo.id, name: "blink", fetched: true, error: null, ahead: 2, behind: 0, changes: 4 },
           { path: "C:/dev/desktop", name: "desktop", fetched: false, error: "fatal: could not read Username for 'https://github.com'", ahead: 0, behind: 0, changes: 0 },
         ];
+      case "keymap":
+        return {};
       case "whats_new":
         return [];
       case "release_notes":

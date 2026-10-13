@@ -18,6 +18,7 @@ import {
   type UpdateInfo,
 } from "./api";
 import { applySidebarWidth, lastSidebarWidth, repoLayout } from "./lib/layout";
+import { resolveBindings } from "./lib/keymap";
 import { reconcile, type FileSel } from "./lib/selection";
 import { closeTab, cycleTab, placeTab } from "./lib/tabs";
 
@@ -245,6 +246,16 @@ export function applyRepoView(view: RepoView) {
     if (!store.selectedPath && view.files.length) setStore("selectedPath", view.files[0].path);
     for (const path of [...diffCache.keys()]) if (!present.has(path)) diffCache.delete(path);
   });
+}
+
+export const [keymap, setKeymap] = createSignal(resolveBindings({}));
+
+export async function loadKeymap() {
+  try {
+    setKeymap(resolveBindings((await api.keymap()) ?? {}));
+  } catch (e) {
+    reportError(e, "Could not read keymap.toml");
+  }
 }
 
 export const windowRepo = new URLSearchParams(location.search).get("repo");

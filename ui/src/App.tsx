@@ -10,6 +10,7 @@ import { TabStrip } from "./components/TabStrip";
 import { applySidebarWidth, clampSidebar, saveRepoLayout } from "./lib/layout";
 import { appMenu, doSync, pickAndAddRepository, Toolbar } from "./components/Toolbar";
 import { fuzzyFilter } from "./lib/fuzzy";
+import { comboFromEvent } from "./lib/keymap";
 import {
   applyRepoView,
   applyTheme,
@@ -18,6 +19,8 @@ import {
   cycleRepoTab,
   dismiss,
   handleLaunches,
+  keymap,
+  loadKeymap,
   offerUpdate,
   openRepo,
   pickNewTab,
@@ -200,13 +203,13 @@ function Palette(p: { onClose: () => void }) {
     const actions = appMenu().filter((m): m is Exclude<typeof m, "separator"> => m !== "separator" && !m.disabled);
     const extra: PaletteItem[] = store.repo
       ? [
-          { label: "New branch…", hint: "Ctrl+Shift+N", run: () => setStore("dialog", { type: "newBranch" }) },
+          { label: "New branch…", hint: keymap().keys["branch.new"], run: () => setStore("dialog", { type: "newBranch" }) },
           { label: "Merge into current branch…", run: () => setStore("dialog", { type: "merge" }) },
           { label: "Rebase current branch…", run: () => setStore("dialog", { type: "rebase" }) },
-          { label: "Stash all changes", hint: "Ctrl+Shift+S", run: () => run("Stash", () => api.stash(store.repo!.id)) },
-          { label: "Undo last Git operation", hint: "Ctrl+Z", run: undoLastOperation },
-          { label: "Search history", hint: "Ctrl+F", run: focusSearch },
-          { label: "Refresh", hint: "F5", run: refreshRepo },
+          { label: "Stash all changes", hint: keymap().keys["stash.all"], run: () => run("Stash", () => api.stash(store.repo!.id)) },
+          { label: "Undo last Git operation", hint: keymap().keys["undo"], run: undoLastOperation },
+          { label: "Search history", hint: keymap().keys["history.search"], run: focusSearch },
+          { label: "Refresh", hint: keymap().keys["refresh"], run: refreshRepo },
         ]
       : [];
     const repos: PaletteItem[] = store.repositories.map((r) => ({ label: `Open ${r.name}`, hint: r.owner ?? undefined, run: () => openRepo(r.path) }));
@@ -272,53 +275,52 @@ export function App() {
   const [palette, setPalette] = createSignal(false);
 
   const onKey = (e: KeyboardEvent) => {
-    const mod = e.ctrlKey || e.metaKey;
-    const key = e.key.toLowerCase();
     const repo = store.repo;
     if (e.key === "F12" && import.meta.env.DEV) {
       e.preventDefault();
       api.openDevtools().catch(() => {});
       return;
     }
-    if (e.key === "F5") {
-      e.preventDefault();
-      refreshRepo();
-      return;
-    }
-    if (!mod) return;
-    const hit = (fn: () => void) => {
-      e.preventDefault();
-      fn();
-    };
+    const action = keymap().byCombo.get(comboFromEvent(e));
+    if (!action) return;
     const id = repo?.id;
     const call = (fn: (id: string) => Promise<unknown>) => () => id && fn(id).catch(reportError);
-    if (key === "tab" && store.tabs.length > 1) hit(() => cycleRepoTab(e.shiftKey ? -1 : 1));
-    else if (key === "pagedown" && store.tabs.length > 1) hit(() => cycleRepoTab(1));
-    else if (key === "pageup" && store.tabs.length > 1) hit(() => cycleRepoTab(-1));
-    else if (key === "w" && store.tabs.length > 1 && repo) hit(() => closeRepoTab(repo.id));
-    else if (key === "t" && e.altKey) hit(pickNewTab);
-    else if (key === "k") hit(() => setPalette(true));
-    else if (key === "1") hit(() => setStore("tab", "changes"));
-    else if (key === "2") hit(() => setStore("tab", "history"));
-    else if (key === "z" && !e.shiftKey && repo && !inTextField(e) && !store.dialog) hit(undoLastOperation);
-    else if (key === "f" && e.shiftKey && repo) hit(call((i) => api.reveal(i)));
-    else if (key === "f" && repo) hit(focusSearch);
-    else if (key === "r" && repo) hit(call((i) => api.createPullRequest(i)));
-    else if (key === "a" && e.shiftKey && repo) hit(call((i) => api.openInEditor(i)));
-    else if (key === "`" && repo) hit(call((i) => api.openInShell(i)));
-    else if (key === "g" && e.shiftKey && repo) hit(call(api.openOnGithub));
-    else if (key === "l" && e.shiftKey && repo && store.selectedPath) hit(() => setStore("dialog", { type: "blame", path: store.selectedPath! }));
-    else if (key === "o" && e.shiftKey) hit(() => setStore("dialog", { type: "clone" }));
-    else if (key === "t" && e.shiftKey) hit(() => doSync("fetch"));
-    else if (key === "t") hit(() => setStore("popover", store.popover === "repos" ? null : "repos"));
-    else if (key === "b" && repo) hit(() => setStore("popover", store.popover === "branches" ? null : "branches"));
-    else if (key === "n" && e.shiftKey && repo) hit(() => setStore("dialog", { type: "newBranch" }));
-    else if (key === "n") hit(() => setStore("dialog", { type: "createRepo" }));
-    else if (key === "o") hit(pickAndAddRepository);
-    else if (key === "p" && e.shiftKey && repo) hit(() => doSync("pull"));
-    else if (key === "p" && repo) hit(() => doSync("push"));
-    else if (key === "s" && e.shiftKey && repo) hit(() => run("Stash", () => api.stash(repo.id)));
-    else if (key === ",") hit(() => setStore("dialog", { type: "settings" }));
+    const manyTabs = store.tabs.length > 1;
+    const actions: Record<string, { when?: boolean; run: () => void }> = {
+      "view.changes": { run: () => setStore("tab", "changes") },
+      "view.history": { run: () => setStore("tab", "history") },
+      "repo.list": { run: () => setStore("popover", store.popover === "repos" ? null : "repos") },
+      "tab.new": { run: pickNewTab },
+      "tab.next": { when: manyTabs, run: () => cycleRepoTab(1) },
+      "tab.previous": { when: manyTabs, run: () => cycleRepoTab(-1) },
+      "tab.nextPage": { when: manyTabs, run: () => cycleRepoTab(1) },
+      "tab.previousPage": { when: manyTabs, run: () => cycleRepoTab(-1) },
+      "tab.close": { when: manyTabs && !!repo, run: () => closeRepoTab(repo!.id) },
+      "branch.list": { when: !!repo, run: () => setStore("popover", store.popover === "branches" ? null : "branches") },
+      "branch.new": { when: !!repo, run: () => setStore("dialog", { type: "newBranch" }) },
+      "repo.add": { run: pickAndAddRepository },
+      "repo.clone": { run: () => setStore("dialog", { type: "clone" }) },
+      "repo.create": { run: () => setStore("dialog", { type: "createRepo" }) },
+      "sync.push": { when: !!repo, run: () => doSync("push") },
+      "sync.pull": { when: !!repo, run: () => doSync("pull") },
+      "sync.fetch": { run: () => doSync("fetch") },
+      undo: { when: !!repo && !inTextField(e) && !store.dialog, run: undoLastOperation },
+      "history.search": { when: !!repo, run: focusSearch },
+      "pr.create": { when: !!repo, run: call(api.createPullRequest) },
+      "open.editor": { when: !!repo, run: call((i) => api.openInEditor(i)) },
+      "open.shell": { when: !!repo, run: call((i) => api.openInShell(i)) },
+      "open.files": { when: !!repo, run: call((i) => api.reveal(i)) },
+      "open.github": { when: !!repo, run: call(api.openOnGithub) },
+      "file.blame": { when: !!repo && !!store.selectedPath, run: () => setStore("dialog", { type: "blame", path: store.selectedPath! }) },
+      "stash.all": { when: !!repo, run: () => run("Stash", () => api.stash(repo!.id)) },
+      palette: { run: () => setPalette(true) },
+      settings: { run: () => setStore("dialog", { type: "settings" }) },
+      refresh: { run: refreshRepo },
+    };
+    const target = actions[action];
+    if (!target || target.when === false) return;
+    e.preventDefault();
+    target.run();
   };
 
   const listeners = Promise.all([
@@ -354,6 +356,8 @@ export function App() {
 
   onMount(async () => {
     window.addEventListener("keydown", onKey);
+    window.addEventListener("focus", loadKeymap);
+    loadKeymap();
     window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
     try {
       await bootstrap();
