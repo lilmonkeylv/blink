@@ -345,6 +345,7 @@ dependencies = [
  "blink-watch",
  "crossbeam-channel",
  "parking_lot",
+ "semver",
  "serde",
  "serde_json",
  "tauri",

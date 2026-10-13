@@ -15,6 +15,7 @@ import {
   store,
   undoLastOperation,
   checkForUpdates,
+  showWhatsNew,
 } from "../store";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { DRAG_TYPE } from "./HistoryPane";
@@ -410,6 +411,7 @@ export function appMenu(): MenuItem[] {
     "separator",
     { label: "Settings", run: () => setStore("dialog", { type: "settings" }) },
     { label: "Keyboard shortcuts", run: () => setStore("dialog", { type: "shortcuts" }) },
+    { label: "What's new", run: () => showWhatsNew(true) },
     { label: "Check for updates…", run: () => checkForUpdates(true) },
   ];
 }

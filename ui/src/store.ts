@@ -6,6 +6,7 @@ import {
   type Account,
   type Bootstrap,
   type ChecksSummary,
+  type ReleaseNote,
   type FileDiff,
   type Progress,
   type RepoRecord,
@@ -47,7 +48,8 @@ export type Dialog =
   | { type: "blame"; path: string }
   | { type: "fileHistory"; path: string }
   | { type: "mergeEditor"; path: string }
-  | { type: "checks" };
+  | { type: "checks" }
+  | { type: "whatsNew"; notes: ReleaseNote[] };
 
 export interface Banner {
   id: number;
@@ -319,6 +321,16 @@ export async function checkForUpdates(manual = false) {
     }
   } catch (e) {
     if (manual) reportError(e, "Could not check for updates");
+  }
+}
+
+export async function showWhatsNew(all = false) {
+  try {
+    const notes = all ? await api.releaseNotes() : await api.whatsNew();
+    if (notes.length) setStore("dialog", { type: "whatsNew", notes });
+    else if (all) notify("info", "No release notes yet.");
+  } catch (e) {
+    if (all) reportError(e, "Could not load release notes");
   }
 }
 

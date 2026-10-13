@@ -11,7 +11,15 @@ import {
   UndoHistoryDialog,
 } from "./dialogs/HistoryDialogs";
 import { CloneDialog, CreateRepoDialog, ImportDialog, InitRepoDialog, PublishDialog, RepoSettingsDialog } from "./dialogs/RepoDialogs";
-import { ApplyPatchDialog, ChecksDialog, MergeEditorDialog, ShortcutsDialog, SignInDialog, WorktreesDialog } from "./dialogs/ToolDialogs";
+import {
+  ApplyPatchDialog,
+  ChecksDialog,
+  MergeEditorDialog,
+  ShortcutsDialog,
+  SignInDialog,
+  WhatsNewDialog,
+  WorktreesDialog,
+} from "./dialogs/ToolDialogs";
 import { SettingsDialog } from "./Settings";
 
 function of<T extends Dialog["type"]>(type: T): Extract<Dialog, { type: T }> | false {
@@ -75,6 +83,7 @@ export function Dialogs() {
         </Match>
         <Match when={of("mergeEditor")}>{(d) => <MergeEditorDialog path={d().path} />}</Match>
         <Match when={of("settings")}>{(d) => <SettingsDialog tab={d().tab} />}</Match>
+        <Match when={of("whatsNew")}>{(d) => <WhatsNewDialog notes={d().notes} />}</Match>
       </Switch>
     </Show>
   );

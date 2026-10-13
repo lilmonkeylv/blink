@@ -5,6 +5,7 @@ pub mod github;
 pub mod history;
 pub mod inspect;
 pub mod integrations;
+pub mod notes;
 pub mod repo;
 pub mod rewrite;
 pub mod settings;

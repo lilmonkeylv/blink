@@ -147,6 +147,26 @@ export function installDevMock() {
       case "blame":
         return { lines: diff.hunks[0].lines.filter((l) => l.newNo).map((l, i) => ({ sha: history[i % 3].id, line: i + 1, text: l.text })),
           commits: Object.fromEntries(history.slice(0, 3).map((c) => [c.id, { author: c.authorName, time: c.time, summary: c.summary }])) };
+      case "whats_new":
+        return [];
+      case "release_notes":
+        return [
+          {
+            version: "0.2.0",
+            date: "2026-10-20",
+            body: [
+              "### Features",
+              "",
+              "- **history:** Commit graph next to the history list ([abc1234](https://github.com/lilmonkeylv/blink/commit/abc1234))",
+              "- Auto-updater with signed `latest.json`",
+              "",
+              "### Fixes",
+              "",
+              "- Diff rows no longer overlap on very long lines",
+            ].join("\n"),
+          },
+          { version: "0.1.0", date: "2026-10-13", body: "### Features\n\n- First release" },
+        ];
       case "account":
         return null;
       case "plugin:event|listen":

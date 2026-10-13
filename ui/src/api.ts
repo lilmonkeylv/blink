@@ -368,6 +368,12 @@ export function onChecksChanged(handler: (e: { repo: string; summary: ChecksSumm
   return listen<{ repo: string; summary: ChecksSummary }>("checks-changed", (e) => handler(e.payload));
 }
 
+export interface ReleaseNote {
+  version: string;
+  date: string | null;
+  body: string;
+}
+
 export interface UpdateInfo {
   version: string;
   currentVersion: string;
@@ -513,6 +519,9 @@ export const api = {
   openDevtools: () => invoke<void>("open_devtools"),
   checkForUpdate: () => invoke<UpdateInfo | null>("check_for_update"),
   installUpdate: () => invoke<void>("install_update"),
+  whatsNew: () => invoke<ReleaseNote[]>("whats_new"),
+  releaseNotes: () => invoke<ReleaseNote[]>("release_notes"),
+  openExternal: (url: string) => invoke<void>("open_external", { url }),
   takePendingLaunch: () => invoke<Launch[]>("take_pending_launch"),
   repoSettings: (id: string) => invoke<RepoSettings>("repo_settings", { id }),
   saveRepoSettings: (id: string, settings: RepoSettings) => invoke<void>("save_repo_settings", { id, settings }),

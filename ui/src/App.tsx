@@ -15,6 +15,7 @@ import {
   dismiss,
   handleLaunches,
   offerUpdate,
+  showWhatsNew,
   openRepo,
   refreshChecks,
   refreshRepo,
@@ -305,6 +306,7 @@ export function App() {
     try {
       await bootstrap();
       await handleLaunches();
+      if (!store.dialog) await showWhatsNew();
     } catch (e) {
       reportError(e, "Startup failed");
       setStore("ready", true);

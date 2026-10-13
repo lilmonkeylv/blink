@@ -147,6 +147,9 @@ pub fn run() {
             commands::settings::open_devtools,
             commands::updater::check_for_update,
             commands::updater::install_update,
+            commands::notes::whats_new,
+            commands::notes::release_notes,
+            commands::notes::open_external,
             launch::take_pending_launch,
         ])
         .run(tauri::generate_context!())
