@@ -3,7 +3,8 @@ import { createMemo, createResource, createSignal, For, Match, Show, Switch } fr
 import { api, type DeviceCode, type JobStep, type ReleaseNote } from "../../api";
 import { conflictCount, parseConflicts, render, type Resolution, type Segment } from "../../lib/conflicts";
 import { parseJobLog } from "../../lib/joblog";
-import { addRepository, notify, refreshChecks, reportError, run, setStore, store } from "../../store";
+import { DEFAULT_BINDINGS } from "../../lib/keymap";
+import { addRepository, keymap, notify, refreshChecks, reportError, run, setStore, store } from "../../store";
 import { Checkbox, Field, Segmented } from "../Controls";
 import { Dialog } from "../Dialog";
 import { Markdown } from "../Markdown";
@@ -81,41 +82,34 @@ export function SignInDialog() {
   );
 }
 
-const SHORTCUTS: [string, string][] = [
-  ["Ctrl+1 / Ctrl+2", "Changes / History"],
-  ["Ctrl+T", "Repository list"],
-  ["Ctrl+Alt+T", "Open a repository in a new tab"],
-  ["Ctrl+Tab", "Next tab"],
-  ["Ctrl+Shift+Tab", "Previous tab"],
-  ["Ctrl+W", "Close tab"],
-  ["Ctrl+B", "Branch list"],
-  ["Ctrl+Shift+N", "New branch"],
-  ["Ctrl+O", "Add local repository"],
-  ["Ctrl+Shift+O", "Clone repository"],
-  ["Ctrl+N", "New repository"],
-  ["Ctrl+P", "Push"],
-  ["Ctrl+Shift+P", "Pull"],
-  ["Ctrl+Shift+T", "Fetch"],
+const FIXED_SHORTCUTS: [string, string][] = [
   ["Ctrl+Enter", "Commit"],
-  ["Ctrl+Z", "Undo last Git operation"],
-  ["Ctrl+F", "Search history"],
-  ["Ctrl+R", "Create pull request"],
-  ["Ctrl+Shift+A", "Open in external editor"],
-  ["Ctrl+`", "Open in shell"],
-  ["Ctrl+Shift+F", "Show in file manager"],
-  ["Ctrl+Shift+G", "View on GitHub"],
-  ["Ctrl+Shift+L", "Blame selected file"],
-  ["Ctrl+Shift+S", "Stash all changes"],
-  ["Ctrl+K", "Command palette"],
-  ["Ctrl+,", "Settings"],
   ["J / K, Space", "Move and toggle lines in a diff"],
-  ["F5", "Refresh"],
 ];
 
 export function ShortcutsDialog() {
   return (
-    <Dialog title="Keyboard shortcuts" onClose={closeDialog}>
-      <For each={SHORTCUTS}>
+    <Dialog
+      title="Keyboard shortcuts"
+      onClose={closeDialog}
+      footer={
+        <>
+          <span class="muted grow">Change any of these in keymap.toml.</span>
+          <button class="btn" onClick={() => api.openKeymap().catch(reportError)}>
+            Edit keymap.toml
+          </button>
+        </>
+      }
+    >
+      <For each={DEFAULT_BINDINGS.filter((b) => keymap().keys[b.id])}>
+        {(b) => (
+          <div class="summary-row" style={{ "justify-content": "space-between" }}>
+            <span>{b.label}</span>
+            <span class="kbd">{keymap().keys[b.id]}</span>
+          </div>
+        )}
+      </For>
+      <For each={FIXED_SHORTCUTS}>
         {([keys, what]) => (
           <div class="summary-row" style={{ "justify-content": "space-between" }}>
             <span>{what}</span>

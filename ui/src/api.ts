@@ -659,6 +659,8 @@ export const api = {
 
   getSettings: () => invoke<Settings>("get_settings"),
   avatar: (url: string) => invoke<string | null>("avatar", { url }),
+  keymap: () => invoke<Record<string, string>>("keymap"),
+  openKeymap: () => invoke<void>("open_keymap"),
   saveSettings: (settings: Settings) => invokeShared<void>("save_settings", { settings }),
 };
 

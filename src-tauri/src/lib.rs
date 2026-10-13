@@ -158,6 +158,8 @@ pub fn run() {
             commands::settings::get_settings,
             commands::settings::save_settings,
             commands::settings::open_logs_folder,
+            commands::settings::keymap,
+            commands::settings::open_keymap,
             commands::settings::open_devtools,
             commands::updater::check_for_update,
             commands::updater::install_update,
