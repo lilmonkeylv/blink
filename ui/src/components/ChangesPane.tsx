@@ -416,7 +416,7 @@ function CommitBox() {
 
   return (
     <div class="commit-box" onKeyDown={onKey}>
-      <div class="summary-row">
+      <div class="summary-field">
         <input
           class="input"
           placeholder={amend() ? "Summary (amending last commit)" : "Summary (required)"}
@@ -447,11 +447,9 @@ function CommitBox() {
           onInput={(e) => setCoAuthors(e.currentTarget.value)}
         />
       </Show>
-      <div class="summary-row" style={{ "justify-content": "space-between" }}>
+      <div class="commit-options">
         <Checkbox checked={amend()} onChange={setAmend} label="Amend last commit" class="muted small" />
-        <a style={{ "font-size": "12px" }} onClick={() => setShowCoAuthors(!showCoAuthors())}>
-          {showCoAuthors() ? "Remove co-authors" : "Add co-authors"}
-        </a>
+        <Checkbox checked={showCoAuthors()} onChange={setShowCoAuthors} label="Co-authors" class="muted small" />
       </div>
       <Show when={summary().length > SUMMARY_SOFT_LIMIT}>
         <div class="warning">Great commit summaries are 50 characters or fewer.</div>

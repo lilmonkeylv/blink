@@ -386,11 +386,23 @@ function BranchPopover() {
       </div>
       <Show when={tab() === "branches"}>
         <div class="filter" style={{ "border-top": "1px solid var(--border)", "border-bottom": "0" }}>
-          <button class="btn" style={{ flex: 1 }} disabled={!current()} onClick={() => setStore("dialog", { type: "merge" })}>
-            Merge into {current() ?? "current branch"}…
+          <button
+            class="btn"
+            style={{ flex: 1 }}
+            disabled={!current()}
+            title={`Pick a branch and merge its commits into ${current() ?? "the current branch"}`}
+            onClick={() => setStore("dialog", { type: "merge" })}
+          >
+            Merge a branch into {current() ?? "current branch"}…
           </button>
-          <button class="btn" style={{ flex: 1 }} disabled={!current()} onClick={() => setStore("dialog", { type: "rebase" })}>
-            Rebase {current() ?? "branch"}…
+          <button
+            class="btn"
+            style={{ flex: 1 }}
+            disabled={!current()}
+            title={`Pick a branch and replay the commits of ${current() ?? "the current branch"} on top of it`}
+            onClick={() => setStore("dialog", { type: "rebase" })}
+          >
+            Rebase {current() ?? "current branch"} onto a branch…
           </button>
         </div>
       </Show>
