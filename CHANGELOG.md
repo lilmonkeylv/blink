@@ -2,6 +2,12 @@
 
 All notable changes to Blink are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.1.0-alpha.6] - 2026-10-13
+
+### Fixes
+
+- **windows:** Keep the window buttons visible and open at a comfortable size ([c62b895](https://github.com/lilmonkeylv/blink/commit/c62b89589e0dde564607fa395da8bbbf734b7a04))
+
 ## [0.1.0-alpha.5] - 2026-10-13
 
 ### Fixes
