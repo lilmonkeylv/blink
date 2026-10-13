@@ -207,6 +207,11 @@ impl Client {
         if status == StatusCode::UNAUTHORIZED {
             return Err(Error::Unauthorized);
         }
+        if status == StatusCode::FORBIDDEN
+            && let Some(url) = response.headers().get("x-github-sso").and_then(|v| v.to_str().ok()).and_then(sso_url)
+        {
+            return Err(Error::SsoRequired { url });
+        }
         if (status == StatusCode::FORBIDDEN || status == StatusCode::TOO_MANY_REQUESTS)
             && response.headers().get("x-ratelimit-remaining").is_some_and(|v| v == "0")
         {
@@ -363,9 +368,29 @@ fn next_link(header: &str) -> Option<String> {
     })
 }
 
+fn sso_url(header: &str) -> Option<String> {
+    let mut parts = header.split(';').map(str::trim);
+    if !parts.next()?.eq_ignore_ascii_case("required") {
+        return None;
+    }
+    let url = parts.find_map(|p| p.strip_prefix("url="))?;
+    url.starts_with("https://").then(|| url.to_string())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn sso_header() {
+        assert_eq!(
+            sso_url("required; url=https://github.com/orgs/acme/sso?authorization_request=A1B2").as_deref(),
+            Some("https://github.com/orgs/acme/sso?authorization_request=A1B2")
+        );
+        assert_eq!(sso_url("partial-results; organizations=21955855,20582480"), None);
+        assert_eq!(sso_url("required"), None);
+        assert_eq!(sso_url("required; url=http://github.com/orgs/acme/sso"), None);
+    }
 
     #[test]
     fn parses_remotes() {

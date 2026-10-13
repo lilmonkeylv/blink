@@ -18,6 +18,8 @@ pub enum Error {
     Api { status: u16, message: String },
     #[error("rate limited until {reset}")]
     RateLimited { reset: i64 },
+    #[error("this organization requires single sign-on; authorize the token at {url}")]
+    SsoRequired { url: String },
 }
 
 pub type Result<T, E = Error> = std::result::Result<T, E>;

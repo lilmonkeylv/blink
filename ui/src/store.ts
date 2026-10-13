@@ -147,9 +147,18 @@ export function dismiss(id: number) {
   setStore("banners", (b) => b.filter((x) => x.id !== id));
 }
 
+function authorizeAction(url: string | null): Banner["action"] {
+  if (!url?.startsWith("https://")) return undefined;
+  return { label: "Authorize", run: () => api.openExternal(url).catch(reportError) };
+}
+
 export function reportError(e: unknown, context?: string) {
   if (isCommandError(e)) {
     if (e.kind === "cancelled") return;
+    if (e.kind === "sso") {
+      notify("error", "This organization requires single sign-on", { sticky: true, action: authorizeAction(e.detail) });
+      return;
+    }
     notify("error", context ? `${context}: ${e.message}` : e.message, { detail: e.detail });
   } else {
     notify("error", context ? `${context}: ${String(e)}` : String(e));
