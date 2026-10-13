@@ -491,6 +491,7 @@ export const api = {
   abortMerge: (id: string) => invoke<void>("abort_merge", { id }),
   resolveConflict: (id: string, path: string, ours: boolean) => invoke<void>("resolve_conflict", { id, path, ours }),
   stash: (id: string, message?: string, paths?: string[]) => invoke<void>("stash_changes", { id, message, paths }),
+  stashSelection: (id: string, files: FileSelection[], message: string) => invoke<void>("stash_selection", { id, files, message }),
   stashList: (id: string) => invoke<{ reference: string; message: string }[]>("stash_list", { id }),
   stashPop: (id: string, reference: string) => invoke<void>("stash_pop", { id, reference }),
   stashDrop: (id: string, reference: string) => invoke<void>("stash_drop", { id, reference }),
