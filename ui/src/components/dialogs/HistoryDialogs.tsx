@@ -1,4 +1,3 @@
-import { ask } from "@tauri-apps/plugin-dialog";
 import { createMemo, createResource, createSignal, For, Index, Show } from "solid-js";
 import { createStore } from "solid-js/store";
 import { api, type CommitSummary, type RebaseAction, type ResetMode } from "../../api";
@@ -11,6 +10,7 @@ import { focusCommit } from "../HistoryPane";
 import { DownIcon, UpIcon } from "../Icons";
 import { VirtualList } from "../VirtualList";
 import { closeDialog, Tabs } from "./common";
+import { ask } from "../Prompt";
 
 const undoAction = (id: string) => ({ label: "Undo", run: () => run("Undo", () => api.undo(id).then(() => undefined)) });
 

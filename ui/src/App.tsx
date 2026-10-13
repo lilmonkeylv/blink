@@ -3,6 +3,7 @@ import { createEffect, createMemo, createSignal, For, Match, on, onCleanup, onMo
 import { api, onChecksChanged, onLaunch, onRepoChanged, onSharedChanged, onSyncProgress, onUpdateAvailable } from "./api";
 import { ChangesDiff, ChangesList } from "./components/ChangesPane";
 import { ContextMenuHost } from "./components/ContextMenu";
+import { PromptHost } from "./components/Prompt";
 import { Dialog } from "./components/Dialog";
 import { Dialogs } from "./components/Dialogs";
 import { CommitView, HistoryList } from "./components/HistoryPane";
@@ -37,6 +38,7 @@ import {
   undoLastOperation,
   windowRepo,
 } from "./store";
+import { nativeWindow } from "./components/WindowControls";
 
 function Banners() {
   return (
@@ -347,7 +349,7 @@ export function App() {
 
   createEffect(() => {
     const title = store.repo ? `${store.repo.name} - Blink` : "Blink";
-    if ("__TAURI_INTERNALS__" in window) getCurrentWindow().setTitle(title).catch(() => {});
+    if (nativeWindow) getCurrentWindow().setTitle(title).catch(() => {});
   });
 
   createEffect(
@@ -413,6 +415,7 @@ export function App() {
       <Show when={palette()}>
         <Palette onClose={() => setPalette(false)} />
       </Show>
+      <PromptHost />
       <ContextMenuHost />
     </div>
   );
