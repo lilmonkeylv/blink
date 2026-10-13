@@ -626,6 +626,7 @@ export const api = {
   enterpriseSignOut: (host: string) => invokeShared<void>("enterprise_sign_out", { host }),
 
   getSettings: () => invoke<Settings>("get_settings"),
+  avatar: (url: string) => invoke<string | null>("avatar", { url }),
   saveSettings: (settings: Settings) => invokeShared<void>("save_settings", { settings }),
 };
 

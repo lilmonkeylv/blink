@@ -523,6 +523,16 @@ a {
   min-width: 0;
 }
 
+.avatar {
+  flex: none;
+  border-radius: 50%;
+}
+
+.avatar.placeholder {
+  display: inline-block;
+  background: var(--bg-hover);
+}
+
 .empty {
   display: grid;
   place-items: center;
