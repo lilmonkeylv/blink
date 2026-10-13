@@ -1,8 +1,19 @@
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { createMemo, createResource, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
-import { api, onFetchAllProgress, onSyncProgress, type FetchAllRow, type GithubRepo, type RepoRecord, type RepoSettings } from "../../api";
+import {
+  api,
+  type DesktopPreferences,
+  type FetchAllRow,
+  type GithubRepo,
+  onFetchAllProgress,
+  onSyncProgress,
+  type RepoRecord,
+  type RepoSettings,
+  type Settings,
+} from "../../api";
+import { unwrap } from "solid-js/store";
 import { fuzzyFilter } from "../../lib/fuzzy";
-import { currentBranch, notify, openRepo, reloadRepositories, reportError, run, setStore, store } from "../../store";
+import { applyTheme, currentBranch, notify, openRepo, reloadRepositories, reportError, run, setStore, store } from "../../store";
 import { Checkbox, Field, Select } from "../Controls";
 import { Dialog } from "../Dialog";
 import { RepoIcon } from "../Icons";
@@ -499,10 +510,19 @@ export function ImportDialog() {
   const [busy, setBusy] = createSignal(false);
   const [fromDesktop, setFromDesktop] = createSignal<RepoRecord[] | null>(null);
   const [picked, setPicked] = createSignal<Set<string>>(new Set());
+  const [prefItems, setPrefItems] = createSignal<DesktopPrefItem[]>([]);
+  const [pickedPrefs, setPickedPrefs] = createSignal<Set<string>>(new Set());
   const findDesktop = async () => {
     setBusy(true);
     try {
-      const found = await api.desktopRepositories();
+      const [found, prefs, tools] = await Promise.all([
+        api.desktopRepositories(),
+        api.desktopPreferences().catch(() => null),
+        api.detectIntegrations().catch(() => ({ editors: [], shells: [] })),
+      ]);
+      const items = prefs ? desktopPrefItems(prefs, tools) : [];
+      setPrefItems(items);
+      setPickedPrefs(new Set(items.map((i) => i.key)));
       setFromDesktop(found);
       setPicked(new Set(found.map((r) => r.path)));
     } catch (e) {
@@ -531,7 +551,17 @@ export function ImportDialog() {
       }
     }
     await reloadRepositories();
-    notify("success", `Added ${added} repositor${added === 1 ? "y" : "ies"}`);
+    const prefs = prefItems().filter((i) => pickedPrefs().has(i.key));
+    if (prefs.length && store.settings) {
+      const next = structuredClone(unwrap(store.settings));
+      for (const item of prefs) item.apply(next);
+      await run("Import settings", () => api.saveSettings(next).then(() => setStore("settings", next)));
+      applyTheme();
+    }
+    const parts = [];
+    if (added || !prefs.length) parts.push(`${added} repositor${added === 1 ? "y" : "ies"}`);
+    if (prefs.length) parts.push(`${prefs.length} setting${prefs.length === 1 ? "" : "s"}`);
+    notify("success", `Imported ${parts.join(" and ")} from GitHub Desktop`);
     if (paths[0] && !store.repo) await openRepo(paths[0]);
     setBusy(false);
     closeDialog();
@@ -567,8 +597,8 @@ export function ImportDialog() {
               </button>
             }
           >
-            <button class="btn primary" disabled={!picked().size || busy()} onClick={addPicked}>
-              {busy() ? "Adding…" : `Add ${picked().size} selected`}
+            <button class="btn primary" disabled={!(picked().size + pickedPrefs().size) || busy()} onClick={addPicked}>
+              {busy() ? "Importing…" : "Import selected"}
             </button>
           </Show>
         </>
@@ -595,25 +625,48 @@ export function ImportDialog() {
         }
       >
         {(found) => (
-          <Show when={found().length} fallback={<span class="muted">No GitHub Desktop repositories that aren't already in Blink.</span>}>
-            <span class="muted">These are in GitHub Desktop but not in Blink yet.</span>
-            <div class="import-list">
-              <For each={found()}>
-                {(r) => (
-                  <Checkbox
-                    checked={picked().has(r.path)}
-                    onChange={(on) => togglePicked(r.path, on)}
-                    label={
-                      <span class="import-item" title={r.path}>
-                        <span>{r.owner ? `${r.owner}/${r.name}` : r.name}</span>
-                        <span class="muted">{r.path}</span>
-                      </span>
-                    }
-                  />
-                )}
-              </For>
-            </div>
-          </Show>
+          <>
+            <Show when={found().length} fallback={<span class="muted">No GitHub Desktop repositories that aren't already in Blink.</span>}>
+              <span class="muted">These are in GitHub Desktop but not in Blink yet.</span>
+              <div class="import-list">
+                <For each={found()}>
+                  {(r) => (
+                    <Checkbox
+                      checked={picked().has(r.path)}
+                      onChange={(on) => togglePicked(r.path, on)}
+                      label={
+                        <span class="import-item" title={r.path}>
+                          <span>{r.owner ? `${r.owner}/${r.name}` : r.name}</span>
+                          <span class="muted">{r.path}</span>
+                        </span>
+                      }
+                    />
+                  )}
+                </For>
+              </div>
+            </Show>
+            <Show when={prefItems().length}>
+              <span class="muted">Settings</span>
+              <div class="import-list">
+                <For each={prefItems()}>
+                  {(item) => (
+                    <Checkbox
+                      checked={pickedPrefs().has(item.key)}
+                      onChange={(on) =>
+                        setPickedPrefs((prev) => {
+                          const next = new Set(prev);
+                          if (on) next.add(item.key);
+                          else next.delete(item.key);
+                          return next;
+                        })
+                      }
+                      label={item.label}
+                    />
+                  )}
+                </For>
+              </div>
+            </Show>
+          </>
         )}
       </Show>
     </Dialog>
@@ -681,4 +734,25 @@ export function FetchAllDialog() {
       </div>
     </Dialog>
   );
+}
+
+interface DesktopPrefItem {
+  key: string;
+  label: string;
+  apply: (settings: Settings) => void;
+}
+
+function desktopPrefItems(prefs: DesktopPreferences, tools: { editors: { id: string; name: string }[]; shells: { id: string; name: string }[] }): DesktopPrefItem[] {
+  const items: DesktopPrefItem[] = [];
+  const editor = tools.editors.find((t) => t.id === prefs.editor);
+  if (editor) items.push({ key: "editor", label: `External editor: ${editor.name}`, apply: (s) => (s.integrations.editor = editor.id) });
+  const shell = tools.shells.find((t) => t.id === prefs.shell);
+  if (shell) items.push({ key: "shell", label: `Shell: ${shell.name}`, apply: (s) => (s.integrations.shell = shell.id) });
+  const theme = prefs.theme;
+  if (theme) items.push({ key: "theme", label: `Theme: ${theme[0].toUpperCase()}${theme.slice(1)}`, apply: (s) => (s.appearance.theme = theme) });
+  const openssh = prefs.useSystemOpenssh;
+  if (openssh !== null) {
+    items.push({ key: "openssh", label: `${openssh ? "Use" : "Don't use"} system OpenSSH`, apply: (s) => (s.advanced.useSystemOpenssh = openssh) });
+  }
+  return items;
 }

@@ -291,6 +291,41 @@ pub async fn import_repositories(state: State<'_, AppState>, root: String) -> Cm
     Ok(added)
 }
 
+#[derive(Debug, Default, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DesktopPreferences {
+    editor: Option<String>,
+    editor_name: Option<String>,
+    shell: Option<String>,
+    shell_name: Option<String>,
+    theme: Option<String>,
+    use_system_openssh: Option<bool>,
+}
+
+fn desktop_preferences_from(prefs: &std::collections::HashMap<String, String>) -> DesktopPreferences {
+    use crate::commands::integrations::{editor_id_for, shell_id_for};
+    let editor_name = prefs.get("externalEditor").cloned();
+    let shell_name = prefs.get("shell").cloned();
+    DesktopPreferences {
+        editor: editor_name.as_deref().and_then(editor_id_for).map(str::to_string),
+        shell: shell_name.as_deref().and_then(shell_id_for).map(str::to_string),
+        editor_name,
+        shell_name,
+        theme: prefs.get("theme").filter(|t| matches!(t.as_str(), "light" | "dark" | "system")).cloned(),
+        use_system_openssh: prefs.get("useWindowsOpenSSH").map(|v| v == "1"),
+    }
+}
+
+#[tauri::command]
+pub async fn desktop_preferences() -> CmdResult<DesktopPreferences> {
+    tauri::async_runtime::spawn_blocking(|| {
+        let Some(dir) = blink_store::desktop_local_storage_dir() else { return DesktopPreferences::default() };
+        desktop_preferences_from(&blink_store::desktop_preferences(&dir))
+    })
+    .await
+    .map_err(|e| CommandError::new("core", e.to_string()))
+}
+
 #[tauri::command]
 pub async fn desktop_repositories(state: State<'_, AppState>) -> CmdResult<Vec<RepoRecord>> {
     let known: std::collections::HashSet<String> = state.cache.repositories()?.into_iter().map(|r| r.path).collect();
@@ -436,6 +471,31 @@ pub async fn remotes(state: State<'_, AppState>, id: String) -> CmdResult<Vec<(S
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn maps_desktop_preferences_to_blink_ids() {
+        let prefs: std::collections::HashMap<String, String> = [
+            ("externalEditor", "JetBrains IntelliJ Idea"),
+            ("shell", "Git Bash"),
+            ("theme", "dark"),
+            ("useWindowsOpenSSH", "1"),
+        ]
+        .into_iter()
+        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .collect();
+        let mapped = desktop_preferences_from(&prefs);
+        assert_eq!(mapped.editor.as_deref(), Some("idea"));
+        assert_eq!(mapped.editor_name.as_deref(), Some("JetBrains IntelliJ Idea"));
+        assert_eq!(mapped.theme.as_deref(), Some("dark"));
+        assert_eq!(mapped.use_system_openssh, Some(true));
+        if cfg!(windows) {
+            assert_eq!(mapped.shell.as_deref(), Some("gitbash"));
+        }
+        let unknown =
+            desktop_preferences_from(&[("externalEditor".to_string(), "Emacs".to_string())].into_iter().collect());
+        assert_eq!(unknown.editor, None);
+        assert_eq!(unknown.editor_name.as_deref(), Some("Emacs"));
+    }
 
     #[test]
     fn owners_and_web_urls() {
