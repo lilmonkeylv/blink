@@ -223,6 +223,13 @@ pub enum WatcherMode {
     Polling,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum UpdateChannel {
+    Stable,
+    Beta,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Advanced {
@@ -235,6 +242,7 @@ pub struct Advanced {
     pub log_level: String,
     pub foreground_threads: Option<usize>,
     pub background_threads: Option<usize>,
+    pub update_channel: UpdateChannel,
 }
 
 impl Default for Advanced {
@@ -249,6 +257,7 @@ impl Default for Advanced {
             log_level: "info".into(),
             foreground_threads: None,
             background_threads: None,
+            update_channel: UpdateChannel::Stable,
         }
     }
 }
@@ -313,5 +322,12 @@ mod tests {
     fn removed_keys_are_ignored() {
         let s: Settings = toml::from_str("[advanced]\nusageStats = true\nbackgroundFetch = false\n").unwrap();
         assert!(!s.advanced.background_fetch);
+    }
+
+    #[test]
+    fn update_channel_defaults_to_stable() {
+        assert_eq!(Settings::default().advanced.update_channel, UpdateChannel::Stable);
+        let s: Settings = toml::from_str("[advanced]\nupdateChannel = \"beta\"\n").unwrap();
+        assert_eq!(s.advanced.update_channel, UpdateChannel::Beta);
     }
 }

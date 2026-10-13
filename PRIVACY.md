@@ -55,7 +55,7 @@ When you fetch, pull, push or clone, Git talks to whatever remote is configured 
 
 ### Update checks
 
-A few seconds after launch, and then every six hours, Blink downloads a small `latest.json` file from this project's GitHub releases to see whether a newer version is available. If you choose to update, the installer is downloaded from the same place. GitHub can see your IP address and that the request came from Blink, as with any download from GitHub. No identifier for you or your machine is included.
+A few seconds after launch, and then every six hours, Blink downloads a small `latest.json` file (`beta.json` on the beta update channel) from this project's GitHub releases to see whether a newer version is available. If you choose to update, the installer is downloaded from the same place. GitHub can see your IP address and that the request came from Blink, as with any download from GitHub. No identifier for you or your machine is included.
 
 ### Links you open
 

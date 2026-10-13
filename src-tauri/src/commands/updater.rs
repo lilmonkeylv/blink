@@ -1,14 +1,20 @@
 use std::time::Duration;
 
+use blink_store::UpdateChannel;
 use parking_lot::Mutex;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_updater::{Update, UpdaterExt};
+use url::Url;
 
 use crate::error::{CmdResult, CommandError};
+use crate::state::AppState;
 
 pub const UPDATE_AVAILABLE: &str = "update-available";
 pub const UPDATE_PROGRESS: &str = "update-progress";
+
+// Prereleases never become GitHub's "latest" release, so beta.json lives on a rolling release.
+const BETA_ENDPOINT: &str = "https://github.com/lilmonkeylv/blink/releases/download/updater/beta.json";
 
 const CHECK_EVERY: Duration = Duration::from_secs(6 * 60 * 60);
 const FIRST_CHECK_AFTER: Duration = Duration::from_secs(20);
@@ -42,7 +48,15 @@ async fn check(app: &AppHandle) -> CmdResult<Option<UpdateInfo>> {
     if std::env::var_os("FLATPAK_ID").is_some() {
         return Ok(None);
     }
-    let update = app.updater().map_err(updater_error)?.check().await.map_err(updater_error)?;
+    let channel = app.state::<AppState>().settings.read().advanced.update_channel;
+    let updater = match channel {
+        UpdateChannel::Stable => app.updater(),
+        UpdateChannel::Beta => {
+            let endpoint = Url::parse(BETA_ENDPOINT).map_err(updater_error)?;
+            app.updater_builder().endpoints(vec![endpoint]).and_then(|b| b.build())
+        }
+    };
+    let update = updater.map_err(updater_error)?.check().await.map_err(updater_error)?;
     let info = update.as_ref().map(|u| UpdateInfo {
         version: u.version.clone(),
         current_version: u.current_version.clone(),

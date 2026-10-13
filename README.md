@@ -191,6 +191,21 @@ git push origin master v0.2.0
 
 Pushing a `v*` tag runs `.github/workflows/release.yml`. It builds the Windows, macOS and Linux installers and attaches them to a draft release. Check it over and publish it from the Releases page. Tags with a suffix like `-beta.1` or `-rc.1` are marked as prereleases. To rebuild an existing tag, run the workflow by hand from the Actions tab.
 
+#### Update channels
+
+Settings > Advanced has a stable and a beta update channel. `scripts/updater-manifest.ts` writes `beta.json` for a prerelease and both `latest.json` and `beta.json` for a stable version:
+
+```bash
+bun scripts/updater-manifest.ts dist 0.2.0-beta.1 v0.2.0-beta.1 notes.md dist
+```
+
+Stable installs read `latest.json` from the latest release, which GitHub never points at a prerelease. Beta installs read `beta.json` from a rolling prerelease tagged `updater`, so after publishing a release, upload the manifests it produced there:
+
+```bash
+gh release create updater --prerelease --title "Updater manifests" --notes "" # once
+gh release upload updater dist/beta.json --clobber
+```
+
 ### Windows builds
 
 Windows installers are not code signed, so SmartScreen may warn the first time you run one. Choose "More info", then "Run anyway". Updates are still verified against the updater signature below.
@@ -212,7 +227,7 @@ Without them the app is only ad-hoc signed. It still runs, but people have to ri
 
 ### Updater signing
 
-Installed copies of Blink check `releases/latest/download/latest.json` every few hours and offer to restart into the new version. Update bundles are signed with a minisign key whose public half lives in `tauri.conf.json` (`plugins.updater.pubkey`). The release workflow needs the private half as repository secrets:
+Installed copies of Blink check the manifest for their update channel every few hours and offer to restart into the new version. Update bundles are signed with a minisign key whose public half lives in `tauri.conf.json` (`plugins.updater.pubkey`). The release workflow needs the private half as repository secrets:
 
 ```bash
 gh secret set TAURI_SIGNING_PRIVATE_KEY < ~/.tauri/blink.key
