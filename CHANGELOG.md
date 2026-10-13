@@ -2,6 +2,18 @@
 
 All notable changes to Blink are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.1.0-alpha.7] - 2026-10-13
+
+### Features
+
+- **ui:** Switch the app icons to Lucide ([c6e4589](https://github.com/lilmonkeylv/blink/commit/c6e458914763cb27422b7546e34450104460021c))
+
+### Fixes
+
+- **ui:** Group the app menu into submenus and theme the menu button focus ([52f2da0](https://github.com/lilmonkeylv/blink/commit/52f2da097dc23bd488698685b2f9a694d84e1f84))
+- **ui:** Tidy the sidebar footer and commit box, animate the tabs ([830621d](https://github.com/lilmonkeylv/blink/commit/830621d5a2ab0f0fc5fd6c96f6b32727f8beb626))
+- **auth:** Bake the GitHub OAuth app into release builds ([53ad922](https://github.com/lilmonkeylv/blink/commit/53ad92272967225a5bcf53f0f78482429a744b4f))
+
 ## [0.1.0-alpha.6] - 2026-10-13
 
 ### Fixes
