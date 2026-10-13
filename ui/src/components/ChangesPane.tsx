@@ -550,6 +550,17 @@ export function ChangesDiff() {
     await refreshRepo();
   };
 
+  const stashLines = async (keys: string[]) => {
+    const f = file();
+    const repo = store.repo;
+    if (!f || !repo || !keys.length) return;
+    const lines = keys.map((k) => k.split(":").map(Number) as [number, number]);
+    const label = `${keys.length} line${keys.length === 1 ? "" : "s"} from ${f.path}`;
+    const done = await run("Stash lines", () => api.stashSelection(repo.id, [{ path: f.path, lines }], `Stashed ${label}`).then(() => true));
+    if (done) notify("success", `Stashed ${label}`);
+    await refreshRepo();
+  };
+
   return (
     <Show when={file()} fallback={<div class="empty">Select a file to view its changes</div>}>
       {(f) => (
@@ -580,6 +591,7 @@ export function ChangesDiff() {
                   sel={store.checkedPaths[f().path]}
                   onSetLines={setLinesFor}
                   onDiscardLines={f().kind === "untracked" ? undefined : discardLines}
+                  onStashLines={f().kind === "untracked" ? undefined : stashLines}
                   onLoadAnyway={() => setFull(true)}
                 />
               )}

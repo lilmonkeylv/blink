@@ -1,3 +1,4 @@
+use blink_core::ops::{self, FileSelection};
 use blink_git::{Branch, BranchKind};
 use serde::{Deserialize, Serialize};
 use tauri::State;
@@ -165,6 +166,16 @@ pub async fn stash_changes(
             repo.cli().stash_push(&label, &refs)
         })
         .await?)
+}
+
+#[tauri::command]
+pub async fn stash_selection(
+    state: State<'_, AppState>,
+    id: String,
+    files: Vec<FileSelection>,
+    message: String,
+) -> CmdResult<()> {
+    Ok(state.engine.write(&id, move |repo| ops::stash_selection(repo, &files, &message)).await?)
 }
 
 #[tauri::command]

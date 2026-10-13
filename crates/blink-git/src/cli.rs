@@ -351,6 +351,10 @@ impl GitCli {
             .collect())
     }
 
+    pub fn stash_staged(&self, message: &str) -> Result<()> {
+        self.run(&["stash", "push", "--staged", "-m", message]).map(drop)
+    }
+
     pub fn stash_push(&self, message: &str, paths: &[&str]) -> Result<()> {
         let mut args = vec!["stash", "push", "--include-untracked", "-m", message];
         if !paths.is_empty() {

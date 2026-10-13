@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use blink_diff::{DiffOptions, FileDiff, LineSelection, PatchDirection, SubmoduleDiff, build_partial_patch, diff_file};
-use blink_git::{BlobSource, ChangeKind, Error, FileChange, Repository, Result};
+use blink_git::{BlobSource, ChangeKind, Error, FileChange, GitCli, Repository, Result};
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -123,10 +123,25 @@ pub fn commit_selection(
     let cli = repo.cli().with_signing(sign);
     let status = repo.status(None)?;
     cli.unstage_all()?;
+    stage_selection(repo, &cli, &status.files, files)?;
+    cli.commit(&message.render(), amend)
+}
 
+pub fn stash_selection(repo: &Repository, files: &[FileSelection], message: &str) -> Result<()> {
+    if files.is_empty() {
+        return Err(Error::Git("nothing selected to stash".into()));
+    }
+    let cli = repo.cli();
+    let status = repo.status(None)?;
+    cli.unstage_all()?;
+    stage_selection(repo, &cli, &status.files, files)?;
+    cli.stash_staged(message)
+}
+
+fn stage_selection(repo: &Repository, cli: &GitCli, changes: &[FileChange], files: &[FileSelection]) -> Result<()> {
     let mut whole: Vec<&str> = Vec::new();
     for file in files {
-        let change = find_change(&status.files, &file.path)?;
+        let change = find_change(changes, &file.path)?;
         match &file.lines {
             None => {
                 whole.push(&change.path);
@@ -145,8 +160,7 @@ pub fn commit_selection(
             }
         }
     }
-    cli.stage(&whole)?;
-    cli.commit(&message.render(), amend)
+    cli.stage(&whole)
 }
 
 pub fn discard_files(repo: &Repository, changes: &[FileChange]) -> Result<()> {
@@ -263,6 +277,28 @@ mod tests {
         let head = cli.rev_parse("HEAD").unwrap();
         let added = commit_diff(&repo, &head, "lib", None, DiffOptions::default()).unwrap().submodule.unwrap();
         assert!(added.old.is_none() && added.new.is_some());
+    }
+
+    #[test]
+    fn stashes_only_the_selected_lines() {
+        let (dir, repo) = fixture();
+        fs::write(dir.path().join("a.txt"), "ONE\n2\n3\n4\n5\n6\n7\n8\n9\nTEN\n").unwrap();
+        fs::write(dir.path().join("b.txt"), "changed\n").unwrap();
+        let diff = working_diff(&repo, &change(&repo, "a.txt"), DiffOptions::default()).unwrap();
+        let first: Vec<(usize, usize)> = diff.hunks[0]
+            .lines
+            .iter()
+            .enumerate()
+            .filter(|(_, l)| l.kind != blink_diff::LineKind::Context)
+            .map(|(i, _)| (0, i))
+            .collect();
+        let files = [FileSelection { path: "a.txt".into(), lines: Some(first) }];
+        stash_selection(&repo, &files, "first line").unwrap();
+
+        assert_eq!(fs::read_to_string(dir.path().join("a.txt")).unwrap(), "1\n2\n3\n4\n5\n6\n7\n8\n9\nTEN\n");
+        assert_eq!(fs::read_to_string(dir.path().join("b.txt")).unwrap(), "changed\n");
+        let stash = repo.cli().run(&["stash", "show", "-p", "stash@{0}"]).unwrap();
+        assert!(stash.contains("+ONE") && !stash.contains("TEN") && !stash.contains("b.txt"));
     }
 
     #[test]

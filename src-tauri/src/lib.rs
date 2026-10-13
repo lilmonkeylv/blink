@@ -91,6 +91,7 @@ pub fn run() {
             commands::branches::abort_merge,
             commands::branches::resolve_conflict,
             commands::branches::stash_changes,
+            commands::branches::stash_selection,
             commands::branches::stash_list,
             commands::branches::stash_pop,
             commands::branches::stash_drop,

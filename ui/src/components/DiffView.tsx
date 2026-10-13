@@ -77,6 +77,7 @@ export function DiffView(p: {
   sel?: FileSel;
   onSetLines?: (keys: string[], include: boolean) => void;
   onDiscardLines?: (keys: string[]) => void;
+  onStashLines?: (keys: string[]) => void;
   onLoadAnyway?: () => void;
 }) {
   const rows = createMemo<Row[]>(() => {
@@ -169,6 +170,11 @@ export function DiffView(p: {
           const items: MenuItem[] = [];
           if (changed()) items.push({ label: "Discard line…", run: () => p.onDiscardLines!([h.cell!.key]) });
           items.push({ label: "Discard hunk…", run: () => p.onDiscardLines!(hunkKeys(h.hunk)) });
+          if (p.onStashLines) {
+            items.push("separator");
+            if (changed()) items.push({ label: "Stash line", run: () => p.onStashLines!([h.cell!.key]) });
+            items.push({ label: "Stash hunk", run: () => p.onStashLines!(hunkKeys(h.hunk)) });
+          }
           openContextMenu(e, items);
         }}
       >
@@ -243,6 +249,13 @@ export function DiffView(p: {
       items.push({ label: "Discard line…", run: () => p.onDiscardLines!(changedKeysBetween(index, index)) });
     }
     items.push({ label: "Discard hunk…", run: () => p.onDiscardLines!(hunkKeys(row.hunk)) });
+    if (p.onStashLines) {
+      items.push("separator");
+      if (row.type === "line" && row.data.kind !== "context") {
+        items.push({ label: "Stash line", run: () => p.onStashLines!(changedKeysBetween(index, index)) });
+      }
+      items.push({ label: "Stash hunk", run: () => p.onStashLines!(hunkKeys(row.hunk)) });
+    }
     openContextMenu(e, items);
   };
 
