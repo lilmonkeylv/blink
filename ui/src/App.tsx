@@ -1,3 +1,4 @@
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { createEffect, createMemo, createSignal, For, Match, on, onCleanup, onMount, Show, Switch } from "solid-js";
 import { api, onChecksChanged, onLaunch, onRepoChanged, onSharedChanged, onSyncProgress, onUpdateAvailable } from "./api";
 import { ChangesDiff, ChangesList } from "./components/ChangesPane";
@@ -342,6 +343,11 @@ export function App() {
   createEffect(() => {
     const id = store.repo?.id;
     if (id) saveRepoLayout(id, { tab: store.tab, selectedPath: store.selectedPath });
+  });
+
+  createEffect(() => {
+    const title = store.repo ? `${store.repo.name} - Blink` : "Blink";
+    if ("__TAURI_INTERNALS__" in window) getCurrentWindow().setTitle(title).catch(() => {});
   });
 
   createEffect(

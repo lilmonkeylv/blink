@@ -1,0 +1,16 @@
+{
+  "app": {
+    "windows": [
+      {
+        "label": "main",
+        "title": "Blink",
+        "width": 1200,
+        "height": 780,
+        "minWidth": 860,
+        "minHeight": 520,
+        "visible": true,
+        "decorations": false
+      }
+    ]
+  }
+}

@@ -21,6 +21,7 @@ import {
   undoLastOperation,
 } from "../store";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
+import { customTitleBar, WindowControls } from "./WindowControls";
 import { DRAG_TYPE } from "./HistoryPane";
 import { BranchIcon, CheckIcon, ChevronDown, DownIcon, MenuIcon, PlusIcon, PullRequestIcon, RepoIcon, SyncIcon, UpIcon } from "./Icons";
 
@@ -479,7 +480,7 @@ export function Toolbar() {
 
   return (
     <>
-      <div class="toolbar">
+      <div class="toolbar" data-tauri-drag-region={customTitleBar || undefined}>
         <button class="toolbar-button repo" classList={{ open: store.popover === "repos" }} onClick={() => toggle("repos")} title="Ctrl+T">
           <RepoIcon />
           <span class="labels">
@@ -570,10 +571,13 @@ export function Toolbar() {
             <span class="toolbar-progress" style={{ width: progressWidth() }} />
           </Show>
         </button>
-        <span class="toolbar-spacer" />
+        <span class="toolbar-spacer" data-tauri-drag-region={customTitleBar || undefined} />
         <button class="toolbar-button app-menu" aria-label="Menu" title="Menu" onClick={(e) => openContextMenu(e, appMenu())}>
           <MenuIcon />
         </button>
+        <Show when={customTitleBar}>
+          <WindowControls />
+        </Show>
       </div>
       <Show when={store.opening || store.busy}>
         <div class="activity-bar" title={store.busy ?? "Opening repository"} />
