@@ -1,6 +1,6 @@
 <div align="center">
 
-<h1><img src="assets/logo.svg" alt="" width="44" height="44" align="center" /> Blink</h1>
+<h1><img src="assets/logo.svg" alt="" width="40" height="40" align="top" /> Blink</h1>
 
 **A blazing-fast, multithreaded Git client for GitHub, built with Rust and Tauri.**
 
