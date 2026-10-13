@@ -369,8 +369,10 @@ a {
   stroke-width: 1;
 }
 
-.window-control:hover {
+.window-control:hover,
+.window-control:focus-visible {
   background: var(--toolbar-hover);
+  outline: none;
 }
 
 .window-control.app-menu-button svg {
@@ -1307,6 +1309,24 @@ select.input {
 
 .menu button:disabled {
   opacity: 0.5;
+}
+
+.menu button.submenu {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.menu button.submenu svg {
+  width: 14px;
+  height: 14px;
+  fill: currentColor;
+  opacity: 0.7;
+}
+
+.menu button.submenu.open:not(:hover) {
+  background: var(--bg-hover);
 }
 
 .menu hr {
