@@ -1,6 +1,6 @@
 <div align="center">
 
-# Blink
+<h1><img src="assets/logo.svg" alt="" width="44" height="44" align="center" /> Blink</h1>
 
 **A blazing-fast, multithreaded Git client for GitHub, built with Rust and Tauri.**
 
@@ -275,7 +275,7 @@ Blink does not collect telemetry. It talks to other systems only in these cases:
 - **Your Git remotes**, when you fetch, pull, push or clone, and during background fetch if it is turned on in Settings
 - **Update checks**, a request to `github.com` for the latest release a few hours apart
 
-There are no usage statistics or crash reports.
+There are no usage statistics or crash reports. The full [privacy policy](PRIVACY.md) lists what's stored on your computer and what's sent where.
 
 ## License
 
