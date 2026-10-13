@@ -2,12 +2,11 @@ use std::path::PathBuf;
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
-use blink_diff::{DiffOptions, FileDiff, diff_file};
-use blink_git::{
-    Blame, BlobSource, CommitFile, CommitSummary, GraphRow, ReflogEntry, SearchKind, Worktree, graph_layout,
-};
+use blink_diff::{DiffOptions, diff_file};
+use blink_git::{Blame, BlobSource, CommitFile, CommitSummary, ReflogEntry, SearchKind, Worktree, graph_layout};
 use serde::Serialize;
 use tauri::State;
+use tauri::ipc::Response;
 
 use crate::error::{CmdResult, CommandError};
 use crate::state::AppState;
@@ -48,20 +47,8 @@ pub async fn reflog(state: State<'_, AppState>, id: String) -> CmdResult<Vec<Ref
     Ok(state.engine.read(&id, |repo| repo.cli().reflog(300)).await?)
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct GraphPage {
-    commits: Vec<CommitSummary>,
-    rows: Vec<GraphRow>,
-}
-
 #[tauri::command]
-pub async fn history_graph(
-    state: State<'_, AppState>,
-    id: String,
-    offset: usize,
-    limit: usize,
-) -> CmdResult<GraphPage> {
+pub async fn history_graph(state: State<'_, AppState>, id: String, offset: usize, limit: usize) -> CmdResult<Response> {
     let end = (offset + limit.min(500)).min(GRAPH_LIMIT);
     Ok(state
         .engine
@@ -69,7 +56,7 @@ pub async fn history_graph(
             let commits = repo.log(None, 0, end)?;
             let rows = graph_layout(&commits);
             let start = offset.min(commits.len());
-            Ok(GraphPage { commits: commits[start..].to_vec(), rows: rows[start..].to_vec() })
+            Ok(Response::new(crate::wire::encode_graph(&commits[start..], &rows[start..])))
         })
         .await?)
 }
@@ -93,9 +80,9 @@ pub async fn range_file_diff(
     path: String,
     old_path: Option<String>,
     highlight: Option<bool>,
-) -> CmdResult<FileDiff> {
+) -> CmdResult<Response> {
     let opts = DiffOptions { highlight: highlight.unwrap_or(true), ..Default::default() };
-    Ok(state
+    let diff = state
         .engine
         .read(&id, move |repo| {
             let old =
@@ -103,7 +90,8 @@ pub async fn range_file_diff(
             let new = repo.read_blob(&BlobSource::Revision(newest), &path)?;
             Ok(diff_file(&path, &old.unwrap_or_default(), &new.unwrap_or_default(), opts))
         })
-        .await?)
+        .await?;
+    Ok(crate::wire::diff_response(&diff))
 }
 
 #[derive(Serialize)]
