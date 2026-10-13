@@ -2,6 +2,13 @@
 
 All notable changes to Blink are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.1.0-alpha.3] - 2026-10-13
+
+### Fixes
+
+- **ui:** In-app prompts instead of native message boxes ([29b07ee](https://github.com/lilmonkeylv/blink/commit/29b07ee23610c10d0188a09a353496fe825408df))
+- **git:** Wait out index.lock contention and offer to clear stale locks ([a075fe2](https://github.com/lilmonkeylv/blink/commit/a075fe20d735b48271f2f346f7f271caf9e74048))
+
 ## [0.1.0-alpha.2] - 2026-10-13
 
 ### Features
