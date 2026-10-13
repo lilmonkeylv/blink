@@ -249,6 +249,8 @@ BLINK_GITHUB_CLIENT_SECRET=your_client_secret
 
 Never commit `.env`. Tokens are stored in your OS keychain, never on disk.
 
+`src-tauri/build.rs` bakes both values into every build, so release installers can sign in without a `.env` next to them. A release build without them prints a cargo warning and ships with sign-in disabled.
+
 ### Tests and benchmarks
 
 ```bash
