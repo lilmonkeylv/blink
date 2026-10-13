@@ -34,7 +34,9 @@ pub fn ensure_watcher(app: &AppHandle, state: &AppState, id: &str) -> CmdResult<
                     match engine.refresh(id).await {
                         Ok(snapshot) => {
                             let name = engine.get(id).map(|h| h.repo().name()).unwrap_or_default();
-                            let _ = app.emit(REPO_CHANGED, RepoView::from_snapshot(id, name, &snapshot));
+                            let view = RepoView::from_snapshot(id, name, &snapshot);
+                            view.remember(&state.cache);
+                            let _ = app.emit(REPO_CHANGED, view);
                         }
                         Err(blink_core::Error::Cancelled) => {}
                         Err(blink_core::Error::UnknownRepo(_)) => {}

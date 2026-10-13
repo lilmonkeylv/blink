@@ -322,7 +322,14 @@ pub async fn open_repository(app: AppHandle, state: State<'_, AppState>, path: S
     ensure_watcher(&app, &state, &id)?;
     let _ = state.cache.touch_repository(&id);
     let _ = state.cache.put_app_state(LAST_REPO_KEY, &id);
-    Ok(RepoView::from_snapshot(&id, handle.repo().name(), &snapshot))
+    let view = RepoView::from_snapshot(&id, handle.repo().name(), &snapshot);
+    view.remember(&state.cache);
+    Ok(view)
+}
+
+#[tauri::command]
+pub fn cached_repository(state: State<'_, AppState>, path: String) -> Option<serde_json::Value> {
+    RepoView::cached(&state.cache, &path)
 }
 
 #[tauri::command]
