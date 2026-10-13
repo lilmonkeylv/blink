@@ -77,6 +77,7 @@ pub async fn clone_repository(
     parent: String,
     name: String,
     depth: Option<u32>,
+    partial: Option<bool>,
 ) -> CmdResult<RepoRecord> {
     let dest = PathBuf::from(&parent).join(&name);
     if dest.exists() && std::fs::read_dir(&dest).map(|mut d| d.next().is_some()).unwrap_or(false) {
@@ -87,9 +88,11 @@ pub async fn clone_repository(
     let permit =
         state.engine.network().clone().acquire_owned().await.map_err(|e| CommandError::new("core", e.to_string()))?;
     let clone_dest = dest.clone();
-    tauri::async_runtime::spawn_blocking(move || GitCli::clone_repository(&url, &clone_dest, depth, &template, emit))
-        .await
-        .map_err(|e| CommandError::new("core", e.to_string()))??;
+    tauri::async_runtime::spawn_blocking(move || {
+        GitCli::clone_repository(&url, &clone_dest, depth, partial.unwrap_or(false), &template, emit)
+    })
+    .await
+    .map_err(|e| CommandError::new("core", e.to_string()))??;
     drop(permit);
     add_repository(state, dest.to_string_lossy().into_owned()).await
 }

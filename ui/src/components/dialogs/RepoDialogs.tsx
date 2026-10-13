@@ -132,6 +132,7 @@ export function CloneDialog(p: { url?: string }) {
   const [parent, setParent] = createSignal(localStorageGet("blink.cloneParent") ?? "");
   const [name, setName] = createSignal(p.url ? repoNameFromUrl(p.url) : "");
   const [shallow, setShallow] = createSignal(false);
+  const [partial, setPartial] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
   const [progress, setProgress] = createSignal<string>("");
   const [repos] = createResource(
@@ -151,7 +152,7 @@ export function CloneDialog(p: { url?: string }) {
     setBusy(true);
     localStorageSet("blink.cloneParent", parent());
     try {
-      const record = await api.clone(source(), parent(), name().trim(), shallow() ? 1 : undefined);
+      const record = await api.clone(source(), parent(), name().trim(), shallow() ? 1 : undefined, partial());
       await reloadRepositories();
       await openRepo(record.path);
       closeDialog();
@@ -253,6 +254,7 @@ export function CloneDialog(p: { url?: string }) {
         <input class="input" value={name()} onInput={(e) => setName(e.currentTarget.value)} />
       </Field>
       <Checkbox checked={shallow()} onChange={setShallow} label="Shallow clone (latest commit only)" />
+      <Checkbox checked={partial()} onChange={setPartial} label="Partial clone (download file contents only when needed)" />
     </Dialog>
   );
 }
@@ -337,18 +339,28 @@ export function PublishDialog() {
 }
 
 export function RepoSettingsDialog() {
-  const [tab, setTab] = createSignal<"remote" | "ignore" | "config" | "fork">("remote");
+  const [tab, setTab] = createSignal<"remote" | "ignore" | "config" | "sparse" | "fork">("remote");
+  const [sparseText, setSparseText] = createSignal<string | null>(null);
   const [settings, setSettings] = createSignal<RepoSettings | null>(null);
   const [fork] = createResource(
     () => (store.repo && store.account ? store.repo.id : null),
     (id) => api.forkInfo(id).catch(() => null),
   );
-  api.repoSettings(store.repo!.id).then(setSettings).catch(reportError);
+  api
+    .repoSettings(store.repo!.id)
+    .then((s) => {
+      setSettings(s);
+      setSparseText(s.sparse ? s.sparse.join("\n") : null);
+    })
+    .catch(reportError);
 
   const update = (fn: (s: RepoSettings) => RepoSettings) => setSettings((s) => (s ? fn(structuredClone(s)) : s));
   const save = async () => {
-    const s = settings();
-    if (!s || !store.repo) return;
+    const current = settings();
+    if (!current || !store.repo) return;
+    const text = sparseText();
+    const sparse = text === null ? null : text.split("\n").map((l) => l.trim()).filter(Boolean);
+    const s = { ...current, sparse };
     const ok = await run("Save repository settings", () => api.saveRepoSettings(store.repo!.id, s).then(() => true));
     if (ok) closeDialog();
   };
@@ -376,6 +388,7 @@ export function RepoSettingsDialog() {
           ["remote", "Remote"],
           ["ignore", "Ignored files"],
           ["config", "Git config"],
+          ["sparse", "Sparse checkout"],
           ...(fork()?.isFork ? ([["fork", "Fork behavior"]] as ["fork", string][]) : []),
         ]}
       />
@@ -434,6 +447,23 @@ export function RepoSettingsDialog() {
               <Field label="Email">
                 <input class="input" value={s().userEmail ?? ""} onInput={(e) => { const v = e.currentTarget.value; update((x) => ((x.userEmail = v || null), x)); }} />
               </Field>
+            </Match>
+            <Match when={tab() === "sparse"}>
+              <Checkbox
+                checked={sparseText() !== null}
+                onChange={(on) => setSparseText(on ? (sparseText() ?? "") : null)}
+                label="Only check out some folders"
+              />
+              <Show when={sparseText() !== null}>
+                <span class="muted small">One folder per line, relative to the repository root. Files in the root are always checked out.</span>
+                <textarea
+                  class="textarea code-area"
+                  spellcheck={false}
+                  placeholder={"src\ndocs"}
+                  value={sparseText() ?? ""}
+                  onInput={(e) => setSparseText(e.currentTarget.value)}
+                />
+              </Show>
             </Match>
             <Match when={tab() === "fork"}>
               <p style={{ margin: 0 }}>
