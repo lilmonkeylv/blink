@@ -394,6 +394,15 @@ a {
   border-bottom-color: #fd8c73;
 }
 
+.list-filter {
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--border);
+}
+
+.list-filter .input {
+  width: 100%;
+}
+
 .list-header {
   display: flex;
   align-items: center;
