@@ -69,6 +69,8 @@ const history: CommitSummary[] = Array.from({ length: 60 }, (_, i) => ({
   parents: [],
 }));
 
+const opened = new Set<string>();
+
 export function installDevMock() {
   const boot: Bootstrap = {
     repositories: [
@@ -89,10 +91,19 @@ export function installDevMock() {
       case "shared_state":
         return { repositories: boot.repositories, settings: defaultSettings(), account: null };
       case "open_repository":
+        return new Promise((resolve) =>
+          setTimeout(() => {
+            opened.add(String(a.path));
+            resolve({ ...repo, id: a.path, name: String(a.path).split("/").pop() });
+          }, 400),
+        );
+      case "cached_repository":
         return { ...repo, id: a.path, name: String(a.path).split("/").pop() };
       case "refresh_repository":
         return { ...repo, id: a.id, name: String(a.id).split("/").pop() };
       case "file_diff":
+        if (!opened.has(String(a.id))) throw { kind: "core", message: `repository not open: ${a.id}`, detail: null };
+        return diff;
       case "commit_file_diff":
         return diff;
       case "history":

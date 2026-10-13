@@ -329,6 +329,7 @@ export async function openRepo(path: string, asNewTab = store.pickingNewTab) {
   const previousTabs = store.tabs;
   setTabs(placeTab(store.tabs, current, path, asNewTab));
   setStore({ popover: null, opening: path, pickingNewTab: false });
+  const request = api.openRepository(path);
   let cached = tabViews.get(path);
   if (!cached && current !== path) {
     const remembered = await api.cachedRepository(path).catch(() => null);
@@ -337,12 +338,13 @@ export async function openRepo(path: string, asNewTab = store.pickingNewTab) {
   }
   if (cached && current !== path) showRepo(cached);
   try {
-    const view = await api.openRepository(path);
+    const view = await request;
     tabViews.set(path, view);
     if (cached && store.repo?.id === path) applyRepoView(view);
     else showRepo(view);
     void offerFsmonitor(view.id);
   } catch (e) {
+    if (store.repo?.id === path && cached) setStore("repo", null);
     if (store.repo?.id !== path) setTabs(previousTabs);
     reportError(e, "Could not open repository");
   } finally {
