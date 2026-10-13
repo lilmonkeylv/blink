@@ -1782,6 +1782,11 @@ input[type="range"] {
   gap: 0;
 }
 
+.preview-base {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+}
+
 .toolbar-button.app-menu {
   width: 54px;
   justify-content: center;

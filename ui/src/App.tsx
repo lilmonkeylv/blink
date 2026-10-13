@@ -303,7 +303,7 @@ export function App() {
     else if (key === "z" && !e.shiftKey && repo && !inTextField(e) && !store.dialog) hit(undoLastOperation);
     else if (key === "f" && e.shiftKey && repo) hit(call((i) => api.reveal(i)));
     else if (key === "f" && repo) hit(focusSearch);
-    else if (key === "r" && repo) hit(call(api.createPullRequest));
+    else if (key === "r" && repo) hit(call((i) => api.createPullRequest(i)));
     else if (key === "a" && e.shiftKey && repo) hit(call((i) => api.openInEditor(i)));
     else if (key === "`" && repo) hit(call((i) => api.openInShell(i)));
     else if (key === "g" && e.shiftKey && repo) hit(call(api.openOnGithub));

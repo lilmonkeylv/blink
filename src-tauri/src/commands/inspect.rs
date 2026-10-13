@@ -94,6 +94,85 @@ pub async fn range_file_diff(
     Ok(crate::wire::diff_response(&diff))
 }
 
+#[tauri::command]
+pub async fn between_file_diff(
+    state: State<'_, AppState>,
+    id: String,
+    from: String,
+    to: String,
+    path: String,
+    old_path: Option<String>,
+    highlight: Option<bool>,
+) -> CmdResult<Response> {
+    let opts = DiffOptions { highlight: highlight.unwrap_or(true), ..Default::default() };
+    let diff = state
+        .engine
+        .read(&id, move |repo| {
+            let old = repo.read_blob(&BlobSource::Revision(from), old_path.as_deref().unwrap_or(&path))?;
+            let new = repo.read_blob(&BlobSource::Revision(to), &path)?;
+            Ok(diff_file(&path, &old.unwrap_or_default(), &new.unwrap_or_default(), opts))
+        })
+        .await?;
+    Ok(crate::wire::diff_response(&diff))
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct PullRequestPreview {
+    base: String,
+    bases: Vec<String>,
+    merge_base: Option<String>,
+    commits: Vec<CommitSummary>,
+    files: Vec<CommitFile>,
+}
+
+fn preview_remote(cli: &blink_git::GitCli) -> String {
+    let remotes = cli.remotes().unwrap_or_default();
+    ["upstream", "origin"]
+        .into_iter()
+        .find(|name| remotes.iter().any(|(r, _)| r == name))
+        .or_else(|| remotes.first().map(|(r, _)| r.as_str()))
+        .unwrap_or("origin")
+        .to_string()
+}
+
+#[tauri::command]
+pub async fn pull_request_preview(
+    state: State<'_, AppState>,
+    id: String,
+    base: Option<String>,
+) -> CmdResult<PullRequestPreview> {
+    let fallback = state.settings.read().git.default_branch.clone();
+    Ok(state
+        .engine
+        .read(&id, move |repo| {
+            let cli = repo.cli();
+            let remote = preview_remote(&cli);
+            let prefix = format!("{remote}/");
+            let bases: Vec<String> = cli
+                .run(&["for-each-ref", "--format=%(refname:short)", &format!("refs/remotes/{remote}")])
+                .unwrap_or_default()
+                .lines()
+                .filter_map(|r| r.strip_prefix(&prefix))
+                .filter(|r| *r != "HEAD" && !r.is_empty())
+                .map(str::to_string)
+                .collect();
+            let remote_default = cli
+                .run(&["symbolic-ref", "--short", &format!("refs/remotes/{remote}/HEAD")])
+                .ok()
+                .and_then(|r| r.trim().strip_prefix(&prefix).map(str::to_string));
+            let base = base.or(remote_default).unwrap_or(fallback);
+            let target = if bases.contains(&base) { format!("{prefix}{base}") } else { base.clone() };
+            let merge_base = cli.run(&["merge-base", &target, "HEAD"]).ok().map(|s| s.trim().to_string());
+            let (commits, files) = match &merge_base {
+                Some(mb) => (cli.range_log(mb, "HEAD", 250)?, repo.files_between(mb, "HEAD")?),
+                None => (Vec::new(), Vec::new()),
+            };
+            Ok(PullRequestPreview { base, bases, merge_base, commits, files })
+        })
+        .await?)
+}
+
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Comparison {

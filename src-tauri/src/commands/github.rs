@@ -284,7 +284,12 @@ pub async fn checkout_pull_request(
 }
 
 #[tauri::command]
-pub async fn create_pull_request(app: AppHandle, state: State<'_, AppState>, id: String) -> CmdResult<()> {
+pub async fn create_pull_request(
+    app: AppHandle,
+    state: State<'_, AppState>,
+    id: String,
+    base: Option<String>,
+) -> CmdResult<()> {
     let handle = state.engine.get(&id)?;
     let repo = handle.repo();
     let HostedRepo { host, owner, name } = hosted(&state, repo)?;
@@ -293,9 +298,10 @@ pub async fn create_pull_request(app: AppHandle, state: State<'_, AppState>, id:
         .branch_name()
         .map(str::to_string)
         .ok_or_else(|| CommandError::new("detached", "Check out a branch first"))?;
+    let base = base.map(|b| format!("{b}...")).unwrap_or_default();
     let url = match hosted_repo(&state, repo, Some("upstream")) {
-        Some(up) => format!("https://{}/{}/{}/compare/{owner}:{branch}?expand=1", up.host, up.owner, up.name),
-        None => format!("https://{host}/{owner}/{name}/compare/{branch}?expand=1"),
+        Some(up) => format!("https://{}/{}/{}/compare/{base}{owner}:{branch}?expand=1", up.host, up.owner, up.name),
+        None => format!("https://{host}/{owner}/{name}/compare/{base}{branch}?expand=1"),
     };
     app.opener().open_url(url, None::<&str>).map_err(|e| CommandError::new("opener", e.to_string()))
 }

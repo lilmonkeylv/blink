@@ -1,8 +1,10 @@
 import { ask } from "@tauri-apps/plugin-dialog";
 import { createResource, createSignal, For, Show } from "solid-js";
-import { api } from "../../api";
+import { api, type CommitFile } from "../../api";
 import { currentBranch, notify, run, setStore, store } from "../../store";
 import { Select } from "../Controls";
+import { DiffView } from "../DiffView";
+import { StatusIcon } from "../Icons";
 import { Dialog } from "../Dialog";
 import { BranchPicker, closeDialog, sanitizeBranchName } from "./common";
 
@@ -273,6 +275,92 @@ export function StashesDialog() {
           )}
         </For>
       </Show>
+    </Dialog>
+  );
+}
+
+export function PullRequestPreviewDialog() {
+  const [base, setBase] = createSignal<string | undefined>(undefined);
+  const [preview] = createResource(
+    () => (store.repo ? { id: store.repo.id, base: base() } : null),
+    ({ id, base }) => api.pullRequestPreview(id, base),
+  );
+  const [picked, setPicked] = createSignal<CommitFile | null>(null);
+  const file = () => {
+    const files = preview()?.files ?? [];
+    return files.find((f) => f.path === picked()?.path) ?? files[0] ?? null;
+  };
+  const [diff] = createResource(
+    () => {
+      const p = preview();
+      const f = file();
+      return store.repo && p?.mergeBase && f ? { id: store.repo.id, from: p.mergeBase, f } : null;
+    },
+    ({ id, from, f }) => api.betweenFileDiff(id, from, "HEAD", f.path, f.oldPath),
+  );
+  const create = () => {
+    const repo = store.repo;
+    const target = preview()?.base;
+    if (!repo) return;
+    closeDialog();
+    run("Create pull request", () => api.createPullRequest(repo.id, target));
+  };
+  const summary = () => {
+    const p = preview();
+    if (!p) return "";
+    if (!p.mergeBase) return `No history in common with ${p.base}`;
+    const c = p.commits.length;
+    const f = p.files.length;
+    return `${c} commit${c === 1 ? "" : "s"}, ${f} changed file${f === 1 ? "" : "s"} into ${p.base}`;
+  };
+  return (
+    <Dialog
+      title={`Preview pull request from ${currentBranch() ?? "HEAD"}`}
+      onClose={closeDialog}
+      class="fill"
+      footer={
+        <>
+          <span class="muted grow">{summary()}</span>
+          <button class="btn" onClick={closeDialog}>
+            Cancel
+          </button>
+          <button class="btn primary" disabled={!preview()?.commits.length} onClick={create}>
+            Create pull request
+          </button>
+        </>
+      }
+    >
+      <div class="summary-row preview-base">
+        <span class="muted">Base branch</span>
+        <Select
+          value={preview()?.base ?? base() ?? ""}
+          options={(preview()?.bases ?? []).map((b) => ({ value: b, label: b }))}
+          onChange={(b) => {
+            setPicked(null);
+            setBase(b);
+          }}
+          ariaLabel="Base branch"
+        />
+      </div>
+      <div class="commit-split" style={{ flex: "1", "min-height": "0", "grid-template-columns": "300px 1fr" }}>
+        <div class="list">
+          <For each={preview()?.files ?? []} fallback={<div class="empty muted">{preview.loading ? "Loading…" : "No changes"}</div>}>
+            {(f) => (
+              <div class="row" classList={{ selected: file()?.path === f.path }} onMouseDown={() => setPicked(f)} title={f.path}>
+                <span class="path grow">
+                  <bdi>{f.oldPath ? `${f.oldPath} -> ${f.path}` : f.path}</bdi>
+                </span>
+                <StatusIcon kind={f.kind} />
+              </div>
+            )}
+          </For>
+        </div>
+        <div class="content">
+          <Show when={diff()} fallback={<div class="empty muted">{diff.loading ? "Loading…" : ""}</div>}>
+            {(d) => <DiffView diff={d()} />}
+          </Show>
+        </div>
+      </div>
     </Dialog>
   );
 }
