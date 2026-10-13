@@ -412,6 +412,25 @@ pub fn dismiss_fsmonitor_suggestion(state: State<'_, AppState>, id: String) -> C
     Ok(state.cache.put_app_state(&fsmonitor_dismissed_key(&id), &true)?)
 }
 
+const STALE_LOCK_AGE: std::time::Duration = std::time::Duration::from_secs(10);
+
+#[tauri::command]
+pub fn remove_stale_lock(state: State<'_, AppState>, id: String, path: String) -> CmdResult<()> {
+    let handle = state.engine.get(&id)?;
+    let git_dir = std::fs::canonicalize(handle.repo().git_dir()).map_err(|e| CommandError::new("io", e.to_string()))?;
+    let lock = PathBuf::from(&path);
+    let Ok(target) = std::fs::canonicalize(&lock) else { return Ok(()) };
+    if !target.starts_with(&git_dir) || target.extension().and_then(|e| e.to_str()) != Some("lock") {
+        return Err(CommandError::new("locked", "That is not a lock file inside this repository"));
+    }
+    let age =
+        std::fs::metadata(&target).and_then(|m| m.modified()).ok().and_then(|t| t.elapsed().ok()).unwrap_or_default();
+    if age < STALE_LOCK_AGE {
+        return Err(CommandError::new("locked", "Git is still using the repository. Try again in a moment."));
+    }
+    std::fs::remove_file(&target).map_err(|e| CommandError::new("io", e.to_string()))
+}
+
 #[tauri::command]
 pub async fn refresh_repository(state: State<'_, AppState>, id: String) -> CmdResult<RepoView> {
     let handle = state.engine.get(&id)?;

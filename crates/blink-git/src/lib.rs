@@ -12,7 +12,7 @@ mod rewrite;
 mod status;
 
 pub use blob::BlobSource;
-pub use cli::{GitCli, Progress, SyncAction};
+pub use cli::{GitCli, Progress, SyncAction, is_lock_error, locked_file};
 pub use error::{Error, Result};
 pub use graph::{Edge, GraphRow, GraphState, layout as graph_layout};
 pub use inspect::{Blame, BlameCommit, BlameLine, ReflogEntry, SearchKind};

@@ -158,11 +158,32 @@ function authorizeAction(url: string | null): Banner["action"] {
   return { label: "Authorize", run: () => api.openExternal(url).catch(reportError) };
 }
 
+function removeLockAction(path: string) {
+  return {
+    label: "Remove lock",
+    run: () => {
+      const repo = store.repo;
+      if (!repo) return;
+      api
+        .removeStaleLock(repo.id, path)
+        .then(() => notify("success", "Lock removed. Try again."))
+        .catch((err) => reportError(err));
+    },
+  };
+}
+
 export function reportError(e: unknown, context?: string) {
   if (isCommandError(e)) {
     if (e.kind === "cancelled") return;
     if (e.kind === "sso") {
       notify("error", "This organization requires single sign-on", { sticky: true, action: authorizeAction(e.detail) });
+      return;
+    }
+    if (e.kind === "locked" && e.detail?.endsWith(".lock")) {
+      notify("error", `${context ? `${context}: ` : ""}${e.message}. If no other Git tool is running, the lock is left over from a crash.`, {
+        detail: e.detail,
+        action: removeLockAction(e.detail),
+      });
       return;
     }
     notify("error", context ? `${context}: ${e.message}` : e.message, { detail: e.detail });
