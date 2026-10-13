@@ -2,7 +2,7 @@ import { ask } from "@tauri-apps/plugin-dialog";
 import { createEffect, createMemo, createSignal, on, Show } from "solid-js";
 import { api, type FileChange, type FileDiff, type FileSelection } from "../api";
 import { checkState, diffSignature, setLines, toggleFile, toPayload, type CheckState, type FileSel } from "../lib/selection";
-import { cachedDiff, currentBranch, notify, refreshRepo, reportError, run, setStore, store, storeDiff } from "../store";
+import { cachedDiff, currentBranch, notify, refreshRepo, reportError, run, sameDiff, setStore, store, storeDiff } from "../store";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { Checkbox } from "./Controls";
 import { DiffView } from "./DiffView";
@@ -353,12 +353,14 @@ export function ChangesDiff() {
         const mine = ++token;
         const apply = (diff: FileDiff) => {
           if (mine !== token) return false;
-          if (ws) setWsDiff(diff);
+          if (ws) {
+            if (!sameDiff(wsDiff(), diff)) setWsDiff(diff);
+          }
           else storeDiff(path, diff);
           return true;
         };
         try {
-          if (ws || loadFull || !cachedDiff(path)) {
+          if (loadFull || (ws ? !wsDiff() : !cachedDiff(path))) {
             if (!apply(await api.fileDiff(id, path, ws, loadFull, false))) return;
           }
           if (apply(await api.fileDiff(id, path, ws, loadFull, true)) && !ws && !loadFull) highlighted.add(key);
@@ -368,7 +370,15 @@ export function ChangesDiff() {
       },
     ),
   );
-  createEffect(on(() => store.selectedPath, () => setFull(false)));
+  createEffect(
+    on(
+      () => store.selectedPath,
+      () => {
+        setFull(false);
+        setWsDiff(undefined);
+      },
+    ),
+  );
 
   const diff = () => (ignoreWhitespace() ? wsDiff() : file() ? cachedDiff(file()!.path) : undefined);
 

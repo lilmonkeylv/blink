@@ -1362,7 +1362,8 @@ input[type="range"] {
 
 .graph {
   flex: none;
-  overflow: visible;
+  overflow: hidden;
+  transition: width var(--ease);
 }
 
 .graph path {

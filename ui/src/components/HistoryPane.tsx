@@ -22,6 +22,7 @@ import { VirtualList } from "./VirtualList";
 const PAGE = 300;
 const ROW = 52;
 const LANE = 12;
+const MAX_LANES = 16;
 const LANE_COLORS = ["#2f81f7", "#3fb950", "#d29922", "#db61a2", "#a371f7", "#f85149", "#39c5cf", "#e3b341"];
 export const DRAG_TYPE = "application/x-blink-commits";
 
@@ -86,7 +87,7 @@ function Graph(p: { row: GraphRow; width: number }) {
   const path = (from: number, to: number, y0: number, y1: number) =>
     from === to ? `M${x(from)} ${y0}V${y1}` : `M${x(from)} ${y0}C${x(from)} ${(y0 + y1) / 2} ${x(to)} ${(y0 + y1) / 2} ${x(to)} ${y1}`;
   return (
-    <svg class="graph" width={p.width} height={ROW} aria-hidden="true">
+    <svg class="graph" style={{ width: `${p.width}px`, height: `${ROW}px` }} aria-hidden="true">
       <For each={p.row.top}>{(e) => <path d={path(e.from, e.to, 0, ROW / 2)} stroke={color(e.color)} />}</For>
       <For each={p.row.bottom}>{(e) => <path d={path(e.from, e.to, ROW / 2, ROW)} stroke={color(e.color)} />}</For>
       <circle cx={x(p.row.lane)} cy={ROW / 2} r="4" fill="var(--bg)" stroke={color(p.row.color)} stroke-width="2.5" />
@@ -262,7 +263,13 @@ export function HistoryList() {
     return commits();
   });
   const graphOn = () => mode() === "log" && showGraph();
-  const graphWidth = createMemo(() => (graphOn() ? Math.min(8, Math.max(1, ...rows().slice(0, 400).map((r) => r.width))) * LANE + 8 : 0));
+  const [range, setRange] = createSignal<[number, number]>([0, 40]);
+  const graphWidth = createMemo(() => {
+    if (!graphOn()) return 0;
+    const [start, end] = range();
+    const lanes = Math.max(1, ...rows().slice(start, end + 1).map((r) => r.width));
+    return Math.min(MAX_LANES, lanes) * LANE + 4;
+  });
 
   const primary = () => selected()[0] ?? null;
   const index = () => list().findIndex((c) => c.id === primary());
@@ -364,6 +371,7 @@ export function HistoryList() {
           onKeyDown={onKeyDown}
           scrollToIndex={index()}
           onEndReached={() => mode() === "log" && loadMore()}
+          onRangeChange={(start, end) => setRange((r) => (r[0] === start && r[1] === end ? r : [start, end]))}
           render={(c, i) => (
             <div
               class="row history-row"

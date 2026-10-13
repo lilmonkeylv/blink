@@ -10,6 +10,7 @@ export function VirtualList<T>(p: {
   onKeyDown?: (e: KeyboardEvent) => void;
   scrollToIndex?: number | null;
   onEndReached?: () => void;
+  onRangeChange?: (start: number, end: number) => void;
   ref?: (el: HTMLDivElement) => void;
   style?: JSX.CSSProperties;
   dynamic?: boolean;
@@ -24,8 +25,6 @@ export function VirtualList<T>(p: {
     overscan: 12,
   });
 
-  createEffect(on(() => p.items, () => p.dynamic && virtualizer.measure(), { defer: true }));
-
   createEffect(
     on(
       () => p.scrollToIndex,
@@ -39,6 +38,7 @@ export function VirtualList<T>(p: {
     const items = virtualizer.getVirtualItems();
     const last = items[items.length - 1];
     if (last && p.onEndReached && last.index >= p.items.length - 20) p.onEndReached();
+    if (items.length) p.onRangeChange?.(items[0].index, last.index);
   });
 
   return (

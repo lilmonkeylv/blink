@@ -112,7 +112,13 @@ export function cachedDiff(path: string): FileDiff | undefined {
   return diffCache.get(path);
 }
 
+export function sameDiff(a: FileDiff | undefined, b: FileDiff): boolean {
+  if (!a || a.additions !== b.additions || a.deletions !== b.deletions || a.hunks.length !== b.hunks.length) return false;
+  return JSON.stringify(a) === JSON.stringify(b);
+}
+
 export function storeDiff(path: string, diff: FileDiff) {
+  if (sameDiff(diffCache.get(path), diff)) return;
   diffCache.set(path, diff);
   const existing = store.checkedPaths[path];
   const next = reconcile(existing, diff);
@@ -168,9 +174,8 @@ export function applyRepoView(view: RepoView) {
       setStore("selectedPath", view.files[0]?.path ?? null);
     }
     if (!store.selectedPath && view.files.length) setStore("selectedPath", view.files[0].path);
+    for (const path of [...diffCache.keys()]) if (!present.has(path)) diffCache.delete(path);
   });
-  diffCache.clear();
-  setDiffVersion((v) => v + 1);
 }
 
 export async function bootstrap() {
