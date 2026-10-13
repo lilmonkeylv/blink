@@ -551,6 +551,7 @@ export const api = {
   repoSettings: (id: string) => invoke<RepoSettings>("repo_settings", { id }),
   saveRepoSettings: (id: string, settings: RepoSettings) => invoke<void>("save_repo_settings", { id, settings }),
   importRepositories: (root: string) => invoke<RepoRecord[]>("import_repositories", { root }),
+  desktopRepositories: () => invoke<RepoRecord[]>("desktop_repositories"),
 
   signIn: () => invoke<{ account: Account; primaryEmail: string | null }>("sign_in"),
   deviceStart: () => invoke<DeviceCode>("device_start"),

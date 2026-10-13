@@ -147,6 +147,11 @@ export function installDevMock() {
       case "blame":
         return { lines: diff.hunks[0].lines.filter((l) => l.newNo).map((l, i) => ({ sha: history[i % 3].id, line: i + 1, text: l.text })),
           commits: Object.fromEntries(history.slice(0, 3).map((c) => [c.id, { author: c.authorName, time: c.time, summary: c.summary }])) };
+      case "desktop_repositories":
+        return [
+          { path: "C:/dev/website", name: "website", owner: "octocat", remoteUrl: null, lastOpened: 0 },
+          { path: "C:/dev/notes", name: "notes", owner: null, remoteUrl: null, lastOpened: 0 },
+        ];
       case "whats_new":
         return [];
       case "release_notes":
