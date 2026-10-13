@@ -487,6 +487,11 @@ a {
   color: var(--fg-muted);
 }
 
+.grow {
+  flex: 1;
+  min-width: 0;
+}
+
 .empty {
   display: grid;
   place-items: center;
