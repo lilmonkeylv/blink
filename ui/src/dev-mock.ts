@@ -86,6 +86,8 @@ export function installDevMock() {
     switch (cmd) {
       case "bootstrap":
         return { ...boot, settings: defaultSettings() };
+      case "shared_state":
+        return { repositories: boot.repositories, settings: defaultSettings(), account: null };
       case "open_repository":
         return { ...repo, id: a.path, name: String(a.path).split("/").pop() };
       case "refresh_repository":
@@ -160,6 +162,8 @@ export function installDevMock() {
       case "blame":
         return { lines: diff.hunks[0].lines.filter((l) => l.newNo).map((l, i) => ({ sha: history[i % 3].id, line: i + 1, text: l.text })),
           commits: Object.fromEntries(history.slice(0, 3).map((c) => [c.id, { author: c.authorName, time: c.time, summary: c.summary }])) };
+      case "desktop_preferences":
+        return { editor: "code", editorName: "Visual Studio Code", shell: "wt", shellName: "Windows Terminal", theme: "dark", useSystemOpenssh: true };
       case "desktop_repositories":
         return [
           { path: "C:/dev/website", name: "website", owner: "octocat", remoteUrl: null, lastOpened: 0 },

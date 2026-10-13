@@ -62,6 +62,7 @@ pub fn run() {
             commands::repo::import_repositories,
             commands::sync::fetch_all,
             commands::repo::desktop_repositories,
+            commands::repo::desktop_preferences,
             commands::window::open_window,
             commands::changes::file_diff,
             commands::changes::commit,

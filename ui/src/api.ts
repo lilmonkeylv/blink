@@ -117,6 +117,15 @@ export interface FetchAllRow {
   changes: number;
 }
 
+export interface DesktopPreferences {
+  editor: string | null;
+  editorName: string | null;
+  shell: string | null;
+  shellName: string | null;
+  theme: "light" | "dark" | "system" | null;
+  useSystemOpenssh: boolean | null;
+}
+
 export interface CommitSummary {
   id: string;
   shortId: string;
@@ -647,6 +656,7 @@ export const api = {
   fetchAll: () => invoke<FetchAllRow[]>("fetch_all"),
   importRepositories: (root: string) => invokeShared<RepoRecord[]>("import_repositories", { root }),
   desktopRepositories: () => invoke<RepoRecord[]>("desktop_repositories"),
+  desktopPreferences: () => invoke<DesktopPreferences>("desktop_preferences"),
 
   signIn: () => invokeShared<{ account: Account; primaryEmail: string | null }>("sign_in"),
   deviceStart: () => invoke<DeviceCode>("device_start"),

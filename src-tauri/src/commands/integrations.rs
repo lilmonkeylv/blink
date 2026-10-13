@@ -209,3 +209,27 @@ pub fn open_in_shell(state: State<'_, AppState>, id: String, path: Option<String
     };
     spawn(shell_command(&state, &dir)?)
 }
+
+const SHELL_ALIASES: &[(&str, &str)] = &[("powershell", "powershell"), ("powershell core", "pwsh")];
+
+fn normalize_tool_name(name: &str) -> String {
+    let lower = name.trim().to_ascii_lowercase();
+    lower.strip_prefix("jetbrains ").unwrap_or(&lower).to_string()
+}
+
+fn match_tool(candidates: &[Candidate], aliases: &[(&str, &'static str)], name: &str) -> Option<&'static str> {
+    let wanted = normalize_tool_name(name);
+    aliases
+        .iter()
+        .find(|(alias, _)| *alias == wanted)
+        .map(|(_, id)| *id)
+        .or_else(|| candidates.iter().find(|c| c.name.to_ascii_lowercase() == wanted).map(|c| c.id))
+}
+
+pub fn editor_id_for(name: &str) -> Option<&'static str> {
+    match_tool(EDITORS, &[], name)
+}
+
+pub fn shell_id_for(name: &str) -> Option<&'static str> {
+    match_tool(SHELLS, SHELL_ALIASES, name)
+}
