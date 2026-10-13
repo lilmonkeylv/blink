@@ -24,7 +24,7 @@
     "@tauri-apps/cli": "^2.12.2",
     "@types/bun": "latest",
     "git-cliff": "2.14.2",
-    "typescript": "^5.9.3",
+    "typescript": "^7.0.2",
     "vite": "^8.3.4",
     "vite-plugin-solid": "^2.11.14"
   }
