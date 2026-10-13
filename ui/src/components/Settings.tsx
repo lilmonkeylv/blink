@@ -416,7 +416,7 @@ export function SettingsDialog(p: { tab?: string }) {
                   { value: "beta", label: "Beta (prereleases)" },
                 ]}
                 onChange={(v) => set((x) => (x.advanced.updateChannel = v))}
-                hint="Beta gets prerelease builds before they ship to everyone."
+                hint="Beta gets prerelease builds before they ship to everyone. Prerelease builds of Blink always follow beta."
               />
               <Text
                 label="Foreground threads"

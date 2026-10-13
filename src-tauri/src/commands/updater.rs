@@ -37,6 +37,10 @@ struct ProgressEvent {
     total: Option<u64>,
 }
 
+fn channel_for(setting: UpdateChannel, running_prerelease: bool) -> UpdateChannel {
+    if running_prerelease { UpdateChannel::Beta } else { setting }
+}
+
 fn updater_error(e: impl std::fmt::Display) -> CommandError {
     CommandError::new("updater", e.to_string())
 }
@@ -48,15 +52,19 @@ async fn check(app: &AppHandle) -> CmdResult<Option<UpdateInfo>> {
     if std::env::var_os("FLATPAK_ID").is_some() {
         return Ok(None);
     }
-    let channel = app.state::<AppState>().settings.read().advanced.update_channel;
-    let updater = match channel {
+    let setting = app.state::<AppState>().settings.read().advanced.update_channel;
+    let updater = match channel_for(setting, !app.package_info().version.pre.is_empty()) {
         UpdateChannel::Stable => app.updater(),
         UpdateChannel::Beta => {
             let endpoint = Url::parse(BETA_ENDPOINT).map_err(updater_error)?;
             app.updater_builder().endpoints(vec![endpoint]).and_then(|b| b.build())
         }
     };
-    let update = updater.map_err(updater_error)?.check().await.map_err(updater_error)?;
+    let update = match updater.map_err(updater_error)?.check().await {
+        Ok(update) => update,
+        Err(tauri_plugin_updater::Error::ReleaseNotFound) => None,
+        Err(e) => return Err(updater_error(e)),
+    };
     let info = update.as_ref().map(|u| UpdateInfo {
         version: u.version.clone(),
         current_version: u.current_version.clone(),
@@ -114,4 +122,17 @@ pub fn spawn_update_checks(app: AppHandle) {
             tokio::time::sleep(CHECK_EVERY).await;
         }
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn prerelease_builds_follow_beta() {
+        assert_eq!(channel_for(UpdateChannel::Stable, true), UpdateChannel::Beta);
+        assert_eq!(channel_for(UpdateChannel::Beta, true), UpdateChannel::Beta);
+        assert_eq!(channel_for(UpdateChannel::Stable, false), UpdateChannel::Stable);
+        assert_eq!(channel_for(UpdateChannel::Beta, false), UpdateChannel::Beta);
+    }
 }
