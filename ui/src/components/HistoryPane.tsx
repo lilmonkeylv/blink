@@ -5,6 +5,7 @@ import {
   isCommandError,
   type CommitDetail,
   type CommitFile,
+  type CommitSignature,
   type CommitSummary,
   type FileDiff,
   type GraphRow,
@@ -596,6 +597,7 @@ export function CommitView() {
                   <pre>{d().body.trim()}</pre>
                 </Show>
                 <div class="muted" style={{ "font-size": "12px" }}>
+                  <SignatureBadge sha={d().commit.id} />
                   {d().commit.authorName} &lt;{d().commit.authorEmail}&gt; · {absoluteTime(d().commit.time)} ·{" "}
                   <span style={{ "font-family": "var(--font-mono)", "user-select": "text" }}>{d().commit.shortId}</span> ·{" "}
                   {d().files.length} changed file{d().files.length === 1 ? "" : "s"}
@@ -629,4 +631,29 @@ export function focusCommit(sha: string) {
   if (!commits().some((c) => c.id === sha)) {
     setStore("historySearch", { kind: "message", query: sha });
   }
+}
+
+const SIGNATURE_TITLES: Record<CommitSignature["state"], string> = {
+  verified: "This commit was signed and GitHub verified the signature",
+  unverified: "This commit is signed but GitHub could not verify the signature",
+  signed: "This commit is signed. GitHub hasn't seen it yet, so it isn't verified",
+};
+
+function SignatureBadge(p: { sha: string }) {
+  const [signature] = createResource(
+    () => (store.repo ? { id: store.repo.id, sha: p.sha } : null),
+    ({ id, sha }) => api.commitSignature(id, sha).catch(() => null),
+  );
+  return (
+    <Show when={signature()}>
+      {(s) => (
+        <span
+          class={`badge signature ${s().state}`}
+          title={s().reason ? `${SIGNATURE_TITLES[s().state]} (${s().reason!.replaceAll("_", " ")})` : SIGNATURE_TITLES[s().state]}
+        >
+          {s().state === "verified" ? "Verified" : s().state === "unverified" ? "Unverified" : "Signed"}
+        </span>
+      )}
+    </Show>
+  );
 }

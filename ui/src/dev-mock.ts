@@ -167,6 +167,8 @@ export function installDevMock() {
         ];
       case "commit_warnings":
         return { protectedBranch: false, unlinkedEmail: null, login: "octocat" };
+      case "commit_signature":
+        return a.sha === history[0].id ? { state: "verified", reason: null } : null;
       case "whats_new":
         return [];
       case "release_notes":

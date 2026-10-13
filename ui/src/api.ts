@@ -94,6 +94,11 @@ export interface CommitWarnings {
   login: string | null;
 }
 
+export interface CommitSignature {
+  state: "verified" | "unverified" | "signed";
+  reason: string | null;
+}
+
 export interface CommitSummary {
   id: string;
   shortId: string;
@@ -508,6 +513,7 @@ export const api = {
   history: (id: string, offset: number, limit: number, rev?: string) =>
     invoke("history", { id, offset, limit, rev }).then(wire(decodeHistory)),
   commitDetail: (id: string, sha: string) => invoke<CommitDetail>("commit_detail", { id, sha }),
+  commitSignature: (id: string, sha: string) => invoke<CommitSignature | null>("commit_signature", { id, sha }),
   commitFileDiff: (id: string, sha: string, path: string, oldPath: string | null, ignoreWhitespace = false, highlight = true) =>
     invoke("commit_file_diff", { id, sha, path, oldPath, ignoreWhitespace, highlight }).then(wire(decodeDiff)),
 

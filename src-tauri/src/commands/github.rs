@@ -1,4 +1,6 @@
+use std::collections::HashMap;
 use std::path::PathBuf;
+use std::sync::LazyLock;
 use std::time::Duration;
 
 use parking_lot::Mutex;
@@ -96,6 +98,51 @@ pub async fn commit_warnings(state: State<'_, AppState>, id: String) -> CmdResul
         unlinked_email: email.filter(|e| !email_is_linked(e, account)),
         login: Some(account.login.clone()),
     })
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Signature {
+    state: &'static str,
+    reason: Option<String>,
+}
+
+static SIGNATURES: LazyLock<Mutex<HashMap<String, Option<Signature>>>> = LazyLock::new(Default::default);
+
+fn has_signature(raw_commit: &str) -> bool {
+    raw_commit
+        .lines()
+        .take_while(|l| !l.is_empty())
+        .any(|l| l.starts_with("gpgsig ") || l.starts_with("gpgsig-sha256 "))
+}
+
+#[tauri::command]
+pub async fn commit_signature(state: State<'_, AppState>, id: String, sha: String) -> CmdResult<Option<Signature>> {
+    if let Some(known) = SIGNATURES.lock().get(&sha) {
+        return Ok(known.clone());
+    }
+    let handle = state.engine.get(&id)?;
+    let raw = handle.repo().cli().run(&["cat-file", "commit", &sha])?;
+    if !has_signature(&raw) {
+        SIGNATURES.lock().insert(sha, None);
+        return Ok(None);
+    }
+    let local = Signature { state: "signed", reason: None };
+    let Some(HostedRepo { host, owner, name }) = hosted_repo(&state, handle.repo(), None) else {
+        return Ok(Some(local));
+    };
+    let Some(gh) = state.client_for_host(&host) else { return Ok(Some(local)) };
+    let signature = match gh.commit_verification(&owner, &name, &sha).await {
+        Ok(Some(v)) if v.verified => Signature { state: "verified", reason: None },
+        Ok(Some(v)) => Signature { state: "unverified", reason: Some(v.reason) },
+        Ok(None) => return Ok(Some(local)),
+        Err(e) => {
+            tracing::debug!(error = %e, "commit verification lookup failed");
+            return Ok(Some(local));
+        }
+    };
+    SIGNATURES.lock().insert(sha, Some(signature.clone()));
+    Ok(Some(signature))
 }
 
 pub fn hosted_repo(state: &AppState, repo: &Repository, remote: Option<&str>) -> Option<HostedRepo> {
@@ -395,5 +442,13 @@ mod tests {
         assert!(email_is_linked("octo@users.noreply.github.com", &linked));
         assert!(!email_is_linked("43+octo@users.noreply.github.com", &linked));
         assert!(!email_is_linked("someone@else.com", &linked));
+    }
+
+    #[test]
+    fn detects_signed_commits_from_the_header_only() {
+        let signed = "tree abc\nauthor A <a@x> 1 +0000\ngpgsig -----BEGIN PGP SIGNATURE-----\n \n -----END PGP SIGNATURE-----\n\nmessage\n";
+        assert!(has_signature(signed));
+        assert!(has_signature("tree abc\ngpgsig-sha256 x\n\nmsg\n"));
+        assert!(!has_signature("tree abc\nauthor A <a@x> 1 +0000\n\ngpgsig in the message body\n"));
     }
 }
