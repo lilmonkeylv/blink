@@ -88,6 +88,12 @@ export interface LfsDiff {
   new: LfsPointer | null;
 }
 
+export interface CommitWarnings {
+  protectedBranch: boolean;
+  unlinkedEmail: string | null;
+  login: string | null;
+}
+
 export interface CommitSummary {
   id: string;
   shortId: string;
@@ -557,6 +563,7 @@ export const api = {
     invoke<void>("checkout_pull_request", { id, number, headRef }),
   createPullRequest: (id: string) => invoke<void>("create_pull_request", { id }),
   branchChecks: (id: string) => invoke<ChecksSummary | null>("branch_checks", { id }),
+  commitWarnings: (id: string) => invoke<CommitWarnings>("commit_warnings", { id }),
   rerunFailedChecks: (id: string, suites: number[]) => invoke<void>("rerun_failed_checks", { id, suites }),
   forkInfo: (id: string) => invoke<ForkInfo>("fork_info", { id }),
   addUpstream: (id: string, url: string) => invoke<void>("add_upstream", { id, url }),

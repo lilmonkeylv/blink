@@ -2,6 +2,8 @@ import { ask } from "@tauri-apps/plugin-dialog";
 import { createEffect, createMemo, createSignal, on, Show } from "solid-js";
 import { api, type FileChange, type FileDiff, type FileSelection } from "../api";
 import { recentMessages, rememberMessage } from "../lib/messages";
+import { fuzzyScore } from "../lib/fuzzy";
+import { nextSelection } from "../lib/multiselect";
 import { checkState, diffSignature, setLines, toggleFile, toPayload, type CheckState, type FileSel } from "../lib/selection";
 import { cachedDiff, currentBranch, notify, refreshRepo, reportError, run, sameDiff, setStore, store, storeDiff } from "../store";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
@@ -30,7 +32,14 @@ export function fileMenu(f: { path: string; kind?: string }, extra: MenuItem[] =
 }
 
 export function ChangesList() {
-  const files = () => store.repo?.files ?? [];
+  const [query, setQuery] = createSignal("");
+  const [picked, setPicked] = createSignal<Set<string>>(new Set());
+  const [anchor, setAnchor] = createSignal<string | null>(null);
+  const allFiles = () => store.repo?.files ?? [];
+  const files = createMemo(() => {
+    const q = query().trim();
+    return q ? allFiles().filter((f) => fuzzyScore(q, f.path) !== null) : allFiles();
+  });
   const selectedIndex = () => files().findIndex((f) => f.path === store.selectedPath);
   const fileState = (f: FileChange) => checkState(store.checkedPaths[f.path], cachedDiff(f.path));
   const allState = createMemo<CheckState>(() => {
@@ -39,12 +48,44 @@ export function ChangesList() {
     if (states.every((s) => s === "none")) return "none";
     return "partial";
   });
+  const selection = createMemo(() => {
+    const visible = files().filter((f) => picked().has(f.path)).map((f) => f.path);
+    return visible.length > 1 ? visible : store.selectedPath ? [store.selectedPath] : [];
+  });
+  const isSelected = (path: string) => path === store.selectedPath || (selection().length > 1 && selection().includes(path));
+
+  const select = (path: string, mods = { shift: false, toggle: false }) => {
+    const next = nextSelection(
+      files().map((f) => f.path),
+      selection().length > 1 ? new Set(selection()) : new Set(store.selectedPath ? [store.selectedPath] : []),
+      anchor() ?? store.selectedPath,
+      path,
+      mods,
+    );
+    setPicked(next.selected);
+    setAnchor(next.anchor);
+    setStore("selectedPath", path);
+  };
 
   const toggle = (f: FileChange) =>
     setStore("checkedPaths", f.path, toggleFile(store.checkedPaths[f.path], cachedDiff(f.path)));
 
+  const setIncluded = (paths: string[], include: boolean) => {
+    for (const path of paths) setStore("checkedPaths", path, { included: include, excluded: new Set() });
+  };
+
+  const toggleSelection = () => {
+    const paths = selection();
+    const all = paths.every((p) => {
+      const f = files().find((x) => x.path === p);
+      return f && fileState(f) === "all";
+    });
+    setIncluded(paths, !all);
+  };
+
   const toggleAll = () => {
     const include = allState() !== "all";
+    if (query().trim()) return setIncluded(files().map((f) => f.path), include);
     const next: Record<string, FileSel> = {};
     for (const f of files()) next[f.path] = { included: include, excluded: new Set() };
     setStore("checkedPaths", next);
@@ -72,6 +113,19 @@ export function ChangesList() {
 
   const menu = (e: MouseEvent, f: FileChange) => {
     const repo = store.repo!;
+    const many = selection().length > 1 && selection().includes(f.path) ? selection() : null;
+    if (many) {
+      openContextMenu(e, [
+        { label: `Include ${many.length} files`, run: () => setIncluded(many, true) },
+        { label: `Exclude ${many.length} files`, run: () => setIncluded(many, false) },
+        "separator",
+        { label: `Discard changes to ${many.length} files…`, run: () => discard(many) },
+        { label: `Stash ${many.length} files`, run: () => run("Stash", () => api.stash(repo.id, `Stashed ${many.length} files`, many)) },
+        "separator",
+        { label: "Copy file paths", run: () => navigator.clipboard.writeText(many.join("\n")) },
+      ]);
+      return;
+    }
     const ext = f.path.includes(".") ? f.path.slice(f.path.lastIndexOf(".")) : null;
     openContextMenu(
       e,
@@ -90,17 +144,22 @@ export function ChangesList() {
   const onKeyDown = (e: KeyboardEvent) => {
     const list = files();
     const i = selectedIndex();
+    const extend = { shift: e.shiftKey, toggle: false };
     if (e.key === "ArrowDown" || e.key === "j") {
       e.preventDefault();
-      if (i < list.length - 1) setStore("selectedPath", list[i + 1].path);
+      if (i < list.length - 1) select(list[i + 1].path, extend);
     } else if (e.key === "ArrowUp" || e.key === "k") {
       e.preventDefault();
-      if (i > 0) setStore("selectedPath", list[i - 1].path);
+      if (i > 0) select(list[i - 1].path, extend);
+    } else if (e.key === "a" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      setPicked(new Set(list.map((f) => f.path)));
     } else if (e.key === " " && i >= 0) {
       e.preventDefault();
-      toggle(list[i]);
+      if (selection().length > 1) toggleSelection();
+      else toggle(list[i]);
     } else if (e.key === "Delete" && i >= 0) {
-      discard([list[i].path]);
+      discard(selection());
     }
   };
 
@@ -113,55 +172,84 @@ export function ChangesList() {
         <Show when={files().length}>
           <Checkbox checked={toCheck(allState())} onChange={toggleAll} ariaLabel="Include all changes" />
         </Show>
-        <span>{files().length ? `${files().length} changed file${files().length === 1 ? "" : "s"}` : "No changed files"}</span>
+        <span class="grow">
+          {query().trim()
+            ? `${files().length} of ${allFiles().length} changed files`
+            : allFiles().length
+              ? `${allFiles().length} changed file${allFiles().length === 1 ? "" : "s"}`
+              : "No changed files"}
+        </span>
+        <Show when={selection().length > 1}>
+          <span>{selection().length} selected</span>
+        </Show>
       </div>
+      <Show when={allFiles().length > 1}>
+        <div class="list-filter">
+          <input
+            class="input"
+            placeholder="Filter changed files"
+            value={query()}
+            onInput={(e) => setQuery(e.currentTarget.value)}
+            onKeyDown={(e) => e.key === "Escape" && setQuery("")}
+          />
+        </div>
+      </Show>
       <Show
-        when={files().length}
-        fallback={
-          <div class="empty">
-            <div>
-              <h2>No local changes</h2>
-              <p>There are no uncommitted changes in this repository.</p>
-              <Show when={store.repo}>
-                <div style={{ display: "flex", gap: "8px", "justify-content": "center", "flex-wrap": "wrap" }}>
-                  <button class="btn" onClick={() => api.openInEditor(store.repo!.id).catch(reportError)}>
-                    Open in editor
-                  </button>
-                  <button class="btn" onClick={() => api.reveal(store.repo!.id).catch(reportError)}>
-                    Show in file manager
-                  </button>
-                </div>
-              </Show>
-            </div>
-          </div>
-        }
+        when={files().length || !allFiles().length}
+        fallback={<div class="empty">No changed files match the filter</div>}
       >
-        <VirtualList
-          items={files()}
-          rowHeight={store.settings?.appearance.density === "compact" ? 24 : 30}
-          onKeyDown={onKeyDown}
-          scrollToIndex={selectedIndex()}
-          render={(f) => (
-            <div
-              class="row"
-              classList={{ selected: f.path === store.selectedPath }}
-              onMouseDown={() => setStore("selectedPath", f.path)}
-              onContextMenu={(e) => menu(e, f)}
-              title={f.oldPath ? `${f.oldPath} -> ${f.path}` : f.path}
-            >
-              <Checkbox
-                checked={toCheck(fileState(f))}
-                onChange={() => toggle(f)}
-                ariaLabel={`Include ${f.path}`}
-                stopPropagation
-              />
-              <span class="path">
-                <bdi>{f.oldPath ? `${f.oldPath} -> ${f.path}` : f.path}</bdi>
-              </span>
-              <StatusIcon kind={f.kind} />
+        <Show
+          when={files().length}
+          fallback={
+            <div class="empty">
+              <div>
+                <h2>No local changes</h2>
+                <p>There are no uncommitted changes in this repository.</p>
+                <Show when={store.repo}>
+                  <div style={{ display: "flex", gap: "8px", "justify-content": "center", "flex-wrap": "wrap" }}>
+                    <button class="btn" onClick={() => api.openInEditor(store.repo!.id).catch(reportError)}>
+                      Open in editor
+                    </button>
+                    <button class="btn" onClick={() => api.reveal(store.repo!.id).catch(reportError)}>
+                      Show in file manager
+                    </button>
+                  </div>
+                </Show>
+              </div>
             </div>
-          )}
-        />
+          }
+        >
+          <VirtualList
+            items={files()}
+            rowHeight={store.settings?.appearance.density === "compact" ? 24 : 30}
+            onKeyDown={onKeyDown}
+            scrollToIndex={selectedIndex()}
+            render={(f) => (
+              <div
+                class="row"
+                classList={{ selected: isSelected(f.path) }}
+                onMouseDown={(e) => {
+                  if (e.button !== 0) return;
+                  if (e.shiftKey) e.preventDefault();
+                  select(f.path, { shift: e.shiftKey, toggle: e.ctrlKey || e.metaKey });
+                }}
+                onContextMenu={(e) => menu(e, f)}
+                title={f.oldPath ? `${f.oldPath} -> ${f.path}` : f.path}
+              >
+                <Checkbox
+                  checked={toCheck(fileState(f))}
+                  onChange={() => toggle(f)}
+                  ariaLabel={`Include ${f.path}`}
+                  stopPropagation
+                />
+                <span class="path">
+                  <bdi>{f.oldPath ? `${f.oldPath} -> ${f.path}` : f.path}</bdi>
+                </span>
+                <StatusIcon kind={f.kind} />
+              </div>
+            )}
+          />
+        </Show>
       </Show>
       <CommitBox />
     </>
@@ -370,6 +458,21 @@ function CommitBox() {
       </Show>
       <Show when={conflicted()}>
         <div class="warning">Resolve all conflicts before committing.</div>
+      </Show>
+      <Show when={store.commitWarnings?.protectedBranch && !amend()}>
+        <div class="warning">
+          <strong>{branch()}</strong> is a protected branch on GitHub, so pushing to it will probably be rejected.{" "}
+          <a onClick={() => setStore("dialog", { type: "newBranch" })}>Create a branch</a>
+        </div>
+      </Show>
+      <Show when={store.commitWarnings?.unlinkedEmail}>
+        {(email) => (
+          <div class="warning">
+            {email()} isn't linked to {store.commitWarnings?.login ?? "your GitHub account"}, so GitHub won't attribute
+            this commit to you.{" "}
+            <a onClick={() => setStore("dialog", { type: "settings", tab: "Git" })}>Change email</a>
+          </div>
+        )}
       </Show>
       <button class="btn primary block" disabled={!canCommit()} onClick={commit} title="Ctrl+Enter">
         {committing() ? "Committing…" : amend() ? "Amend last commit" : `Commit to ${branch()}`}

@@ -136,6 +136,7 @@ pub fn run() {
             commands::github::checkout_pull_request,
             commands::github::create_pull_request,
             commands::github::branch_checks,
+            commands::github::commit_warnings,
             commands::github::rerun_failed_checks,
             commands::github::fork_info,
             commands::github::add_upstream,
