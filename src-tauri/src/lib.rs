@@ -1,31 +1,19 @@
 mod commands;
 mod error;
 mod launch;
+mod logging;
 mod state;
 mod view;
 mod watch;
 mod wire;
 
 use tauri::Manager;
-use tracing_subscriber::layer::SubscriberExt;
-use tracing_subscriber::util::SubscriberInitExt;
 
 use crate::state::AppState;
 
-fn init_logging(log_dir: Option<&std::path::Path>) {
-    let filter = tracing_subscriber::EnvFilter::try_from_env("BLINK_LOG").unwrap_or_else(|_| "info,blink=debug".into());
-    let file = log_dir.and_then(|dir| {
-        std::fs::create_dir_all(dir).ok()?;
-        std::fs::OpenOptions::new().create(true).append(true).open(dir.join("blink.log")).ok()
-    });
-    let file_layer =
-        file.map(|f| tracing_subscriber::fmt::layer().with_ansi(false).with_writer(std::sync::Mutex::new(f)));
-    tracing_subscriber::registry().with(filter).with(tracing_subscriber::fmt::layer()).with(file_layer).init();
-}
-
 pub fn run() {
     let paths = blink_store::AppPaths::system().ok();
-    init_logging(paths.as_ref().map(|p| p.log_dir.as_path()));
+    logging::init(paths.as_ref().map(|p| p.log_dir.as_path()));
 
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {

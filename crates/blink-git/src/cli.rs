@@ -6,6 +6,7 @@ use std::sync::OnceLock;
 use serde::Serialize;
 
 use crate::error::{Error, Result};
+use crate::redact::redact;
 
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -111,11 +112,12 @@ impl GitCli {
         if output.status.success() {
             Ok(String::from_utf8_lossy(&output.stdout).into_owned())
         } else {
-            let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
-            let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            let message = if stderr.trim().is_empty() { stdout.trim() } else { stderr.trim() };
             Err(Error::Cli {
                 command: args.first().copied().unwrap_or_default().to_string(),
-                stderr: if stderr.is_empty() { stdout } else { stderr },
+                stderr: redact(message),
                 code: output.status.code(),
             })
         }
