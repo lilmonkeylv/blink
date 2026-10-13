@@ -1,11 +1,12 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { createSignal, onCleanup, onMount, Show } from "solid-js";
+import { MenuIcon } from "./Icons";
 
 // the browser dev mock defines the IPC bridge but no window metadata
 export const nativeWindow = !!(window as { __TAURI_INTERNALS__?: { metadata?: unknown } }).__TAURI_INTERNALS__?.metadata;
 export const customTitleBar = nativeWindow && navigator.userAgent.includes("Windows");
 
-export function WindowControls() {
+export function WindowControls(p: { onMenu: (e: MouseEvent) => void }) {
   const win = getCurrentWindow();
   const [maximized, setMaximized] = createSignal(false);
   onMount(() => {
@@ -16,6 +17,9 @@ export function WindowControls() {
   });
   return (
     <div class="window-controls">
+      <button class="window-control menu" aria-label="Menu" title="Menu" onClick={(e) => p.onMenu(e)}>
+        <MenuIcon />
+      </button>
       <button class="window-control" aria-label="Minimize" onClick={() => win.minimize()}>
         <svg viewBox="0 0 10 10" aria-hidden="true">
           <path d="M0 5h10" />
