@@ -91,16 +91,50 @@ jobs:
       - name: Updater config
         shell: bash
         run: |
+          echo 'PLATFORM_CONFIG={}' >> "$GITHUB_ENV"
           if [ -n "$TAURI_SIGNING_PRIVATE_KEY" ]; then
             echo 'UPDATER_CONFIG={"bundle":{"createUpdaterArtifacts":true}}' >> "$GITHUB_ENV"
           else
             echo "::warning::TAURI_SIGNING_PRIVATE_KEY is not set, building without updater artifacts"
             echo 'UPDATER_CONFIG={}' >> "$GITHUB_ENV"
           fi
+      - name: Apple signing
+        if: runner.os == 'macOS'
+        shell: bash
+        env:
+          CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          API_ISSUER: ${{ secrets.APPLE_API_ISSUER }}
+          API_KEY: ${{ secrets.APPLE_API_KEY }}
+          API_PRIVATE_KEY: ${{ secrets.APPLE_API_PRIVATE_KEY }}
+        run: |
+          if [ -z "$CERTIFICATE" ]; then
+            echo "::warning::APPLE_CERTIFICATE is not set, the macOS build is only ad-hoc signed"
+            echo 'PLATFORM_CONFIG={"bundle":{"macOS":{"signingIdentity":"-"}}}' >> "$GITHUB_ENV"
+            exit 0
+          fi
+          {
+            echo "APPLE_CERTIFICATE=$CERTIFICATE"
+            echo "APPLE_CERTIFICATE_PASSWORD=$CERTIFICATE_PASSWORD"
+            echo "APPLE_SIGNING_IDENTITY=$SIGNING_IDENTITY"
+          } >> "$GITHUB_ENV"
+          if [ -n "$API_PRIVATE_KEY" ]; then
+            key_path="$RUNNER_TEMP/AuthKey_$API_KEY.p8"
+            printf '%s' "$API_PRIVATE_KEY" > "$key_path"
+            {
+              echo "APPLE_API_ISSUER=$API_ISSUER"
+              echo "APPLE_API_KEY=$API_KEY"
+              echo "APPLE_API_KEY_PATH=$key_path"
+            } >> "$GITHUB_ENV"
+          else
+            echo "::warning::APPLE_API_PRIVATE_KEY is not set, the macOS build is signed but not notarized"
+          fi
       - name: Build
         if: env.SIGNPATH != 'true'
         shell: bash
-        run: bun tauri build --ci --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --config "$UPDATER_CONFIG"
+        run: |
+          bun tauri build --ci --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --config "$UPDATER_CONFIG" --config "$PLATFORM_CONFIG"
 
       - name: Build blink.exe
         if: env.SIGNPATH == 'true'
@@ -131,7 +165,7 @@ jobs:
         shell: bash
         run: |
           cp signed-exe/blink.exe target/${{ matrix.target }}/release/blink.exe
-          bun tauri bundle --ci --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --config "$UPDATER_CONFIG"
+          bun tauri bundle --ci --target ${{ matrix.target }} --bundles ${{ matrix.bundles }} --config "$UPDATER_CONFIG" --config "$PLATFORM_CONFIG"
       - id: unsigned-installers
         if: env.SIGNPATH == 'true'
         uses: actions/upload-artifact@v4

@@ -83,6 +83,9 @@
       "nsis": {
         "installMode": "currentUser"
       }
+    },
+    "macOS": {
+      "minimumSystemVersion": "11.0"
     }
   }
 }

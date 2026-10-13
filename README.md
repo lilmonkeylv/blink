@@ -189,6 +189,21 @@ Windows builds are signed through [SignPath Foundation](https://signpath.org). O
 
 The SignPath project needs two artifact configurations, `exe` and `installers`. Their definitions are in [`.signpath/artifact-configurations`](.signpath/artifact-configurations). The workflow signs `blink.exe` first, bundles the NSIS and MSI installers around the signed exe, then signs the installers and regenerates the updater signatures. Without the secret, Windows builds are unsigned.
 
+### macOS signing and notarization
+
+macOS releases are a universal `.dmg` (Apple Silicon and Intel). With an Apple Developer account, add these secrets and the workflow signs with your Developer ID and notarizes:
+
+| Secret | Value |
+| --- | --- |
+| `APPLE_CERTIFICATE` | base64 of the exported Developer ID Application `.p12` |
+| `APPLE_CERTIFICATE_PASSWORD` | password of that `.p12` |
+| `APPLE_SIGNING_IDENTITY` | e.g. `Developer ID Application: Your Name (TEAMID)` |
+| `APPLE_API_ISSUER` | App Store Connect API issuer ID |
+| `APPLE_API_KEY` | App Store Connect API key ID |
+| `APPLE_API_PRIVATE_KEY` | contents of the matching `AuthKey_XXXX.p8` |
+
+Without them the app is only ad-hoc signed. It still runs, but people have to right-click it and choose Open the first time.
+
 ### Updater signing
 
 Installed copies of Blink check `releases/latest/download/latest.json` every few hours and offer to restart into the new version. Update bundles are signed with a minisign key whose public half lives in `tauri.conf.json` (`plugins.updater.pubkey`). The release workflow needs the private half as repository secrets:
