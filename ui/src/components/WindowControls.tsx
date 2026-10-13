@@ -16,7 +16,7 @@ export function WindowControls(p: { onMenu: (e: MouseEvent) => void }) {
     onCleanup(() => unlisten.then((u) => u()));
   });
   return (
-    <div class="window-controls">
+    <div class="window-controls" onMouseDown={(e) => e.preventDefault()}>
       <button class="window-control app-menu-button" aria-label="Menu" title="Menu" onClick={(e) => p.onMenu(e)}>
         <MenuIcon />
       </button>

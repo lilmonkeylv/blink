@@ -626,7 +626,7 @@ export function Toolbar() {
         <Show
           when={customTitleBar}
           fallback={
-            <button class="toolbar-button app-menu" aria-label="Menu" title="Menu" onClick={(e) => openContextMenu(e, appMenu())}>
+            <button class="toolbar-button app-menu" aria-label="Menu" title="Menu" onMouseDown={(e) => e.preventDefault()} onClick={(e) => openContextMenu(e, appMenu())}>
               <MenuIcon />
             </button>
           }
