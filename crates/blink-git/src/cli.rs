@@ -130,6 +130,14 @@ impl GitCli {
         Self::finish(args, output)
     }
 
+    pub fn run_bytes(&self, args: &[&str]) -> Result<Vec<u8>> {
+        let output = self.command(args).output().map_err(Self::spawn_error)?;
+        if output.status.success() {
+            return Ok(output.stdout);
+        }
+        Self::finish(args, output).map(String::into_bytes)
+    }
+
     pub fn run_with_stdin(&self, args: &[&str], input: &[u8]) -> Result<String> {
         let mut child = self.command(args).stdin(Stdio::piped()).spawn().map_err(Self::spawn_error)?;
         let mut stdin = child.stdin.take().expect("stdin piped");

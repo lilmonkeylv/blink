@@ -40,7 +40,10 @@ impl Repository {
 
     fn blob_at_revision(&self, repo: &gix::Repository, rev: &str, path: &str) -> Result<Option<Vec<u8>>> {
         let Ok(id) = repo.rev_parse_single(format!("{rev}:{path}").as_str()) else { return Ok(None) };
-        let object = id.object().git()?;
+        let Ok(object) = id.object() else {
+            // Partial clones leave blobs out; the CLI fetches them from the promisor remote on demand.
+            return Ok(Some(self.cli().run_bytes(&["cat-file", "blob", &id.to_string()])?));
+        };
         if object.kind != gix::object::Kind::Blob {
             return Ok(None);
         }

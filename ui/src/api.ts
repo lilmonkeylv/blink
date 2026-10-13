@@ -380,6 +380,7 @@ export interface RepoSettings {
   gitignore: string;
   userName: string | null;
   userEmail: string | null;
+  sparse: string[] | null;
 }
 
 export interface Tool {
@@ -554,8 +555,8 @@ export const api = {
   githubRepositories: () => invoke<GithubRepo[]>("github_repositories"),
   githubOrgs: () => invoke<{ login: string; avatar_url: string }[]>("github_orgs"),
   gitignoreTemplates: () => invoke<string[]>("gitignore_templates"),
-  clone: (url: string, parent: string, name: string, depth?: number) =>
-    invokeShared<RepoRecord>("clone_repository", { url, parent, name, depth }),
+  clone: (url: string, parent: string, name: string, depth?: number, partial = false) =>
+    invokeShared<RepoRecord>("clone_repository", { url, parent, name, depth, partial }),
   publish: (id: string, name: string, description: string, isPrivate: boolean, org?: string) =>
     invokeShared<GithubRepo>("publish_repository", { id, name, description, private: isPrivate, org }),
   pullRequests: (id: string) => invoke<PullRequest[]>("pull_requests", { id }),

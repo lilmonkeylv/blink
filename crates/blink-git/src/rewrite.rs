@@ -240,6 +240,7 @@ impl GitCli {
         url: &str,
         dest: &Path,
         depth: Option<u32>,
+        partial: bool,
         template: &GitCli,
         progress: impl FnMut(Progress),
     ) -> Result<()> {
@@ -250,6 +251,9 @@ impl GitCli {
         let mut args = vec!["clone", "--progress", "--recurse-submodules"];
         if let Some(d) = &depth_arg {
             args.push(d);
+        }
+        if partial {
+            args.push("--filter=blob:none");
         }
         args.extend(["--", url, dest_str.as_str()]);
         template.relocated(parent).run_with_progress(&args, progress).map(drop)
@@ -334,6 +338,26 @@ impl GitCli {
                 Err(Error::Cli { code: Some(5), .. }) => Ok(()),
                 Err(e) => Err(e),
             },
+        }
+    }
+
+    pub fn sparse_folders(&self) -> Option<Vec<String>> {
+        let enabled = self.run(&["config", "--bool", "--get", "core.sparseCheckout"]).ok()?;
+        if enabled.trim() != "true" {
+            return None;
+        }
+        let list = self.run(&["sparse-checkout", "list"]).ok()?;
+        Some(list.lines().map(str::trim).filter(|l| !l.is_empty()).map(str::to_string).collect())
+    }
+
+    pub fn set_sparse_folders(&self, folders: Option<&[String]>) -> Result<()> {
+        match folders {
+            Some(folders) => {
+                let mut args = vec!["sparse-checkout", "set", "--cone", "--"];
+                args.extend(folders.iter().map(String::as_str));
+                self.run(&args).map(drop)
+            }
+            None => self.run(&["sparse-checkout", "disable"]).map(drop),
         }
     }
 

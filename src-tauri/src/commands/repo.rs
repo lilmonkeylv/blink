@@ -198,6 +198,7 @@ pub struct RepoSettings {
     gitignore: String,
     user_name: Option<String>,
     user_email: Option<String>,
+    sparse: Option<Vec<String>>,
 }
 
 #[tauri::command]
@@ -211,6 +212,7 @@ pub async fn repo_settings(state: State<'_, AppState>, id: String) -> CmdResult<
                 gitignore: std::fs::read_to_string(repo.workdir().join(".gitignore")).unwrap_or_default(),
                 user_name: cli.local_config("user.name"),
                 user_email: cli.local_config("user.email"),
+                sparse: cli.sparse_folders(),
             })
         })
         .await?)
@@ -240,7 +242,12 @@ pub async fn save_repo_settings(state: State<'_, AppState>, id: String, settings
                 std::fs::write(&path, &settings.gitignore)?;
             }
             cli.set_local_config("user.name", settings.user_name.as_deref())?;
-            cli.set_local_config("user.email", settings.user_email.as_deref())
+            cli.set_local_config("user.email", settings.user_email.as_deref())?;
+            let sparse = settings.sparse.filter(|f| !f.is_empty());
+            if sparse != cli.sparse_folders() {
+                cli.set_sparse_folders(sparse.as_deref())?;
+            }
+            Ok(())
         })
         .await?)
 }

@@ -145,8 +145,45 @@ fn clone_local_repository() {
     let dest = dir.path().with_extension("clone");
     let url = dir.path().to_string_lossy().into_owned();
     let mut events = 0;
-    GitCli::clone_repository(&url, &dest, None, &GitCli::new("."), |_| events += 1).unwrap();
+    GitCli::clone_repository(&url, &dest, None, false, &GitCli::new("."), |_| events += 1).unwrap();
     let cloned = Repository::open(&dest).unwrap();
     assert_eq!(cloned.log(None, 0, 10).unwrap().len(), 1);
     let _ = fs::remove_dir_all(dest);
+}
+
+#[test]
+fn partial_clone_reads_old_blobs_on_demand() {
+    let (dir, repo, ids) = fixture(&[("f", "old\n", "first"), ("f", "new\n", "second")]);
+    repo.cli().run(&["config", "uploadpack.allowFilter", "true"]).unwrap();
+    let dest = dir.path().with_extension("partial");
+    let url = format!("file://{}", dir.path().to_string_lossy().replace('\\', "/"));
+    GitCli::clone_repository(&url, &dest, None, true, &GitCli::new("."), |_| {}).unwrap();
+    let cloned = Repository::open(&dest).unwrap();
+    assert_eq!(cloned.cli().run(&["config", "remote.origin.promisor"]).unwrap().trim(), "true");
+    let old = cloned.read_blob(&BlobSource::Revision(ids[0].clone()), "f").unwrap().unwrap();
+    assert_eq!(old, b"old\n");
+    let _ = fs::remove_dir_all(dest);
+}
+
+#[test]
+fn sparse_checkout_round_trip() {
+    let (dir, repo, _) = fixture(&[("root.txt", "r\n", "root")]);
+    let cli = repo.cli();
+    for folder in ["keep", "drop"] {
+        fs::create_dir(dir.path().join(folder)).unwrap();
+        fs::write(dir.path().join(folder).join("f"), "x\n").unwrap();
+    }
+    cli.stage_all().unwrap();
+    cli.commit("folders", false).unwrap();
+
+    assert_eq!(cli.sparse_folders(), None);
+    cli.set_sparse_folders(Some(&["keep".to_string()])).unwrap();
+    assert_eq!(cli.sparse_folders(), Some(vec!["keep".to_string()]));
+    assert!(dir.path().join("keep/f").exists());
+    assert!(!dir.path().join("drop/f").exists());
+    assert!(dir.path().join("root.txt").exists());
+
+    cli.set_sparse_folders(None).unwrap();
+    assert_eq!(cli.sparse_folders(), None);
+    assert!(dir.path().join("drop/f").exists());
 }
