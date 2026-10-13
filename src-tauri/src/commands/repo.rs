@@ -25,6 +25,23 @@ pub struct Bootstrap {
     git_found: bool,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct SharedState {
+    repositories: Vec<RepoRecord>,
+    settings: Settings,
+    account: Option<Account>,
+}
+
+#[tauri::command]
+pub fn shared_state(state: State<'_, AppState>) -> CmdResult<SharedState> {
+    Ok(SharedState {
+        repositories: state.cache.repositories()?,
+        settings: state.settings.read().clone(),
+        account: state.account(),
+    })
+}
+
 #[tauri::command]
 pub fn bootstrap(state: State<'_, AppState>) -> CmdResult<Bootstrap> {
     Ok(Bootstrap {

@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createSignal, For, Match, on, onCleanup, onMount, Show, Switch } from "solid-js";
-import { api, onChecksChanged, onLaunch, onRepoChanged, onSyncProgress, onUpdateAvailable } from "./api";
+import { api, onChecksChanged, onLaunch, onRepoChanged, onSharedChanged, onSyncProgress, onUpdateAvailable } from "./api";
 import { ChangesDiff, ChangesList } from "./components/ChangesPane";
 import { ContextMenuHost } from "./components/ContextMenu";
 import { Dialog } from "./components/Dialog";
@@ -18,6 +18,7 @@ import {
   openRepo,
   refreshChecks,
   refreshRepo,
+  reloadSharedState,
   reportError,
   run,
   setStore,
@@ -280,6 +281,7 @@ export function App() {
 
   const listeners = Promise.all([
     onRepoChanged(applyRepoView),
+    onSharedChanged(() => reloadSharedState().catch(reportError)),
     onSyncProgress((e) => {
       if (store.sync && store.repo?.id === e.repo) setStore("sync", "progress", e.progress);
     }),

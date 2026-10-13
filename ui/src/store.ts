@@ -235,8 +235,14 @@ export async function refreshRepo() {
 }
 
 export async function reloadRepositories() {
-  const boot = await api.bootstrap();
-  setStore("repositories", boot.repositories);
+  const shared = await api.sharedState();
+  setStore("repositories", shared.repositories);
+}
+
+export async function reloadSharedState() {
+  const shared = await api.sharedState();
+  setStore({ repositories: shared.repositories, settings: shared.settings, account: shared.account });
+  applyTheme();
 }
 
 export async function addRepository(path: string) {
