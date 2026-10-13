@@ -30,6 +30,7 @@ pub async fn open_window(app: AppHandle, path: String) -> CmdResult<()> {
         .title("Blink")
         .inner_size(1200.0, 780.0)
         .min_inner_size(860.0, 520.0)
+        .decorations(!cfg!(windows))
         .build()
         .map_err(|e| CommandError::new("window", e.to_string()))?;
     REPO_WINDOWS.lock().push((label, path));

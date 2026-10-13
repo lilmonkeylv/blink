@@ -332,6 +332,42 @@ a {
   flex: 1;
 }
 
+.window-controls {
+  display: flex;
+  align-self: flex-start;
+  height: 32px;
+}
+
+.window-control {
+  display: grid;
+  place-items: center;
+  width: 46px;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--toolbar-fg);
+  cursor: pointer;
+  transition: background-color var(--ease);
+}
+
+.window-control svg {
+  width: 10px;
+  height: 10px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1;
+}
+
+.window-control:hover {
+  background: var(--toolbar-hover);
+}
+
+.window-control.close:hover {
+  background: #c42b1c;
+  color: #fff;
+}
+
 .toolbar-progress {
   position: absolute;
   left: 0;

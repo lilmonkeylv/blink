@@ -2,12 +2,20 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
   "description": "App windows: core IPC plus folder picker and native dialogs only.",
-  "windows": ["main", "repo-*"],
+  "windows": [
+    "main",
+    "repo-*"
+  ],
   "permissions": [
     "core:default",
     "dialog:allow-open",
     "dialog:allow-ask",
     "dialog:allow-message",
-    "dialog:allow-confirm"
+    "dialog:allow-confirm",
+    "core:window:allow-minimize",
+    "core:window:allow-toggle-maximize",
+    "core:window:allow-close",
+    "core:window:allow-start-dragging",
+    "core:window:allow-set-title"
   ]
 }
