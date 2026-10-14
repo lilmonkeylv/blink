@@ -2,6 +2,7 @@ import { createEffect, createMemo, createSignal, on, Show } from "solid-js";
 import { api, type FileChange, type FileDiff, type FileSelection } from "../api";
 import { recentMessages, rememberMessage } from "../lib/messages";
 import { fuzzyScore } from "../lib/fuzzy";
+import { COMMIT_KEYS } from "../lib/keymap";
 import { nextSelection } from "../lib/multiselect";
 import { checkState, diffSignature, setLines, toggleFile, toPayload, type CheckState, type FileSel } from "../lib/selection";
 import { EMPTY_DRAFT, type CommitDraft } from "../lib/drafts";
@@ -498,7 +499,7 @@ function CommitBox() {
           </div>
         )}
       </Show>
-      <button class="btn primary block" disabled={!canCommit()} onClick={commit} title="Ctrl+Enter">
+      <button class="btn primary block" disabled={!canCommit()} onClick={commit} data-tooltip="Commit" data-shortcut={COMMIT_KEYS}>
         {committing() ? "Committing…" : amend() ? "Amend last commit" : `Commit to ${branch()}`}
       </button>
     </div>

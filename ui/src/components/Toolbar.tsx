@@ -8,7 +8,6 @@ import {
   checkForUpdates,
   closeRepoTab,
   currentBranch,
-  keymap,
   notify,
   openInNewTab,
   openInNewWindow,
@@ -17,6 +16,7 @@ import {
   reportError,
   run,
   setStore,
+  shortcut,
   showWhatsNew,
   store,
   undoLastOperation,
@@ -27,6 +27,7 @@ import { DRAG_TYPE } from "./HistoryPane";
 import { BranchIcon, CheckIcon, ChevronDown, DownIcon, MenuIcon, PlusIcon, PullRequestIcon, RepoIcon, SyncIcon, UpIcon } from "./Icons";
 import { Loading } from "./Loading";
 import { ask, choose, message } from "./Prompt";
+import { undoPhrase } from "../lib/keymap";
 import { transferPercent } from "../lib/progress";
 
 export async function pickAndAddRepository() {
@@ -41,9 +42,9 @@ function usePopoverDismiss(close: () => void) {
 }
 
 const addMenu = (): MenuItem[] => [
-  { label: "Add existing repository…", hint: keymap().keys["repo.add"], run: () => pickAndAddRepository() },
-  { label: "Clone repository…", hint: keymap().keys["repo.clone"], run: () => setStore("dialog", { type: "clone" }) },
-  { label: "Create new repository…", hint: keymap().keys["repo.create"], run: () => setStore("dialog", { type: "createRepo" }) },
+  { label: "Add existing repository…", hint: shortcut("repo.add"), run: () => pickAndAddRepository() },
+  { label: "Clone repository…", hint: shortcut("repo.clone"), run: () => setStore("dialog", { type: "clone" }) },
+  { label: "Create new repository…", hint: shortcut("repo.create"), run: () => setStore("dialog", { type: "createRepo" }) },
   "separator",
   { label: "Import repositories from a folder…", run: () => setStore("dialog", { type: "import" }) },
 ];
@@ -262,7 +263,7 @@ function BranchPopover() {
     const includeRemote = b.upstream
       ? await ask(`Also delete ${b.upstream} on the remote?`, { title: `Delete ${b.name}`, okLabel: "Delete remote too", cancelLabel: "Local only" })
       : false;
-    const ok = await ask(`Delete branch ${b.name}? You can undo this with Ctrl+Z.`, { title: "Delete branch", kind: "warning", okLabel: "Delete" });
+    const ok = await ask(`Delete branch ${b.name}? You can ${undoPhrase(shortcut("undo"))}.`, { title: "Delete branch", kind: "warning", okLabel: "Delete" });
     if (!ok) return;
     try {
       await api.deleteBranch(repo.id, b.name, false, includeRemote);
@@ -459,9 +460,9 @@ export function appMenu(): MenuItem[] {
     {
       label: "Repository",
       items: [
-        { label: "Push", hint: keymap().keys["sync.push"], run: () => doSync("push"), disabled: !repo },
-        { label: "Pull", hint: keymap().keys["sync.pull"], run: () => doSync("pull"), disabled: !repo },
-        { label: "Fetch", hint: keymap().keys["sync.fetch"], run: () => doSync("fetch"), disabled: !repo },
+        { label: "Push", hint: shortcut("sync.push"), run: () => doSync("push"), disabled: !repo },
+        { label: "Pull", hint: shortcut("sync.pull"), run: () => doSync("pull"), disabled: !repo },
+        { label: "Fetch", hint: shortcut("sync.fetch"), run: () => doSync("fetch"), disabled: !repo },
         { label: "Force push (with lease)…", run: () => doSync("push", true), disabled: !repo },
         "separator",
         { label: "Fetch all repositories…", run: () => setStore("dialog", { type: "fetchAll" }) },
@@ -479,9 +480,9 @@ export function appMenu(): MenuItem[] {
       disabled: !repo,
       items: [
         { label: "Preview pull request…", run: () => setStore("dialog", { type: "previewPullRequest" }) },
-        { label: "Create pull request", hint: keymap().keys["pr.create"], run: r((i) => api.createPullRequest(i)) },
+        { label: "Create pull request", hint: shortcut("pr.create"), run: r((i) => api.createPullRequest(i)) },
         { label: "Checks for this branch…", run: () => setStore("dialog", { type: "checks" }) },
-        { label: "View on GitHub", hint: keymap().keys["open.github"], run: r(api.openOnGithub) },
+        { label: "View on GitHub", hint: shortcut("open.github"), run: r(api.openOnGithub) },
       ],
     },
     {
@@ -489,13 +490,13 @@ export function appMenu(): MenuItem[] {
       disabled: !repo,
       items: [
         { label: "Open in new window", run: () => id && openInNewWindow(id) },
-        { label: "Open in external editor", hint: keymap().keys["open.editor"], run: r((i) => api.openInEditor(i)) },
-        { label: "Open in shell", hint: keymap().keys["open.shell"], run: r((i) => api.openInShell(i)) },
-        { label: "Show in file manager", hint: keymap().keys["open.files"], run: r((i) => api.reveal(i)) },
+        { label: "Open in external editor", hint: shortcut("open.editor"), run: r((i) => api.openInEditor(i)) },
+        { label: "Open in shell", hint: shortcut("open.shell"), run: r((i) => api.openInShell(i)) },
+        { label: "Show in file manager", hint: shortcut("open.files"), run: r((i) => api.reveal(i)) },
       ],
     },
     "separator",
-    { label: "Settings", hint: keymap().keys["settings"], run: () => setStore("dialog", { type: "settings" }) },
+    { label: "Settings", hint: shortcut("settings"), run: () => setStore("dialog", { type: "settings" }) },
     { label: "Keyboard shortcuts", run: () => setStore("dialog", { type: "shortcuts" }) },
     "separator",
     { label: "What's new", run: () => showWhatsNew(true) },
@@ -520,12 +521,12 @@ export function Toolbar() {
   }, "");
   const state = () => syncState();
   const syncTooltip = () => (state().action === "push" ? "Push your commits" : state().action === "pull" ? "Pull new commits" : "Check for new commits");
-  const syncShortcut = () => keymap().keys[`sync.${state().action}`];
+  const syncShortcut = () => shortcut(`sync.${state().action}`);
 
   return (
     <>
       <div class="toolbar" data-tauri-drag-region={customTitleBar || undefined}>
-        <button class="toolbar-button repo" classList={{ open: store.popover === "repos" }} onClick={() => toggle("repos")} data-tooltip="Switch repository" data-shortcut={keymap().keys["repo.list"]}>
+        <button class="toolbar-button repo" classList={{ open: store.popover === "repos" }} onClick={() => toggle("repos")} data-tooltip="Switch repository" data-shortcut={shortcut("repo.list")}>
           <RepoIcon />
           <span class="labels">
             <span class="title">{store.opening ? "Opening repository" : "Current repository"}</span>
@@ -551,7 +552,7 @@ export function Toolbar() {
           onDragLeave={() => setDropping(false)}
           onDrop={() => setDropping(false)}
           data-tooltip="Switch branch"
-          data-shortcut={keymap().keys["branch.list"]}
+          data-shortcut={shortcut("branch.list")}
         >
           <BranchIcon />
           <span class="labels">

@@ -1,8 +1,9 @@
 import { createMemo, createResource, createSignal, For, Index, Show } from "solid-js";
 import { createStore } from "solid-js/store";
 import { api, type CommitSummary, type RebaseAction, type ResetMode } from "../../api";
+import { undoPhrase } from "../../lib/keymap";
 import { absoluteTime, relativeTime } from "../../lib/time";
-import { currentBranch, notify, run, store } from "../../store";
+import { currentBranch, notify, run, shortcut, store } from "../../store";
 import { Field, Select } from "../Controls";
 import { Dialog } from "../Dialog";
 import { Loading } from "../Loading";
@@ -191,7 +192,7 @@ export function InteractiveRebaseDialog(p: { sha: string }) {
       }
     >
       <Show when={!error()} fallback={<div class="warning">{error()}</div>}>
-        <span class="muted small">Oldest commit first. A backup is kept so you can undo with Ctrl+Z.</span>
+        <span class="muted small">Oldest commit first. A backup is kept so you can {undoPhrase(shortcut("undo"))}.</span>
         <div class="pick-list" style={{ "max-height": "380px" }}>
           <Index each={steps}>
             {(step, i) => (

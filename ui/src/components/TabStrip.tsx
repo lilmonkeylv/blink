@@ -1,5 +1,5 @@
 import { For, Show } from "solid-js";
-import { closeRepoTab, keymap, openInNewWindow, openRepo, pickNewTab, store } from "../store";
+import { closeRepoTab, openInNewWindow, openRepo, pickNewTab, shortcut, store } from "../store";
 import { openContextMenu } from "./ContextMenu";
 import { CloseIcon, PlusIcon } from "./Icons";
 
@@ -37,7 +37,7 @@ export function TabStrip() {
                 class="tab-close"
                 aria-label="Close tab"
                 data-tooltip="Close tab"
-                data-shortcut={keymap().keys["tab.close"]}
+                data-shortcut={shortcut("tab.close")}
                 onClick={(e) => {
                   e.stopPropagation();
                   closeRepoTab(path);
@@ -52,7 +52,7 @@ export function TabStrip() {
           class="tab-new"
           aria-label="New tab"
           data-tooltip="Open a repository in a new tab"
-          data-shortcut={keymap().keys["tab.new"]}
+          data-shortcut={shortcut("tab.new")}
           onClick={pickNewTab}
         >
           <PlusIcon />

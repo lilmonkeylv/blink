@@ -3,7 +3,7 @@ import { createMemo, createResource, createSignal, For, Match, onCleanup, Show, 
 import { api, isCommandError, type DeviceCode, type JobStep, type ReleaseNote } from "../../api";
 import { conflictCount, parseConflicts, render, type Resolution, type Segment } from "../../lib/conflicts";
 import { parseJobLog } from "../../lib/joblog";
-import { DEFAULT_BINDINGS } from "../../lib/keymap";
+import { COMMIT_KEYS, DEFAULT_BINDINGS } from "../../lib/keymap";
 import { addRepository, keymap, notify, refreshChecks, reportError, run, setStore, store } from "../../store";
 import { Checkbox, Field, Segmented } from "../Controls";
 import { Dialog } from "../Dialog";
@@ -140,7 +140,7 @@ export function SignInDialog() {
 }
 
 const FIXED_SHORTCUTS: [string, string][] = [
-  ["Ctrl+Enter", "Commit"],
+  [COMMIT_KEYS, "Commit"],
   ["J / K, Space", "Move and toggle lines in a diff"],
 ];
 

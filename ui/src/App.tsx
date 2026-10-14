@@ -34,6 +34,7 @@ import {
   reportError,
   run,
   setStore,
+  shortcut,
   showWhatsNew,
   store,
   undoLastOperation,
@@ -101,7 +102,7 @@ function SidebarResizer() {
     handle.addEventListener("pointermove", move);
     handle.addEventListener("pointerup", done);
   };
-  return <div class="sidebar-resizer" onPointerDown={start} title="Drag to resize" />;
+  return <div class="sidebar-resizer" onPointerDown={start} data-tooltip="Drag to resize" />;
 }
 
 function Sidebar() {
@@ -109,13 +110,13 @@ function Sidebar() {
   return (
     <div class="sidebar">
       <div class="tabs sidebar-tabs" classList={{ history: store.tab === "history" }} role="tablist">
-        <button class="tab" classList={{ active: store.tab === "changes" }} onClick={() => setStore("tab", "changes")} title="Ctrl+1">
+        <button class="tab" classList={{ active: store.tab === "changes" }} onClick={() => setStore("tab", "changes")} data-tooltip="Changes" data-shortcut={shortcut("view.changes")}>
           Changes{" "}
           <Show when={changes()}>
             <span class="badge">{changes()}</span>
           </Show>
         </button>
-        <button class="tab" classList={{ active: store.tab === "history" }} onClick={() => setStore("tab", "history")} title="Ctrl+2">
+        <button class="tab" classList={{ active: store.tab === "history" }} onClick={() => setStore("tab", "history")} data-tooltip="History" data-shortcut={shortcut("view.history")}>
           History
         </button>
       </div>
@@ -149,13 +150,13 @@ function Palette(p: { onClose: () => void }) {
     const actions = menuActions(appMenu());
     const extra: PaletteItem[] = store.repo
       ? [
-          { label: "New branch…", hint: keymap().keys["branch.new"], run: () => setStore("dialog", { type: "newBranch" }) },
+          { label: "New branch…", hint: shortcut("branch.new"), run: () => setStore("dialog", { type: "newBranch" }) },
           { label: "Merge into current branch…", run: () => setStore("dialog", { type: "merge" }) },
           { label: "Rebase current branch…", run: () => setStore("dialog", { type: "rebase" }) },
-          { label: "Stash all changes", hint: keymap().keys["stash.all"], run: () => run("Stash", () => api.stash(store.repo!.id)) },
-          { label: "Undo last Git operation", hint: keymap().keys["undo"], run: undoLastOperation },
-          { label: "Search history", hint: keymap().keys["history.search"], run: focusSearch },
-          { label: "Refresh", hint: keymap().keys["refresh"], run: refreshRepo },
+          { label: "Stash all changes", hint: shortcut("stash.all"), run: () => run("Stash", () => api.stash(store.repo!.id)) },
+          { label: "Undo last Git operation", hint: shortcut("undo"), run: undoLastOperation },
+          { label: "Search history", hint: shortcut("history.search"), run: focusSearch },
+          { label: "Refresh", hint: shortcut("refresh"), run: refreshRepo },
         ]
       : [];
     const repos: PaletteItem[] = store.repositories.map((r) => ({ label: `Open ${r.name}`, hint: r.owner ?? undefined, run: () => openRepo(r.path) }));

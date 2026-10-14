@@ -36,6 +36,12 @@ export const DEFAULT_BINDINGS: Binding[] = [
   { id: "refresh", keys: "F5", label: "Refresh" },
 ];
 
+export const COMMIT_KEYS = "Ctrl+Enter";
+
+export function undoPhrase(keys: string | undefined): string {
+  return keys ? `undo this with ${keys}` : "undo this from Undo history";
+}
+
 const MODIFIERS = ["ctrl", "alt", "shift"] as const;
 
 export function normalizeCombo(combo: string): string | null {

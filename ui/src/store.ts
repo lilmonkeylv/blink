@@ -290,6 +290,8 @@ export function applyRepoView(view: RepoView) {
 
 export const [keymap, setKeymap] = createSignal(resolveBindings({}));
 
+export const shortcut = (id: string): string | undefined => keymap().keys[id] || undefined;
+
 export async function loadKeymap() {
   try {
     setKeymap(resolveBindings((await api.keymap()) ?? {}));

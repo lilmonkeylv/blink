@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { comboFromEvent, normalizeCombo, resolveBindings } from "./keymap";
+import { comboFromEvent, normalizeCombo, resolveBindings, undoPhrase } from "./keymap";
 
 const press = (key: string, mods: Partial<{ ctrl: boolean; meta: boolean; alt: boolean; shift: boolean }> = {}) => ({
   key,
@@ -30,4 +30,11 @@ test("overrides replace defaults and an empty string unbinds", () => {
   expect(byCombo.get("ctrl+n")).toBeUndefined();
   expect(keys["repo.create"]).toBe("");
   expect(byCombo.get("ctrl+shift+n")).toBe("branch.new");
+});
+
+test("undo copy follows the bound keys and falls back when unbound", () => {
+  expect(undoPhrase("Ctrl+Z")).toBe("undo this with Ctrl+Z");
+  expect(undoPhrase("Ctrl+Shift+U")).toBe("undo this with Ctrl+Shift+U");
+  expect(undoPhrase("")).toBe("undo this from Undo history");
+  expect(undoPhrase(undefined)).toBe("undo this from Undo history");
 });
