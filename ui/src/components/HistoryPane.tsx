@@ -12,7 +12,7 @@ import {
 } from "../api";
 import { repoLayout, saveRepoLayout } from "../lib/layout";
 import { absoluteTime, relativeTime } from "../lib/time";
-import { currentBranch, notify, reportError, run, setStore, store } from "../store";
+import { currentBranch, notify, reportError, run, setStore, store, undoHeadCommit } from "../store";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { Checkbox, Select, Segmented } from "./Controls";
 import { DiffLayoutToggle, DiffView } from "./DiffView";
@@ -154,7 +154,9 @@ export function commitMenu(c: CommitSummary, list: CommitSummary[]): MenuItem[] 
       : tags.length === 1
         ? [{ label: `Delete tag ${tags[0]}…`, run: () => deleteTag(tags[0]) }]
         : [{ label: "Delete tag", items: tags.map((name) => ({ label: `${name}…`, run: () => deleteTag(name) })) }];
+  const unpushed = !repo.aheadBehind || repo.aheadBehind.ahead > 0;
   return [
+    ...(isHead ? [{ label: "Undo commit", run: () => undoHeadCommit(c.summary), disabled: isMerge(c) || !unpushed }] : []),
     { label: "Reset to commit…", run: () => setStore("dialog", { type: "reset", sha: c.id }), disabled: isHead },
     { label: "Check out commit", run: () => checkoutDetached(c) },
     { label: "Revert changes in commit", run: () => run("Revert", () => api.revert(repo.id, c.id)) },

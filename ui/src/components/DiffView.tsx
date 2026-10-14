@@ -3,8 +3,9 @@ import type { DiffHunk, DiffLine, FileDiff, LfsDiff, LfsPointer, SubmoduleDiff }
 import { isLineIncluded, lineKey, type FileSel } from "../lib/selection";
 import { formatBytes } from "../lib/size";
 import { pairLines, type Cell } from "../lib/split";
+import { store } from "../store";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
-import { SplitIcon, UnifiedIcon } from "./Icons";
+import { CheckIcon, SplitIcon, UnifiedIcon } from "./Icons";
 import { VirtualList } from "./VirtualList";
 
 type Row =
@@ -125,6 +126,7 @@ export function DiffView(p: {
       .map((r) => r.key);
 
   const included = (key: string) => isLineIncluded(p.sel, key);
+  const checkMarks = () => !!p.selectable && !!store.settings?.accessibility.diffCheckMarks;
 
   const inDrag = (index: number) => {
     const d = drag();
@@ -204,6 +206,13 @@ export function DiffView(p: {
           onMouseEnter={() => splitDrag()?.side === h.side && setSplitDrag({ ...splitDrag()!, to: h.index })}
         >
           <span class="no">{h.cell ? (h.side === "left" ? h.cell.data.oldNo : h.cell.data.newNo) ?? "" : ""}</span>
+          <Show when={checkMarks()}>
+            <span class="mark">
+              <Show when={changed() && cellIncludedView(h.side, h.index, h.cell!)}>
+                <CheckIcon />
+              </Show>
+            </span>
+          </Show>
         </div>
         <span class="marker">{kind() === "added" ? "+" : kind() === "removed" ? "-" : " "}</span>
         <span class="code">
@@ -347,6 +356,9 @@ export function DiffView(p: {
                 <div class="gutter" onMouseDown={() => startDrag(index, row)} title={p.selectable ? "Toggle hunk" : undefined}>
                   <span class="no" />
                   <span class="no" />
+                  <Show when={checkMarks()}>
+                    <span class="mark" />
+                  </Show>
                 </div>
                 <span class="marker" />
                 <span class="code">{header(row.data)}</span>
@@ -375,6 +387,13 @@ export function DiffView(p: {
                 >
                   <span class="no">{row.data.oldNo ?? ""}</span>
                   <span class="no">{row.data.newNo ?? ""}</span>
+                  <Show when={checkMarks()}>
+                    <span class="mark">
+                      <Show when={row.data.kind !== "context" && lineIncludedView(row, index)}>
+                        <CheckIcon />
+                      </Show>
+                    </span>
+                  </Show>
                 </div>
                 <span class="marker">{row.data.kind === "added" ? "+" : row.data.kind === "removed" ? "-" : " "}</span>
                 <span class="code">

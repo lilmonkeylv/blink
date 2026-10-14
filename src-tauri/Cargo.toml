@@ -20,6 +20,7 @@ blink-git.workspace = true
 blink-github.workspace = true
 blink-store.workspace = true
 blink-watch.workspace = true
+chrono = { version = "0.4", default-features = false, features = ["clock"] }
 crossbeam-channel.workspace = true
 parking_lot.workspace = true
 serde.workspace = true

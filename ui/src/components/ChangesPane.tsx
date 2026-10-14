@@ -1,6 +1,7 @@
 import { createEffect, createMemo, createResource, createSignal, on, Show } from "solid-js";
 import { api, type FileChange, type FileDiff, type FileSelection } from "../api";
 import { recentMessages, rememberMessage } from "../lib/messages";
+import { listRowHeight } from "../lib/appearance";
 import { fuzzyScore } from "../lib/fuzzy";
 import { COMMIT_KEYS } from "../lib/keymap";
 import { nextSelection } from "../lib/multiselect";
@@ -9,6 +10,7 @@ import { EMPTY_DRAFT, type CommitDraft } from "../lib/drafts";
 import {
   cachedDiff,
   commitDraft,
+  confirmUndoCommit,
   currentBranch,
   notify,
   refreshRepo,
@@ -45,6 +47,20 @@ export function fileMenu(f: { path: string; kind?: string }, extra: MenuItem[] =
     { label: "File history", run: () => setStore("dialog", { type: "fileHistory", path: f.path }), disabled: !tracked },
     { label: "Blame", run: () => setStore("dialog", { type: "blame", path: f.path }), disabled: !tracked },
   ];
+}
+
+const DIFF_TOOL_NAMES: Record<string, string> = {
+  "vs-code": "Visual Studio Code",
+  "beyond-compare": "Beyond Compare",
+  meld: "Meld",
+  "k-diff3": "KDiff3",
+};
+
+function diffToolItems(f: FileChange): MenuItem[] {
+  const repo = store.repo!;
+  const name = DIFF_TOOL_NAMES[store.settings?.integrations.diffTool ?? "built-in"];
+  if (!name || f.kind === "untracked" || f.kind === "added") return [];
+  return [{ label: `Open in ${name}`, run: () => api.openInDiffTool(repo.id, f.path).catch(reportError) }];
 }
 
 export function ChangesList() {
@@ -149,6 +165,7 @@ export function ChangesList() {
         { label: "Discard changes…", run: () => discard([f.path]) },
         { label: "Discard all changes…", run: () => discard(files().map((x) => x.path)) },
         { label: "Stash this file", run: () => run("Stash", () => api.stash(repo.id, `Stashed ${f.path}`, [f.path])) },
+        ...diffToolItems(f),
         "separator",
         { label: "Ignore file (add to .gitignore)", run: () => ignore(f.path), disabled: f.kind !== "untracked" },
         ...(ext ? [{ label: `Ignore all ${ext} files`, run: () => ignore(`*${ext}`) }] : []),
@@ -237,7 +254,7 @@ export function ChangesList() {
         >
           <VirtualList
             items={files()}
-            rowHeight={store.settings?.appearance.density === "compact" ? 24 : 30}
+            rowHeight={listRowHeight(store.settings?.appearance.density, store.settings?.accessibility.largeHitTargets)}
             onKeyDown={onKeyDown}
             scrollToIndex={selectedIndex()}
             render={(f) => (
@@ -443,7 +460,14 @@ function CommitBox() {
       notify(
         "success",
         amended ? "Amended last commit" : `Committed ${count} file${count === 1 ? "" : "s"} to ${branch()}`,
-        { action: { label: "Undo", run: () => run("Undo", () => api.undo(repo.id).then(() => undefined)) } },
+        {
+          action: {
+            label: "Undo",
+            run: async () => {
+              if (await confirmUndoCommit(amended ? "the amend" : "this commit")) await run("Undo", () => api.undo(repo.id).then(() => undefined));
+            },
+          },
+        },
       );
     } catch (e) {
       reportError(e, "Commit failed");
@@ -582,12 +606,14 @@ export function ChangesDiff() {
     const f = file();
     const repo = store.repo;
     if (!f || !repo || !keys.length) return;
-    const ok = await ask(`Discard ${keys.length} selected line${keys.length === 1 ? "" : "s"} in ${f.path}?`, {
-      title: "Discard lines",
-      kind: "warning",
-      okLabel: "Discard",
-    });
-    if (!ok) return;
+    if (store.settings?.prompts.discardChangesPermanently !== false) {
+      const ok = await ask(`Discard ${keys.length} selected line${keys.length === 1 ? "" : "s"} in ${f.path}? Discarded lines are not moved to the trash and cannot be recovered.`, {
+        title: "Discard lines permanently",
+        kind: "warning",
+        okLabel: "Discard",
+      });
+      if (!ok) return;
+    }
     const lines = keys.map((k) => k.split(":").map(Number) as [number, number]);
     await run("Discard lines", () => api.discardLines(repo.id, f.path, lines));
     await refreshRepo();

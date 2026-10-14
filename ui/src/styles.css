@@ -110,6 +110,20 @@
   text-decoration: underline;
 }
 
+:root.large-hit-targets {
+  --row: 36px;
+}
+
+:root.large-hit-targets .icon-button {
+  width: 32px;
+  height: 32px;
+}
+
+:root.keyboard-navigation :focus {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -1024,6 +1038,22 @@ select.input {
   box-shadow: inset 4px 0 0 var(--accent);
 }
 
+.diff-row .gutter .mark {
+  display: grid;
+  place-items: center;
+  align-self: flex-start;
+  width: 18px;
+  height: 20px;
+  padding-left: 4px;
+  color: var(--accent);
+}
+
+.diff-row .gutter .mark .icon {
+  width: 13px;
+  height: 13px;
+  stroke-width: 3;
+}
+
 .diff-row.hunk {
   background: var(--hunk-bg);
   color: var(--hunk-fg);
@@ -1215,6 +1245,61 @@ select.input {
 .field .hint {
   font-size: 12px;
   color: var(--fg-muted);
+}
+
+.field .hint.ok {
+  color: var(--add-fg);
+}
+
+.field .hint.error {
+  color: var(--del-fg);
+}
+
+.swatches {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.swatch {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--swatch) 70%, var(--fg));
+  border-radius: 50%;
+  background: var(--swatch);
+}
+
+.swatch[aria-checked="true"] {
+  box-shadow:
+    0 0 0 2px var(--bg),
+    0 0 0 4px var(--swatch);
+}
+
+.swatch .icon {
+  width: 14px;
+  height: 14px;
+  stroke-width: 3;
+}
+
+.input.swatch-hex {
+  width: 104px;
+  font-family: var(--font-mono);
+}
+
+.input.invalid {
+  border-color: var(--del-fg);
+}
+
+.quiet-hours {
+  padding-left: 24px;
+}
+
+.quiet-hours .select {
+  width: 96px;
 }
 
 .check {

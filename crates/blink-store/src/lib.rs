@@ -5,7 +5,7 @@ mod paths;
 mod secrets;
 mod settings;
 
-pub use cache::{Cache, RepoRecord};
+pub use cache::{Cache, Pruned, RepoRecord};
 pub use desktop::{desktop_indexeddb_dir, desktop_local_storage_dir, desktop_preferences, desktop_repositories};
 pub use error::{Error, Result};
 pub use paths::AppPaths;

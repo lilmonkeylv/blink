@@ -6,13 +6,13 @@ use std::time::Duration;
 use parking_lot::Mutex;
 
 use blink_git::{GitCli, HeadState, PushTarget, Repository, SyncAction};
-use blink_github::{CheckState, ChecksSummary, Client, Job, Org, PullRequest, Repo, parse_remote};
+use blink_github::{CheckState, ChecksSummary, Client, Job, Org, PullActivity, PullRequest, Repo, parse_remote};
 use blink_store::RepoRecord;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
-use tauri_plugin_notification::NotificationExt;
 use tauri_plugin_opener::OpenerExt;
 
+use crate::alerts::{self, Alert};
 use crate::commands::repo::{add_repository, origin_url};
 use crate::commands::sync::progress_emitter;
 use crate::error::{CmdResult, CommandError};
@@ -387,8 +387,30 @@ struct ChecksEvent {
     summary: ChecksSummary,
 }
 
+fn activity_alerts(before: &PullActivity, now: &PullActivity, repo: &str) -> Vec<(Alert, String, String)> {
+    let mut out = Vec::new();
+    if let (Some(was), Some(is)) = (&before.branch_pull, &now.branch_pull)
+        && was.number == is.number
+        && !was.merged
+        && is.merged
+    {
+        out.push((Alert::PrMerged, format!("Pull request #{} merged", is.number), format!("{} in {repo}", is.title)));
+    }
+    for pr in &now.review_requests {
+        if !before.review_requests.iter().any(|p| p.number == pr.number) {
+            out.push((
+                Alert::ReviewRequested,
+                format!("Review requested on #{}", pr.number),
+                format!("{} in {repo}", pr.title),
+            ));
+        }
+    }
+    out
+}
+
 pub fn spawn_checks_poller(app: AppHandle) {
     tauri::async_runtime::spawn(async move {
+        let mut activity: HashMap<String, PullActivity> = HashMap::new();
         loop {
             tokio::time::sleep(Duration::from_secs(90)).await;
             let state = app.state::<AppState>();
@@ -399,6 +421,18 @@ pub fn spawn_checks_poller(app: AppHandle) {
                 let Some(HeadState::Branch { id: sha, name: branch }) = handle.snapshot().head.clone() else {
                     continue;
                 };
+                if alerts::subscribed(&app, Alert::PrMerged) || alerts::subscribed(&app, Alert::ReviewRequested) {
+                    match gh.pull_activity(&owner, &name, &branch).await {
+                        Ok(now) => {
+                            if let Some(before) = activity.insert(id.clone(), now.clone()) {
+                                for (alert, title, body) in activity_alerts(&before, &now, &format!("{owner}/{name}")) {
+                                    alerts::notify(&app, alert, title, body);
+                                }
+                            }
+                        }
+                        Err(e) => tracing::debug!(repo = %id, error = %e, "pull request activity poll failed"),
+                    }
+                }
                 let summary = match gh.checks(&owner, &name, &sha).await {
                     Ok(s) => s,
                     Err(blink_github::Error::Unauthorized) => continue,
@@ -409,18 +443,13 @@ pub fn spawn_checks_poller(app: AppHandle) {
                 };
                 let key = format!("{id}@{sha}");
                 let previous = state.check_states.lock().insert(key, summary.state);
-                let notify = {
-                    let n = &state.settings.read().notifications;
-                    n.enabled && n.checks_failed
-                };
-                if notify && summary.state == CheckState::Failure && previous.is_some_and(|p| p != CheckState::Failure)
-                {
-                    let _ = app
-                        .notification()
-                        .builder()
-                        .title(format!("Checks failed on {branch}"))
-                        .body(format!("{} of {} checks failed in {owner}/{name}", summary.failed, summary.total))
-                        .show();
+                if summary.state == CheckState::Failure && previous.is_some_and(|p| p != CheckState::Failure) {
+                    alerts::notify(
+                        &app,
+                        Alert::ChecksFailed,
+                        format!("Checks failed on {branch}"),
+                        format!("{} of {} checks failed in {owner}/{name}", summary.failed, summary.total),
+                    );
                 }
                 let _ = app.emit(CHECKS_CHANGED, ChecksEvent { repo: id.clone(), summary });
             }
@@ -445,6 +474,24 @@ mod tests {
         assert!(email_is_linked("octo@users.noreply.github.com", &linked));
         assert!(!email_is_linked("43+octo@users.noreply.github.com", &linked));
         assert!(!email_is_linked("someone@else.com", &linked));
+    }
+
+    #[test]
+    fn alerts_on_merges_and_new_review_requests_only() {
+        use blink_github::PullBrief;
+        let pr = |number, merged| PullBrief { number, title: format!("PR {number}"), merged };
+        let before = PullActivity { branch_pull: Some(pr(1, false)), review_requests: vec![pr(5, false)] };
+        assert!(activity_alerts(&before, &before, "a/b").is_empty());
+
+        let now = PullActivity { branch_pull: Some(pr(1, true)), review_requests: vec![pr(5, false), pr(6, false)] };
+        let alerts = activity_alerts(&before, &now, "a/b");
+        assert_eq!(alerts.len(), 2);
+        assert_eq!(alerts[0], (Alert::PrMerged, "Pull request #1 merged".into(), "PR 1 in a/b".into()));
+        assert_eq!(alerts[1].0, Alert::ReviewRequested);
+        assert_eq!(alerts[1].1, "Review requested on #6");
+
+        let other_branch = PullActivity { branch_pull: Some(pr(2, true)), review_requests: vec![] };
+        assert!(activity_alerts(&before, &other_branch, "a/b").is_empty());
     }
 
     #[test]

@@ -1,7 +1,10 @@
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use blink_watch::{DEFAULT_DEBOUNCE, RepoWatcher};
+use blink_git::{GitCli, Repository};
+use blink_store::WatcherMode;
+use blink_watch::{Change, DEFAULT_DEBOUNCE, POLL_INTERVAL, RepoWatcher, WatchMode};
 use tauri::{AppHandle, Emitter, Manager};
 
 use crate::error::CmdResult;
@@ -20,7 +23,7 @@ pub fn ensure_watcher(app: &AppHandle, state: &AppState, id: &str) -> CmdResult<
     let handle = state.engine.get(id)?;
     let repo = handle.repo();
     let (tx, rx) = crossbeam_channel::unbounded();
-    let watcher = RepoWatcher::start(repo, DEFAULT_DEBOUNCE, tx)?;
+    let watcher = start_watcher(state.settings.read().advanced.watcher, repo, tx)?;
     watchers.insert(id.to_string(), watcher);
 
     let app = app.clone();
@@ -59,4 +62,63 @@ pub fn ensure_watcher(app: &AppHandle, state: &AppState, id: &str) -> CmdResult<
 
 pub fn stop_watcher(state: &AppState, id: &str) {
     state.watchers.lock().remove(id);
+}
+
+pub fn restart_watchers(app: &AppHandle, state: &AppState) {
+    let ids: Vec<String> = state.watchers.lock().keys().cloned().collect();
+    for id in ids {
+        stop_watcher(state, &id);
+        if let Err(e) = ensure_watcher(app, state, &id) {
+            tracing::warn!(repo = %id, error = %e.message, "could not restart the file watcher");
+        }
+    }
+}
+
+fn start_watcher(
+    mode: WatcherMode,
+    repo: &Repository,
+    tx: crossbeam_channel::Sender<Change>,
+) -> Result<RepoWatcher, blink_watch::Error> {
+    match mode {
+        WatcherMode::Polling => RepoWatcher::start_with(repo, DEFAULT_DEBOUNCE, WatchMode::Polling(POLL_INTERVAL), tx),
+        // Git's built-in fsmonitor daemon only exists on Windows and macOS.
+        WatcherMode::Fsmonitor if cfg!(any(windows, target_os = "macos")) => {
+            let cli = repo.cli().with_config("core.fsmonitor", "true");
+            let probe = move || status_fingerprint(&cli);
+            RepoWatcher::start_with(repo, DEFAULT_DEBOUNCE, WatchMode::GitDirOnly, tx.clone())
+                .map(|w| w.with_probe(repo.workdir(), POLL_INTERVAL, probe, tx))
+        }
+        _ => RepoWatcher::start(repo, DEFAULT_DEBOUNCE, tx),
+    }
+}
+
+fn status_fingerprint(cli: &GitCli) -> Option<u64> {
+    let status = cli.run_bytes(&["status", "--porcelain", "-z", "--untracked-files=all"]).ok()?;
+    let mut hasher = std::hash::DefaultHasher::new();
+    status.hash(&mut hasher);
+    for entry in status.split(|b| *b == 0).filter(|e| e.len() > 3) {
+        if let Ok(meta) = std::fs::metadata(cli.workdir().join(String::from_utf8_lossy(&entry[3..]).as_ref())) {
+            meta.len().hash(&mut hasher);
+            meta.modified().ok().hash(&mut hasher);
+        }
+    }
+    Some(hasher.finish())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn fingerprint_tracks_edits_to_already_modified_files() {
+        let dir = tempfile::tempdir().unwrap();
+        GitCli::init(dir.path(), "main").unwrap();
+        let cli = GitCli::new(dir.path());
+        let file = dir.path().join("a.txt");
+        std::fs::write(&file, "one\n").unwrap();
+        let before = status_fingerprint(&cli).unwrap();
+        assert_eq!(status_fingerprint(&cli), Some(before));
+        std::fs::write(&file, "one\ntwo, a longer line\n").unwrap();
+        assert_ne!(status_fingerprint(&cli), Some(before));
+    }
 }

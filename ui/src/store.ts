@@ -17,6 +17,7 @@ import {
   type SyncAction,
   type UpdateInfo,
 } from "./api";
+import { accentTokens, monoStack } from "./lib/appearance";
 import { EMPTY_DRAFT, persistDraft, savedDrafts, type CommitDraft } from "./lib/drafts";
 import { ask } from "./components/Prompt";
 import { applySidebarWidth, lastSidebarWidth, repoLayout } from "./lib/layout";
@@ -441,16 +442,28 @@ export async function addRepository(path: string) {
   }
 }
 
-export function applyTheme() {
-  const theme = store.settings?.appearance.theme ?? "system";
+const ACCENT_PROPERTIES = ["--accent", "--accent-fg", "--bg-selected-focus", "--fg-selected-focus", "--bg-selected"];
+
+export function applyTheme(settings: Settings | null = store.settings) {
+  const root = document.documentElement;
+  const theme = settings?.appearance.theme ?? "system";
   const dark = theme === "dark" || (theme === "system" && window.matchMedia("(prefers-color-scheme: dark)").matches);
-  document.documentElement.dataset.theme = dark ? "dark" : "light";
-  const density = store.settings?.appearance.density ?? "comfortable";
-  document.documentElement.dataset.density = density;
-  const a11y = store.settings?.accessibility;
-  document.documentElement.classList.toggle("reduced-motion", !!a11y?.reducedMotion);
-  document.documentElement.classList.toggle("high-contrast", !!a11y?.highContrast);
-  document.documentElement.classList.toggle("underline-links", !!a11y?.underlineLinks);
+  root.dataset.theme = dark ? "dark" : "light";
+  root.dataset.density = settings?.appearance.density ?? "comfortable";
+  const a11y = settings?.accessibility;
+  root.classList.toggle("reduced-motion", !!a11y?.reducedMotion);
+  root.classList.toggle("high-contrast", !!a11y?.highContrast);
+  root.classList.toggle("underline-links", !!a11y?.underlineLinks);
+  root.classList.toggle("large-hit-targets", !!a11y?.largeHitTargets);
+  root.classList.toggle("keyboard-navigation", !!a11y?.keyboardNavigation);
+  const accent = accentTokens(settings?.appearance.accentColor);
+  for (const prop of ACCENT_PROPERTIES) {
+    if (accent?.[prop]) root.style.setProperty(prop, accent[prop]);
+    else root.style.removeProperty(prop);
+  }
+  const mono = monoStack(settings?.appearance.diffFont);
+  if (mono) root.style.setProperty("--font-mono", mono);
+  else root.style.removeProperty("--font-mono");
 }
 
 export async function saveSettings(settings: Settings) {
@@ -496,6 +509,17 @@ export async function undoLastOperation() {
   } catch (e) {
     reportError(e, "Undo failed");
   }
+}
+
+export async function confirmUndoCommit(what: string): Promise<boolean> {
+  if (store.settings?.prompts.undoCommit === false) return true;
+  return ask(`Undo ${what}? Its changes go back to the Changes list.`, { title: "Undo commit", okLabel: "Undo" });
+}
+
+export async function undoHeadCommit(summary: string) {
+  const repo = store.repo;
+  if (!repo || !(await confirmUndoCommit(`"${summary}"`))) return;
+  await run("Undo commit", () => api.undoLastCommit(repo.id));
 }
 
 let updateOffered: string | null = null;

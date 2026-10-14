@@ -14,10 +14,20 @@ pub fn get_settings(state: State<'_, AppState>) -> Settings {
 }
 
 #[tauri::command]
-pub fn save_settings(state: State<'_, AppState>, settings: Settings) -> CmdResult<()> {
+pub fn save_settings(app: AppHandle, state: State<'_, AppState>, settings: Settings) -> CmdResult<()> {
     settings.save(&state.paths.settings_file())?;
-    *state.settings.write() = settings;
+    let previous = std::mem::replace(&mut *state.settings.write(), settings.clone());
+    crate::apply::apply_settings(&app, Some(&previous), &settings);
     Ok(())
+}
+
+#[tauri::command]
+pub async fn check_git_executable(path: String) -> CmdResult<String> {
+    let git = std::path::PathBuf::from(path.trim());
+    blink_git::git_version(&git).map_err(|e| match e {
+        blink_git::Error::GitNotFound => CommandError::new("gitNotFound", format!("{} does not exist", git.display())),
+        other => other.into(),
+    })
 }
 
 #[tauri::command]

@@ -343,6 +343,7 @@ dependencies = [
  "blink-github",
  "blink-store",
  "blink-watch",
+ "chrono",
  "crossbeam-channel",
  "parking_lot",
  "semver",

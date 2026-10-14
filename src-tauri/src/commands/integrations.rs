@@ -1,6 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+use blink_store::DiffTool;
 use serde::Serialize;
 use tauri::State;
 
@@ -208,6 +209,41 @@ pub fn open_in_shell(state: State<'_, AppState>, id: String, path: Option<String
         None => root,
     };
     spawn(shell_command(&state, &dir)?)
+}
+
+fn difftool_name(tool: DiffTool) -> Option<&'static str> {
+    match tool {
+        DiffTool::BuiltIn => None,
+        DiffTool::VsCode => Some("vscode"),
+        DiffTool::BeyondCompare => Some("bc"),
+        DiffTool::Meld => Some("meld"),
+        DiffTool::KDiff3 => Some("kdiff3"),
+    }
+}
+
+#[tauri::command]
+pub fn open_in_diff_tool(state: State<'_, AppState>, id: String, path: String) -> CmdResult<()> {
+    let tool = difftool_name(state.settings.read().integrations.diff_tool)
+        .ok_or_else(|| CommandError::new("noDiffTool", "Choose a diff tool in Settings > Integrations."))?;
+    let handle = state.engine.get(&id)?;
+    let mut cmd = Command::new(blink_git::find_git().unwrap_or_else(|| PathBuf::from("git")));
+    cmd.current_dir(handle.repo().workdir()).args([
+        "difftool",
+        "--no-prompt",
+        &format!("--tool={tool}"),
+        "HEAD",
+        "--",
+        &path,
+    ]);
+    #[cfg(windows)]
+    {
+        use std::os::windows::process::CommandExt;
+        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
+        cmd.creation_flags(CREATE_NO_WINDOW);
+    }
+    let mut child = cmd.spawn().map_err(|e| CommandError::new("launch", e.to_string()))?;
+    std::thread::spawn(move || child.wait());
+    Ok(())
 }
 
 const SHELL_ALIASES: &[(&str, &str)] = &[("powershell", "powershell"), ("powershell core", "pwsh")];

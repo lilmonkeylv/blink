@@ -1,4 +1,4 @@
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use parking_lot::Mutex;
 use rusqlite::{Connection, OptionalExtension, params};
@@ -141,6 +141,70 @@ impl Cache {
             .optional()?;
         Ok(json.map(|j| serde_json::from_str(&j)).transpose()?)
     }
+
+    pub fn enforce_limit(&self, files_dir: &Path, limit_bytes: u64) -> Result<Pruned> {
+        enum Entry {
+            Row(String, String),
+            File(PathBuf),
+        }
+        let mut conn = self.writer.lock();
+        let mut entries: Vec<(i64, u64, Entry)> = {
+            let mut stmt = conn.prepare("SELECT path, key, length(CAST(value AS BLOB)), updated_at FROM repo_state")?;
+            let rows = stmt.query_map([], |r| {
+                Ok((r.get::<_, i64>(3)?, r.get::<_, i64>(2)?.max(0) as u64, Entry::Row(r.get(0)?, r.get(1)?)))
+            })?;
+            rows.collect::<Result<_, _>>()?
+        };
+        if let Ok(dir) = std::fs::read_dir(files_dir) {
+            for entry in dir.flatten() {
+                let Ok(meta) = entry.metadata() else { continue };
+                if !meta.is_file() {
+                    continue;
+                }
+                let modified = meta
+                    .modified()
+                    .ok()
+                    .and_then(|t| t.duration_since(std::time::UNIX_EPOCH).ok())
+                    .map_or(0, |d| d.as_secs() as i64);
+                entries.push((modified, meta.len(), Entry::File(entry.path())));
+            }
+        }
+        let mut total: u64 = entries.iter().map(|(_, size, _)| size).sum();
+        let mut pruned = Pruned::default();
+        if total <= limit_bytes {
+            return Ok(pruned);
+        }
+        entries.sort_by_key(|(time, _, _)| *time);
+        let tx = conn.transaction()?;
+        for (_, size, entry) in entries {
+            if total <= limit_bytes {
+                break;
+            }
+            match entry {
+                Entry::Row(path, key) => {
+                    tx.execute("DELETE FROM repo_state WHERE path = ?1 AND key = ?2", [&path, &key])?;
+                    pruned.rows += 1;
+                }
+                Entry::File(path) => {
+                    if std::fs::remove_file(&path).is_err() {
+                        continue;
+                    }
+                    pruned.files += 1;
+                }
+            }
+            total -= size;
+            pruned.bytes += size;
+        }
+        tx.commit()?;
+        Ok(pruned)
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+pub struct Pruned {
+    pub rows: usize,
+    pub files: usize,
+    pub bytes: u64,
 }
 
 #[cfg(test)]
@@ -175,6 +239,39 @@ mod tests {
         cache.put_repo_state("/r", "tab", &"history").unwrap();
         assert_eq!(cache.repo_state::<String>("/r", "tab").unwrap().as_deref(), Some("history"));
         assert_eq!(cache.repo_state::<String>("/r", "none").unwrap(), None);
+    }
+
+    #[test]
+    fn prunes_oldest_views_and_files_over_the_limit() {
+        let cache = Cache::in_memory().unwrap();
+        let dir = tempfile::tempdir().unwrap();
+        let blob = "x".repeat(98);
+        for (path, at) in [("/old", 100), ("/mid", 300), ("/new", 500)] {
+            cache.put_repo_state(path, "view", &blob).unwrap();
+            cache
+                .writer
+                .lock()
+                .execute("UPDATE repo_state SET updated_at = ?2 WHERE path = ?1", params![path, at])
+                .unwrap();
+        }
+        let epoch = |secs| std::time::UNIX_EPOCH + std::time::Duration::from_secs(secs);
+        for (name, at) in [("a.png", 200), ("b.png", 400)] {
+            let file = std::fs::File::create(dir.path().join(name)).unwrap();
+            file.set_len(100).unwrap();
+            file.set_modified(epoch(at)).unwrap();
+        }
+
+        assert_eq!(cache.enforce_limit(dir.path(), 500).unwrap(), Pruned::default());
+        let pruned = cache.enforce_limit(dir.path(), 250).unwrap();
+        assert_eq!(pruned, Pruned { rows: 2, files: 1, bytes: 300 });
+        assert!(cache.repo_state::<String>("/old", "view").unwrap().is_none());
+        assert!(cache.repo_state::<String>("/mid", "view").unwrap().is_none());
+        assert!(cache.repo_state::<String>("/new", "view").unwrap().is_some());
+        assert!(!dir.path().join("a.png").exists());
+        assert!(dir.path().join("b.png").exists());
+
+        let missing = dir.path().join("missing");
+        assert_eq!(cache.enforce_limit(&missing, 0).unwrap().rows, 1);
     }
 
     #[test]
