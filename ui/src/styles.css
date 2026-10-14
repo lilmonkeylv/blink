@@ -1900,6 +1900,53 @@ select.input {
   margin-left: auto;
 }
 
+.bisect-bar {
+  background: var(--hunk-bg);
+}
+
+.history-row.bisect-bad {
+  box-shadow: inset 3px 0 0 var(--del-fg);
+}
+
+.history-row.bisect-good {
+  box-shadow: inset 3px 0 0 var(--add-fg);
+}
+
+.history-row.bisect-skipped {
+  box-shadow: inset 3px 0 0 var(--fg-muted);
+}
+
+.history-row.bisect-current {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.bisect-tag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 5px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 15px;
+}
+
+.bisect-tag.bad {
+  color: var(--del-fg);
+}
+
+.bisect-tag.good {
+  color: var(--add-fg);
+}
+
+.bisect-tag.current {
+  color: var(--accent);
+}
+
+.list:focus .row.selected .bisect-tag {
+  color: var(--fg-selected-focus);
+}
+
 .merge-preview {
   display: flex;
   flex-direction: column;

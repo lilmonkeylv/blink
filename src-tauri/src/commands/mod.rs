@@ -1,4 +1,5 @@
 pub mod auth;
+pub mod bisect;
 pub mod branches;
 pub mod changes;
 pub mod github;

@@ -62,6 +62,7 @@ export interface RepoView {
   aheadBehind: AheadBehind | null;
   operation: string | null;
   hasRemote: boolean;
+  bisecting: boolean;
 }
 
 export type LineKind = "context" | "added" | "removed";
@@ -385,6 +386,20 @@ export type MergePrediction =
   | { type: "clean" }
   | { type: "conflicts"; files: string[] }
   | { type: "unknown" };
+
+export type BisectMark = "good" | "bad" | "skip";
+
+export interface BisectState {
+  bad: string | null;
+  good: string[];
+  skipped: string[];
+  current: string | null;
+  currentSummary: string | null;
+  revisionsLeft: number | null;
+  stepsLeft: number | null;
+  firstBad: string | null;
+  firstBadSummary: string | null;
+}
 
 export type ResetMode = "soft" | "mixed" | "hard";
 export type RebaseAction = "pick" | "reword" | "squash" | "fixup" | "drop";
@@ -732,6 +747,10 @@ export const api = {
   abortOperation: (id: string, operation: string) => invoke<void>("abort_operation", { id, operation }),
   skipOperation: (id: string, operation: string) => invoke<void>("skip_operation", { id, operation }),
   undoHistory: (id: string) => invoke<UndoEntry[]>("undo_history", { id }),
+  bisectState: (id: string) => invoke<BisectState | null>("bisect_state", { id }),
+  bisectStart: (id: string, bad: string, good?: string) => invoke<BisectState | null>("bisect_start", { id, bad, good }),
+  bisectMark: (id: string, mark: BisectMark, sha?: string) => invoke<BisectState | null>("bisect_mark", { id, mark, sha }),
+  bisectReset: (id: string) => invoke<void>("bisect_reset", { id }),
   undo: (id: string) => invoke<UndoEntry>("undo", { id }),
 
   blame: (id: string, path: string, rev?: string) => invoke<Blame>("blame", { id, path, rev }),

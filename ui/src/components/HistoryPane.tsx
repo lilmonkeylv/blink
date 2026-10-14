@@ -10,6 +10,7 @@ import {
   type GraphRow,
   type SearchKind,
 } from "../api";
+import { bisectRole } from "../lib/bisect";
 import { repoLayout, saveRepoLayout } from "../lib/layout";
 import { absoluteTime, relativeTime } from "../lib/time";
 import { currentBranch, notify, reportError, run, setStore, store, undoHeadCommit } from "../store";
@@ -21,6 +22,7 @@ import { ImageDiff, isImagePath } from "./ImageDiff";
 import { Loading } from "./Loading";
 import { VirtualList } from "./VirtualList";
 import { ask } from "./Prompt";
+import { markBisect, startBisect } from "./BisectBar";
 
 const PAGE = 300;
 const ROW = 52;
@@ -167,11 +169,25 @@ export function commitMenu(c: CommitSummary, list: CommitSummary[]): MenuItem[] 
     { label: "Cherry-pick commit…", run: () => setStore("dialog", { type: "cherryPick", shas: [c.id] }) },
     { label: "Edit history from here…", run: () => setStore("dialog", { type: "interactiveRebase", sha: c.id }), disabled: isMerge(c) },
     "separator",
+    ...bisectMenu(c),
+    "separator",
     { label: "Copy SHA", run: () => navigator.clipboard.writeText(c.id) },
     { label: "Copy summary", run: () => navigator.clipboard.writeText(c.summary) },
     { label: "Copy as patch", run: () => api.commitPatch(repo.id, c.id).then((p) => navigator.clipboard.writeText(p)).then(() => notify("info", "Patch copied")).catch(reportError) },
   ];
 }
+
+function bisectMenu(c: CommitSummary): MenuItem[] {
+  if (!store.bisect) return [{ label: "Start bisect here (bad)", run: () => startBisect(c.id) }];
+  const role = bisectRole(store.bisect, c.id);
+  return [
+    { label: "Mark as good", run: () => markBisect("good", c.id), disabled: role === "good" },
+    { label: "Mark as bad", run: () => markBisect("bad", c.id), disabled: role === "bad" },
+    { label: "Skip in bisect", run: () => markBisect("skip", c.id), disabled: role === "skipped" },
+  ];
+}
+
+const BISECT_TAGS = { bad: "bad", good: "good", skipped: "skipped", current: "testing" } as const;
 
 async function checkoutDetached(c: CommitSummary) {
   const repo = store.repo!;
@@ -432,6 +448,7 @@ export function HistoryList() {
               class="row history-row"
               classList={{
                 selected: selected().includes(c.id),
+                [`bisect-${bisectRole(store.bisect, c.id)}`]: !!bisectRole(store.bisect, c.id),
                 "drop-before": dropHint()?.id === c.id && dropHint()?.zone === "before",
                 "drop-on": dropHint()?.id === c.id && dropHint()?.zone === "on",
                 "drop-after": dropHint()?.id === c.id && dropHint()?.zone === "after",
@@ -462,6 +479,7 @@ export function HistoryList() {
                   {c.summary || "(no message)"}
                 </span>
                 <span class="meta">
+                  <Show when={bisectRole(store.bisect, c.id)}>{(role) => <span class={`bisect-tag ${role()}`}>{BISECT_TAGS[role()]}</span>}</Show>
                   {c.authorName} · {dateFormat() === "relative" ? relativeTime(c.time) : absoluteTime(c.time)} · {c.shortId}
                 </span>
               </div>

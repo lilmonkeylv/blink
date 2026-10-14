@@ -1,3 +1,4 @@
+mod bisect;
 mod blob;
 mod cli;
 mod error;
@@ -19,6 +20,7 @@ mod status;
 mod submodule;
 mod validate;
 
+pub use bisect::{BisectMark, BisectState, is_bisecting};
 pub use blob::BlobSource;
 pub use cli::{GitCli, Progress, PushTarget, SyncAction, find_git, is_lock_error, locked_file};
 pub use error::{Error, Result};

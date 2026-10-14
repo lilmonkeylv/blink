@@ -27,6 +27,7 @@ pub struct RepoView {
     pub ahead_behind: Option<AheadBehind>,
     pub operation: Option<&'static str>,
     pub has_remote: bool,
+    pub bisecting: bool,
 }
 
 const CACHED_VIEW_KEY: &str = "view";
@@ -74,6 +75,7 @@ impl RepoView {
             ahead_behind: snapshot.ahead_behind,
             operation: snapshot.operation,
             has_remote: snapshot.has_remote,
+            bisecting: snapshot.bisecting,
         }
     }
 }
@@ -97,6 +99,7 @@ mod tests {
             ahead_behind: None,
             operation: None,
             has_remote: true,
+            bisecting: false,
         }
     }
 
@@ -108,6 +111,7 @@ mod tests {
         let small = RepoView::cached(&cache, "/small").unwrap();
         assert_eq!(small["files"].as_array().unwrap().len(), 2);
         assert_eq!(small["hasRemote"], true);
+        assert_eq!(small["bisecting"], false);
         assert!(RepoView::cached(&cache, "/huge").is_none());
     }
 

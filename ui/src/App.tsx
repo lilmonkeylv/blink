@@ -2,6 +2,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { createEffect, createMemo, createSignal, For, Match, on, onCleanup, onMount, Show, Switch } from "solid-js";
 import { api, onChecksChanged, onHookOutput, onLaunch, onRepoChanged, onSharedChanged, onSyncProgress, onUpdateAvailable } from "./api";
 import { ChangesDiff, ChangesList } from "./components/ChangesPane";
+import { BisectBar } from "./components/BisectBar";
 import { ContextMenuHost, menuActions } from "./components/ContextMenu";
 import { HookPanel } from "./components/HookPanel";
 import { PromptHost } from "./components/Prompt";
@@ -30,6 +31,7 @@ import {
   offerUpdate,
   openRepo,
   pickNewTab,
+  refreshBisect,
   refreshChecks,
   refreshCommitWarnings,
   refreshLfs,
@@ -125,6 +127,7 @@ function Sidebar() {
           History
         </button>
       </div>
+      <BisectBar />
       <Switch>
         <Match when={store.tab === "changes"}>
           <ChangesList />
@@ -342,6 +345,8 @@ export function App() {
       },
     ),
   );
+
+  createEffect(on(() => [store.repo?.id, store.repo?.bisecting, store.repo?.generation] as const, refreshBisect));
 
   onMount(async () => {
     window.addEventListener("keydown", onKey);

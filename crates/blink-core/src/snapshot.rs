@@ -10,6 +10,7 @@ pub struct RepoSnapshot {
     pub ahead_behind: Option<AheadBehind>,
     pub operation: Option<&'static str>,
     pub has_remote: bool,
+    pub bisecting: bool,
     pub taken_at: Instant,
 }
 
@@ -22,6 +23,7 @@ impl RepoSnapshot {
             ahead_behind: None,
             operation: None,
             has_remote: false,
+            bisecting: false,
             taken_at: Instant::now(),
         }
     }

@@ -4,6 +4,7 @@ import {
   api,
   isCommandError,
   type Account,
+  type BisectState,
   type Bootstrap,
   type ChecksSummary,
   type CommitWarnings,
@@ -98,6 +99,7 @@ interface AppStore {
   sync: { action: SyncAction; progress: Progress | null; label?: string } | null;
   hookRun: HookRun | null;
   hookRetry: { label: string; run: () => void } | null;
+  bisect: BisectState | null;
   busy: string | null;
   opening: string | null;
   checks: ChecksSummary | null;
@@ -128,6 +130,7 @@ export const [store, setStore] = createStore<AppStore>({
   sync: null,
   hookRun: null,
   hookRetry: null,
+  bisect: null,
   busy: null,
   opening: null,
   checks: null,
@@ -374,6 +377,7 @@ function showRepo(view: RepoView) {
       compareWith: null,
       hookRun: null,
       hookRetry: null,
+      bisect: null,
     });
   });
   setDiffVersion((v) => v + 1);
@@ -499,6 +503,16 @@ export function currentBranch(): string | null {
   const head = store.repo?.head;
   if (!head) return null;
   return head.type === "detached" ? null : head.name;
+}
+
+let bisectToken = 0;
+
+export async function refreshBisect() {
+  const repo = store.repo;
+  const mine = ++bisectToken;
+  if (!repo?.bisecting) return setStore("bisect", null);
+  const state = await api.bisectState(repo.id).catch(() => null);
+  if (mine === bisectToken && store.repo?.id === repo.id) setStore("bisect", state);
 }
 
 export async function refreshCommitWarnings() {

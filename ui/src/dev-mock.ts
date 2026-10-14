@@ -13,6 +13,7 @@ const repo: RepoView = {
   conflicted: 0,
   operation: null,
   hasRemote: true,
+  bisecting: false,
   files: [
     { path: "crates/blink-core/src/engine.rs", oldPath: null, staged: null, unstaged: "modified", kind: "modified" },
     { path: "ui/src/App.tsx", oldPath: null, staged: null, unstaged: "modified", kind: "modified" },
@@ -72,6 +73,36 @@ const history: CommitSummary[] = Array.from({ length: 60 }, (_, i) => ({
 }));
 
 const opened = new Set<string>();
+let bisect: { bad: string; good: string[]; skipped: string[]; current: string } | null = null;
+
+function bisectView() {
+  if (!bisect) return null;
+  const at = (sha: string) => history.findIndex((c) => c.id === sha);
+  const bad = at(bisect.bad);
+  const good = Math.min(...bisect.good.map(at), history.length);
+  const span = good - bad;
+  const found = bisect.good.length > 0 && span <= 1;
+  const current = history[at(bisect.current)];
+  return {
+    ...bisect,
+    good: [...bisect.good],
+    skipped: [...bisect.skipped],
+    currentSummary: current?.summary ?? null,
+    revisionsLeft: bisect.good.length && !found ? Math.max(0, Math.floor(span / 2) - 1) : null,
+    stepsLeft: bisect.good.length && !found ? Math.max(1, Math.ceil(Math.log2(Math.max(span, 2))) - 1) : null,
+    firstBad: found ? bisect.bad : null,
+    firstBadSummary: found ? history[bad].summary : null,
+  };
+}
+
+function moveBisect() {
+  if (!bisect || !bisect.good.length) return;
+  const at = (sha: string) => history.findIndex((c) => c.id === sha);
+  const bad = at(bisect.bad);
+  const good = Math.min(...bisect.good.map(at));
+  if (good - bad > 1) bisect.current = history[bad + Math.floor((good - bad) / 2)].id;
+}
+
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function mockHooks(id: string, action: HookAction, hooks: string[], lines: string[], failing: string | null) {
@@ -262,6 +293,30 @@ export function installDevMock() {
           reviewComments: [{ id: 2, path: "crates/blink-core/src/engine.rs", line: 12, original_line: 12, side: "RIGHT", body: "Why 256?", user: { login: "hubot" }, created_at: new Date().toISOString(), in_reply_to_id: null }],
           reviews: [],
         };
+      case "bisect_state":
+        return bisectView();
+      case "bisect_start":
+        bisect = { bad: String(a.bad), good: a.good ? [String(a.good)] : [], skipped: [], current: repo.head?.type === "branch" ? history[0].id : "" };
+        repo.bisecting = true;
+        moveBisect();
+        return bisectView();
+      case "bisect_mark": {
+        if (!bisect) return null;
+        const sha = String(a.sha ?? bisect.current);
+        if (a.mark === "good") bisect.good.push(sha);
+        else if (a.mark === "bad") bisect.bad = sha;
+        else bisect.skipped.push(sha);
+        moveBisect();
+        if (a.mark === "skip" && bisect.current === sha) {
+          const next = history[history.findIndex((c) => c.id === sha) + 1];
+          if (next) bisect.current = next.id;
+        }
+        return bisectView();
+      }
+      case "bisect_reset":
+        bisect = null;
+        repo.bisecting = false;
+        return null;
       case "predict_merge":
         return sleep(250).then(() => {
           if (a.branch === "feature/watcher") return { type: "conflicts", files: ["crates/blink-watch/src/lib.rs", "ui/src/App.tsx"] };
