@@ -2,6 +2,12 @@
 
 All notable changes to Blink are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.1.0-alpha.11] - 2026-10-14
+
+### Fixes
+
+- **ui:** Line up the account, menu and window buttons in one row ([5055ee3](https://github.com/lilmonkeylv/blink/commit/5055ee302f812cbca2d53c7c215b0b2f03616528))
+
 ## [0.1.0-alpha.10] - 2026-10-14
 
 ### Fixes
