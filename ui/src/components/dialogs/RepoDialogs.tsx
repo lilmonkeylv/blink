@@ -1,5 +1,5 @@
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { createMemo, createResource, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
+import { createMemo, createResource, createSignal, For, Index, Match, onCleanup, Show, Switch } from "solid-js";
 import {
   api,
   type DesktopPreferences,
@@ -18,7 +18,7 @@ import { applyTheme, currentBranch, notify, openRepo, reloadRepositories, report
 import { Checkbox, Field, Select } from "../Controls";
 import { Dialog } from "../Dialog";
 import { Loading } from "../Loading";
-import { RepoIcon } from "../Icons";
+import { CheckIcon, CopyIcon, RepoIcon } from "../Icons";
 import { closeDialog, Tabs } from "./common";
 
 const LICENSES = [
@@ -345,6 +345,29 @@ export function PublishDialog() {
   );
 }
 
+function CopyButton(p: { text: string; label: string }) {
+  const [copied, setCopied] = createSignal(false);
+  let timer: number | undefined;
+  onCleanup(() => clearTimeout(timer));
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(p.text);
+    } catch (e) {
+      return reportError(e);
+    }
+    setCopied(true);
+    clearTimeout(timer);
+    timer = window.setTimeout(() => setCopied(false), 1500);
+  };
+  return (
+    <button type="button" class="icon-button" aria-label={p.label} data-tooltip={copied() ? "Copied" : p.label} disabled={!p.text.trim()} onClick={copy}>
+      <Show when={copied()} fallback={<CopyIcon />}>
+        <CheckIcon />
+      </Show>
+    </button>
+  );
+}
+
 export function RepoSettingsDialog() {
   const [tab, setTab] = createSignal<"remote" | "ignore" | "config" | "sparse" | "fork">("remote");
   const [sparseText, setSparseText] = createSignal<string | null>(null);
@@ -403,25 +426,26 @@ export function RepoSettingsDialog() {
         {(s) => (
           <Switch>
             <Match when={tab() === "remote"}>
-              <For each={s().remotes}>
-                {([name, url], i) => (
-                  <Field label={name}>
+              <Index each={s().remotes}>
+                {(remote, i) => (
+                  <Field label={remote()[0]}>
                     <div class="summary-row">
                       <input
                         class="input"
-                        value={url}
+                        value={remote()[1]}
                         onInput={(e) => {
                           const v = e.currentTarget.value;
-                          update((x) => ((x.remotes[i()][1] = v), x));
+                          update((x) => ((x.remotes[i][1] = v), x));
                         }}
                       />
-                      <button class="btn danger" onClick={() => update((x) => ((x.remotes = x.remotes.filter((_, j) => j !== i())), x))}>
+                      <CopyButton text={remote()[1]} label={`Copy the ${remote()[0]} URL`} />
+                      <button class="btn danger" onClick={() => update((x) => ((x.remotes = x.remotes.filter((_, j) => j !== i)), x))}>
                         Remove
                       </button>
                     </div>
                   </Field>
                 )}
-              </For>
+              </Index>
               <div>
                 <button
                   class="btn"

@@ -71,6 +71,24 @@ const history: CommitSummary[] = Array.from({ length: 60 }, (_, i) => ({
 
 const opened = new Set<string>();
 
+let tags: [string, string][] = [
+  ["v0.2.0", history[0].id],
+  ["v0.1.0", history[6].id],
+  ["first-preview", history[6].id],
+];
+
+const remotes: [string, string][] = [
+  ["origin", "https://github.com/lilmonkeylv/blink.git"],
+  ["upstream", "git@github.com:desktop/desktop.git"],
+];
+
+const jobs = (runId: number) => [
+  { id: 1, run_id: runId, name: "build (ubuntu)", status: "completed", conclusion: "success", html_url: null, steps: [] },
+  { id: 2, run_id: runId, name: "test (windows)", status: "completed", conclusion: "failure", html_url: null, steps: [] },
+  { id: 4, run_id: runId, name: "lint", status: "completed", conclusion: "skipped", html_url: null, steps: [] },
+  { id: 3, run_id: runId, name: "bench", status: "in_progress", conclusion: null, html_url: null, steps: [] },
+];
+
 export function installDevMock() {
   const boot: Bootstrap = {
     repositories: [
@@ -126,10 +144,31 @@ export function installDevMock() {
       case "git_identity":
         return { name: "Dev User", email: "dev@example.com" };
       case "stash_list":
+        return [
+          { reference: "stash@{0}", message: "On main: !!Blink<feature/watcher>" },
+          { reference: "stash@{1}", message: "On main: try a bigger channel" },
+        ];
       case "take_pending_launch":
       case "undo_history":
-      case "tags":
         return [];
+      case "tags":
+        return tags;
+      case "create_tag":
+        tags = [...tags, [String(a.name), String(a.sha)]];
+        return null;
+      case "delete_tag":
+        tags = tags.filter(([name]) => name !== a.name);
+        return null;
+      case "remotes":
+        return remotes;
+      case "repo_settings":
+        return { remotes, gitignore: "target/\nnode_modules/\n", userName: null, userEmail: null, sparse: null };
+      case "conflict_versions":
+        return [["fn main() {", "    run(8);", "    flush();", "}", ""].join("\n"), null, null];
+      case "workflow_run_jobs":
+        return jobs(a.runId as number);
+      case "plugin:app|version":
+        return "0.1.0-alpha.7";
       case "history_graph": {
         const page = history.slice(a.offset as number, (a.offset as number) + (a.limit as number));
         return {
@@ -146,10 +185,11 @@ export function installDevMock() {
       case "detect_integrations":
         return { editors: [{ id: "code", name: "Visual Studio Code" }], shells: [{ id: "wt", name: "Windows Terminal" }, { id: "pwsh", name: "PowerShell 7" }] };
       case "branch_checks":
-        return { state: "failure", total: 3, failed: 1, pending: 1, statuses: [], runs: [
-          { id: 1, name: "build (ubuntu)", status: "completed", conclusion: "success", html_url: null, check_suite: { id: 9 }, app: { slug: "github-actions" } },
-          { id: 2, name: "test (windows)", status: "completed", conclusion: "failure", html_url: null, check_suite: { id: 9 }, app: { slug: "github-actions" } },
+        return { state: "failure", total: 4, failed: 1, pending: 1, statuses: [], runs: [
+          { id: 1, name: "build (ubuntu)", status: "completed", conclusion: "success", html_url: "https://github.com/lilmonkeylv/blink/actions/runs/7/job/1", check_suite: { id: 9 }, app: { slug: "github-actions" } },
+          { id: 2, name: "test (windows)", status: "completed", conclusion: "failure", html_url: "https://github.com/lilmonkeylv/blink/actions/runs/7/job/2", check_suite: { id: 9 }, app: { slug: "github-actions" } },
           { id: 3, name: "bench", status: "in_progress", conclusion: null, html_url: null, check_suite: { id: 9 }, app: { slug: "github-actions" } },
+          { id: 5, name: "codecov/patch", status: "completed", conclusion: "neutral", html_url: null, check_suite: { id: 11 }, app: { slug: "codecov" } },
         ] };
       case "workflow_job":
         return { id: a.jobId, run_id: 7, name: "test (windows)", status: "completed", conclusion: "failure", html_url: null, steps: [

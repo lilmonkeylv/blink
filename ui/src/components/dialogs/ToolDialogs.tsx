@@ -1,13 +1,15 @@
+import { getVersion } from "@tauri-apps/api/app";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { createMemo, createResource, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
-import { api, isCommandError, type DeviceCode, type JobStep, type ReleaseNote } from "../../api";
-import { conflictCount, parseConflicts, render, type Resolution, type Segment } from "../../lib/conflicts";
+import { api, isCommandError, type CheckRun, type DeviceCode, type JobStep, type ReleaseNote } from "../../api";
+import { baseSections, conflictCount, parseConflicts, render, type Resolution, type Segment } from "../../lib/conflicts";
 import { parseJobLog } from "../../lib/joblog";
 import { COMMIT_KEYS, DEFAULT_BINDINGS } from "../../lib/keymap";
-import { addRepository, keymap, notify, refreshChecks, reportError, run, setStore, store } from "../../store";
+import logo from "../../../../assets/logo.svg";
+import { addRepository, checkForUpdates, keymap, notify, refreshChecks, reportError, run, setStore, store } from "../../store";
 import { Checkbox, Field, Segmented } from "../Controls";
 import { Dialog } from "../Dialog";
-import { CheckIcon } from "../Icons";
+import { CheckIcon, ChevronRight, ExternalIcon, FolderOpenIcon } from "../Icons";
 import { Loading } from "../Loading";
 import { Markdown } from "../Markdown";
 import { VirtualList } from "../VirtualList";
@@ -312,20 +314,7 @@ export function ChecksDialog() {
       <Show when={checks()} fallback={<div class="empty muted">No checks for this commit</div>}>
         {(c) => (
           <>
-            <For each={c().runs}>
-              {(r) => (
-                <div class="check-run">
-                  <span class={`dot ${CONCLUSION_STATE(r.status, r.conclusion)}`} />
-                  <span class="grow">{r.name}</span>
-                  <span class="muted small">{r.conclusion ?? r.status.replace("_", " ")}</span>
-                  <Show when={r.app?.slug === "github-actions" && CONCLUSION_STATE(r.status, r.conclusion) === "failure"}>
-                    <button class="btn" onClick={() => setStore("dialog", { type: "checkLog", jobId: r.id, name: r.name })}>
-                      View log
-                    </button>
-                  </Show>
-                </div>
-              )}
-            </For>
+            <For each={c().runs}>{(r) => <CheckRunRow run={r} />}</For>
             <For each={c().statuses}>
               {(s) => (
                 <div class="check-run">
@@ -339,6 +328,76 @@ export function ChecksDialog() {
         )}
       </Show>
     </Dialog>
+  );
+}
+
+const viewLog = (jobId: number, name: string) => setStore("dialog", { type: "checkLog", jobId, name });
+
+const jobState = (status: string, conclusion: string | null) =>
+  conclusion === "skipped" || conclusion === "cancelled" ? "" : CONCLUSION_STATE(status, conclusion);
+
+async function workflowRunId(repo: string, run: CheckRun) {
+  const fromUrl = run.html_url?.match(/\/actions\/runs\/(\d+)/)?.[1];
+  return fromUrl ? Number(fromUrl) : (await api.workflowJob(repo, run.id)).run_id;
+}
+
+function CheckRunRow(p: { run: CheckRun }) {
+  const [open, setOpen] = createSignal(false);
+  const actions = () => p.run.app?.slug === "github-actions";
+  const state = () => CONCLUSION_STATE(p.run.status, p.run.conclusion);
+  const [jobs] = createResource(
+    () => (open() && actions() && store.repo ? store.repo.id : null),
+    async (repo) => api.workflowRunJobs(repo, await workflowRunId(repo, p.run)),
+  );
+  return (
+    <div class="check-group" classList={{ open: open() }}>
+      <div class="check-run">
+        <Show when={actions()} fallback={<span class="check-toggle-spacer" />}>
+          <button
+            type="button"
+            class="icon-button check-toggle"
+            aria-expanded={open()}
+            aria-label={open() ? "Hide jobs" : "Show jobs"}
+            onClick={() => setOpen(!open())}
+          >
+            <ChevronRight />
+          </button>
+        </Show>
+        <span class={`dot ${state()}`} />
+        <span class="grow">{p.run.name}</span>
+        <span class="muted small">{p.run.conclusion ?? p.run.status.replace("_", " ")}</span>
+        <Show when={actions() && state() === "failure"}>
+          <button class="btn" onClick={() => viewLog(p.run.id, p.run.name)}>
+            View log
+          </button>
+        </Show>
+      </div>
+      <Show when={open()}>
+        <div class="check-jobs">
+          <Switch fallback={<Loading />}>
+            <Match when={jobs.error}>
+              <div class="muted small">Could not load the jobs for this workflow run.</div>
+            </Match>
+            <Match when={jobs()}>
+              {(list) => (
+                <For each={list()} fallback={<div class="muted small">This workflow run has no jobs.</div>}>
+                  {(job) => (
+                    <div class="check-job" classList={{ current: job.id === p.run.id }}>
+                      <span class={`dot ${jobState(job.status, job.conclusion)}`} />
+                      <span class="grow">{job.name}</span>
+                      <span class="muted small">{job.conclusion ?? job.status.replace("_", " ")}</span>
+                      <button class="btn" disabled={job.status !== "completed"} onClick={() => viewLog(job.id, job.name)}>
+                        View log
+                      </button>
+                    </div>
+                  )}
+                </For>
+              )}
+            </Match>
+          </Switch>
+        </div>
+      </Show>
+    </div>
   );
 }
 
@@ -416,6 +475,7 @@ export function MergeEditorDialog(p: { path: string }) {
   const [status, setStatus] = createSignal<"loading" | "ready" | "error">("loading");
   const [loadError, setLoadError] = createSignal("");
   const repoId = store.repo!.id;
+  const [ancestor] = createResource(() => api.conflictVersions(repoId, p.path).then(([base]) => base, () => null));
 
   const load = async () => {
     setStatus("loading");
@@ -434,6 +494,16 @@ export function MergeEditorDialog(p: { path: string }) {
 
   const output = createMemo(() => render(segments(), resolutions()));
   const conflicts = createMemo(() => segments().filter((s) => s.type === "conflict"));
+  const bases = createMemo(() => {
+    const text = ancestor();
+    return text == null ? conflicts().map((c) => (c.type === "conflict" ? c.base : null)) : baseSections(segments(), text);
+  });
+  const baseNote = (i: number) => {
+    if (bases()[i]) return null;
+    if (ancestor.loading) return "Loading the common ancestor…";
+    if (ancestor() == null) return "There is no common ancestor. Both sides added this file.";
+    return "Could not find this part of the file in the common ancestor.";
+  };
   const result = () => manual() ?? output().text;
   const unresolved = () => (manual() != null ? (manual()!.includes("<<<<<<<") ? 1 : 0) : output().unresolved);
 
@@ -533,6 +603,7 @@ export function MergeEditorDialog(p: { path: string }) {
                         Theirs ({c.theirsLabel || "incoming"})
                       </div>
                       <pre class="conflict-side theirs">{c.theirs.join("\n") || " "}</pre>
+                      <BaseSection lines={bases()[i()]} note={baseNote(i())} />
                     </div>
                   )
                 }
@@ -542,6 +613,27 @@ export function MergeEditorDialog(p: { path: string }) {
         </Match>
       </Switch>
     </Dialog>
+  );
+}
+
+function BaseSection(p: { lines: string[] | null; note: string | null }) {
+  const [open, setOpen] = createSignal(false);
+  return (
+    <div class="conflict-base" classList={{ open: open() }}>
+      <button type="button" class="conflict-base-toggle" aria-expanded={open()} onClick={() => setOpen(!open())}>
+        <ChevronRight />
+        Base (common ancestor)
+      </button>
+      <Show when={open()}>
+        <Show when={p.lines} fallback={<div class="muted small conflict-base-note">{p.note}</div>}>
+          {(lines) => (
+            <Show when={lines().length} fallback={<div class="muted small conflict-base-note">Empty in the common ancestor.</div>}>
+              <pre class="conflict-side base">{lines().join("\n")}</pre>
+            </Show>
+          )}
+        </Show>
+      </Show>
+    </div>
   );
 }
 
@@ -570,6 +662,57 @@ export function WhatsNewDialog(p: { notes: ReleaseNote[] }) {
           </section>
         )}
       </For>
+    </Dialog>
+  );
+}
+
+const REPO_URL = "https://github.com/lilmonkeylv/blink";
+
+export function AboutDialog() {
+  const [version] = createResource(() => getVersion().catch(() => null));
+  const channel = () => (store.settings?.advanced.updateChannel === "beta" ? "Beta (prereleases)" : "Stable");
+  const open = (url: string) => api.openExternal(url).catch(reportError);
+  return (
+    <Dialog
+      title="About Blink"
+      onClose={closeDialog}
+      footer={
+        <>
+          <button class="btn" onClick={() => checkForUpdates(true)}>
+            Check for updates
+          </button>
+          <button class="btn primary" onClick={closeDialog}>
+            Close
+          </button>
+        </>
+      }
+    >
+      <div class="about-head">
+        <img src={logo} alt="" width="64" height="64" />
+        <div>
+          <h2>Blink</h2>
+          <div class="muted">
+            <Show when={!version.loading} fallback="Version…">
+              Version <span class="about-version">{version() ?? "unknown"}</span>
+            </Show>
+          </div>
+          <div class="muted small">Update channel: {channel()}</div>
+        </div>
+      </div>
+      <div class="about-links">
+        <button type="button" class="btn" onClick={() => open(REPO_URL)}>
+          <ExternalIcon />
+          GitHub repository
+        </button>
+        <button type="button" class="btn" onClick={() => open(`${REPO_URL}/releases`)}>
+          <ExternalIcon />
+          Releases
+        </button>
+        <button type="button" class="btn" onClick={() => api.openLogsFolder().catch(reportError)}>
+          <FolderOpenIcon />
+          Logs folder
+        </button>
+      </div>
     </Dialog>
   );
 }

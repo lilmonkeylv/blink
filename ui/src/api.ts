@@ -734,6 +734,7 @@ export const api = {
   releaseNotes: () => invoke<ReleaseNote[]>("release_notes"),
   openExternal: (url: string) => invoke<void>("open_external", { url }),
   takePendingLaunch: () => invoke<Launch[]>("take_pending_launch"),
+  remotes: (id: string) => invoke<[string, string][]>("remotes", { id }),
   repoSettings: (id: string) => invoke<RepoSettings>("repo_settings", { id }),
   saveRepoSettings: (id: string, settings: RepoSettings) => invoke<void>("save_repo_settings", { id, settings }),
   fetchAll: () => invoke<FetchAllRow[]>("fetch_all"),

@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { conflictCount, parseConflicts, render } from "./conflicts";
+import { baseSections, conflictCount, parseConflicts, render } from "./conflicts";
 
 const text = ["head", "<<<<<<< HEAD", "ours 1", "ours 2", "=======", "theirs", ">>>>>>> feature", "tail", ""].join("\n");
 
@@ -31,6 +31,40 @@ describe("conflicts", () => {
     if (c.type !== "conflict") throw new Error("expected conflict");
     expect(c.base).toEqual(["o"]);
     expect(c.ours).toEqual(["a"]);
+  });
+
+  test("finds each conflict's base lines between anchors", () => {
+    const merged = [
+      "fn a() {",
+      "}",
+      "fn b() {",
+      "<<<<<<< HEAD",
+      "    run(64);",
+      "=======",
+      "    run(256);",
+      ">>>>>>> feature",
+      "}",
+      "fn c() {",
+      "<<<<<<< HEAD",
+      "    x",
+      "=======",
+      "    y",
+      ">>>>>>> feature",
+      "}",
+      "",
+    ].join("\n");
+    const base = ["fn a() {", "}", "fn b() {", "    run(8);", "    flush();", "}", "fn c() {", "    w", "}", ""].join("\r\n");
+    expect(baseSections(parseConflicts(merged), base)).toEqual([["    run(8);", "    flush();"], ["    w"]]);
+  });
+
+  test("prefers diff3 base and reports conflicts it cannot place", () => {
+    const merged = ["start", "<<<<<<< ours", "a", "=======", "b", ">>>>>>> theirs", "gone", "<<<<<<< ours", "c", "||||||| base", "o", "=======", "d", ">>>>>>> theirs"].join("\n");
+    expect(baseSections(parseConflicts(merged), "other\nfile")).toEqual([null, ["o"]]);
+  });
+
+  test("handles a conflict at the end of the file", () => {
+    const merged = ["keep", "<<<<<<< ours", "a", "=======", "b", ">>>>>>> theirs", ""].join("\n");
+    expect(baseSections(parseConflicts(merged), "keep\nold\n")).toEqual([["old"]]);
   });
 
   test("unterminated markers stay as text", () => {
