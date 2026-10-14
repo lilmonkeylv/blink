@@ -6,7 +6,7 @@ import { baseSections, conflictCount, parseConflicts, render, type Resolution, t
 import { parseJobLog } from "../../lib/joblog";
 import { COMMIT_KEYS, DEFAULT_BINDINGS } from "../../lib/keymap";
 import logo from "../../../../assets/logo.svg";
-import { addRepository, checkForUpdates, keymap, notify, refreshChecks, reportError, run, setStore, store } from "../../store";
+import { addRepository, checkForUpdates, keymap, notify, refreshChecks, reloadSharedState, reportError, run, setStore, store } from "../../store";
 import { Checkbox, Field, Segmented } from "../Controls";
 import { Dialog } from "../Dialog";
 import { CheckIcon, ChevronRight, ExternalIcon, FolderOpenIcon } from "../Icons";
@@ -18,8 +18,10 @@ import { closeDialog, sanitizeBranchName } from "./common";
 type SignedIn = Awaited<ReturnType<typeof api.signIn>>;
 
 export function SignInDialog() {
-  const [mode, setMode] = createSignal<"idle" | "browser" | "device">("idle");
+  const [mode, setMode] = createSignal<"idle" | "browser" | "device" | "token">(store.oauthConfigured ? "idle" : "token");
   const [device, setDevice] = createSignal<DeviceCode | null>(null);
+  const [token, setToken] = createSignal("");
+  const [checking, setChecking] = createSignal(false);
   const [copied, setCopied] = createSignal(false);
   let attempt = 0;
   let copiedTimer: number | undefined;
@@ -29,8 +31,7 @@ export function SignInDialog() {
   });
 
   const finish = async (signedIn: SignedIn) => {
-    const boot = await api.bootstrap();
-    setStore("account", boot.account);
+    await reloadSharedState();
     const identity = await api.gitIdentity().catch(() => null);
     if (identity && (!identity.name || !identity.email)) {
       await api.setGitIdentity(identity.name || signedIn.account.login, identity.email || signedIn.primaryEmail || "").catch(reportError);
@@ -67,6 +68,19 @@ export function SignInDialog() {
     });
   };
 
+  const withToken = async () => {
+    setChecking(true);
+    const mine = ++attempt;
+    try {
+      const signedIn = await api.tokenSignIn(token());
+      if (mine === attempt) await finish(signedIn);
+    } catch (e) {
+      if (mine === attempt) reportError(e, "Sign in");
+    } finally {
+      setChecking(false);
+    }
+  };
+
   const copyCode = async (code: string) => {
     await navigator.clipboard.writeText(code).catch(reportError);
     setCopied(true);
@@ -75,15 +89,31 @@ export function SignInDialog() {
   };
 
   return (
-    <Dialog title="Sign in to GitHub.com" onClose={closeDialog}>
+    <Dialog title={store.account ? "Add a GitHub.com account" : "Sign in to GitHub.com"} onClose={closeDialog}>
       <Switch>
-        <Match when={!store.oauthConfigured}>
-          <p style={{ margin: 0 }}>
-            GitHub sign-in isn't available in this build. You can sign in with a personal access token in Settings &gt; Accounts.
-          </p>
-          <button class="btn primary" onClick={() => setStore("dialog", { type: "settings", tab: "Accounts" })}>
-            Open account settings
+        <Match when={mode() === "token"}>
+          <Show when={!store.oauthConfigured}>
+            <p style={{ margin: 0 }}>Browser sign-in isn't available in this build. Sign in with a personal access token instead.</p>
+          </Show>
+          <Field label="Personal access token" hint="Create one at github.com under Settings > Developer settings with the repo, read:org, user:email and workflow scopes. It's stored in your system keychain.">
+            <input
+              class="input"
+              type="password"
+              autocomplete="off"
+              autofocus
+              value={token()}
+              onInput={(e) => setToken(e.currentTarget.value)}
+              onKeyDown={(e) => e.key === "Enter" && token().trim() && !checking() && withToken()}
+            />
+          </Field>
+          <button class="btn primary" disabled={checking() || !token().trim()} onClick={withToken}>
+            {checking() ? "Checking…" : "Sign in"}
           </button>
+          <Show when={store.oauthConfigured}>
+            <button class="btn" onClick={() => setMode("idle")}>
+              Back
+            </button>
+          </Show>
         </Match>
         <Match when={mode() === "idle"}>
           <p style={{ margin: 0 }}>Your browser opens so you can sign in with your password, passkey or SSO. Blink never sees your password.</p>
@@ -93,6 +123,12 @@ export function SignInDialog() {
           <button class="btn" onClick={withCode}>
             Sign in with a code
           </button>
+          <button class="btn" onClick={() => setMode("token")}>
+            Use a personal access token
+          </button>
+          <Show when={store.account}>
+            <span class="muted small">To add a different account, sign out of GitHub in your browser first or use a private window.</span>
+          </Show>
         </Match>
         <Match when={mode() === "browser"}>
           <div class="sign-in-wait">

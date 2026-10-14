@@ -6,7 +6,7 @@ use serde::Serialize;
 use tauri::State;
 
 use crate::error::{CmdResult, CommandError};
-use crate::state::AppState;
+use crate::state::{AppState, GITHUB_HOST};
 
 pub const GITHUB_KEYS_URL: &str = "https://github.com/settings/keys";
 const KEY_TITLE: &str = "Blink signing key";
@@ -171,8 +171,9 @@ async fn github_key_state(gh: &Client, login: &str, format: SigningFormat, key: 
 }
 
 fn signed_in(state: &AppState) -> Option<(String, Client)> {
-    let (account, _) = state.token()?;
-    Some((account.login, state.github()?))
+    let login = state.account()?.login;
+    let gh = state.client_as(GITHUB_HOST, &login)?;
+    Some((login, gh))
 }
 
 #[tauri::command]

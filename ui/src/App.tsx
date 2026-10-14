@@ -1,6 +1,6 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { createEffect, createMemo, createSignal, For, Match, on, onCleanup, onMount, Show, Switch } from "solid-js";
-import { api, onChecksChanged, onHookOutput, onLaunch, onRepoChanged, onSharedChanged, onSyncProgress, onUpdateAvailable } from "./api";
+import { api, onChecksChanged, onHookOutput, onLaunch, onRepoChanged, onSharedChanged, onSyncProgress, onTrayAction, onUpdateAvailable, type TrayAction } from "./api";
 import { ChangesDiff, ChangesList } from "./components/ChangesPane";
 import { BisectBar } from "./components/BisectBar";
 import { ContextMenuHost, menuActions } from "./components/ContextMenu";
@@ -23,6 +23,7 @@ import {
   applyRepoView,
   applyTheme,
   bootstrap,
+  checkForUpdates,
   closeRepoTab,
   cycleRepoTab,
   handleLaunches,
@@ -37,6 +38,7 @@ import {
   refreshLfs,
   refreshSubmodules,
   refreshRepo,
+  refreshRepoAccount,
   reloadSharedState,
   reportError,
   run,
@@ -48,6 +50,11 @@ import {
   windowRepo,
 } from "./store";
 import { nativeWindow } from "./components/WindowControls";
+
+function runTrayAction(action: TrayAction) {
+  if (action === "fetchAll") setStore("dialog", { type: "fetchAll" });
+  else void checkForUpdates(true);
+}
 
 function Welcome() {
   return (
@@ -316,7 +323,7 @@ export function App() {
     onChecksChanged((e) => {
       if (store.repo?.id === e.repo) setStore("checks", e.summary);
     }),
-    ...(windowRepo ? [] : [onLaunch(handleLaunches), onUpdateAvailable(offerUpdate)]),
+    ...(windowRepo ? [] : [onLaunch(handleLaunches), onUpdateAvailable(offerUpdate), onTrayAction(runTrayAction)]),
   ]);
   onCleanup(() => {
     window.removeEventListener("keydown", onKey);
@@ -336,7 +343,7 @@ export function App() {
 
   createEffect(
     on(
-      () => [store.repo?.id, store.repo?.head?.type === "branch" ? store.repo.head.id : null, store.account?.login] as const,
+      () => [store.repo?.id, store.repo?.head?.type === "branch" ? store.repo.head.id : null, store.account?.login, store.repoAccount?.account?.login] as const,
       () => {
         refreshChecks();
         refreshCommitWarnings();
@@ -347,6 +354,12 @@ export function App() {
   );
 
   createEffect(on(() => [store.repo?.id, store.repo?.bisecting, store.repo?.generation] as const, refreshBisect));
+  createEffect(
+    on(
+      () => [store.repo?.id, store.accounts.map((a) => a.login).join(" ")] as const,
+      () => void refreshRepoAccount(),
+    ),
+  );
 
   onMount(async () => {
     window.addEventListener("keydown", onKey);

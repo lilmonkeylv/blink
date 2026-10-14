@@ -258,6 +258,7 @@ pub struct Advanced {
     pub foreground_threads: Option<usize>,
     pub background_threads: Option<usize>,
     pub update_channel: UpdateChannel,
+    pub close_to_tray: bool,
 }
 
 impl Default for Advanced {
@@ -273,6 +274,7 @@ impl Default for Advanced {
             foreground_threads: None,
             background_threads: None,
             update_channel: UpdateChannel::Stable,
+            close_to_tray: false,
         }
     }
 }
@@ -363,5 +365,12 @@ mod tests {
         assert_eq!(Settings::default().advanced.update_channel, UpdateChannel::Stable);
         let s: Settings = toml::from_str("[advanced]\nupdateChannel = \"beta\"\n").unwrap();
         assert_eq!(s.advanced.update_channel, UpdateChannel::Beta);
+    }
+
+    #[test]
+    fn closing_to_the_tray_is_opt_in() {
+        assert!(!Settings::default().advanced.close_to_tray);
+        let s: Settings = toml::from_str("[advanced]\ncloseToTray = true\n").unwrap();
+        assert!(s.advanced.close_to_tray);
     }
 }

@@ -4,8 +4,10 @@ import { api, isCommandError, type Branch, type PullRequest, type RepoRecord, ty
 import { fuzzyFilter } from "../lib/fuzzy";
 import { relativeTime } from "../lib/time";
 import {
+  activeAccount,
   addRepository,
   checkForUpdates,
+  chooseRepoAccount,
   clearFailedHooks,
   closeRepoTab,
   currentBranch,
@@ -31,6 +33,7 @@ import { customTitleBar, WindowControls } from "./WindowControls";
 import { DRAG_TYPE } from "./HistoryPane";
 import { BranchIcon, CheckIcon, ChevronDown, DownIcon, MenuIcon, PlusIcon, PullRequestIcon, RepoIcon, SyncIcon, UpIcon } from "./Icons";
 import { Loading } from "./Loading";
+import { Avatar } from "./Avatar";
 import { ask, choose, message } from "./Prompt";
 import { undoPhrase } from "../lib/keymap";
 import { transferPercent } from "../lib/progress";
@@ -544,6 +547,48 @@ export function appMenu(): MenuItem[] {
   ];
 }
 
+function accountMenu(): MenuItem[] {
+  const repo = store.repo;
+  const chosen = store.repoAccount?.chosen ?? null;
+  const active = activeAccount()?.login;
+  const perRepo: MenuItem[] =
+    repo && store.accounts.length > 1
+      ? [
+          ...store.accounts.map((a) => ({
+            label: `Use @${a.login} for ${repo.name}`,
+            hint: a.login === active ? (chosen ? "Chosen" : "Automatic") : undefined,
+            run: () => void chooseRepoAccount(a.login),
+          })),
+          { label: "Choose automatically", disabled: !chosen, run: () => void chooseRepoAccount(null) },
+          "separator",
+        ]
+      : [];
+  return [
+    ...perRepo,
+    { label: "Add another account…", run: () => setStore("dialog", { type: "signIn" }) },
+    { label: "Account settings…", run: () => setStore("dialog", { type: "settings", tab: "Accounts" }) },
+  ];
+}
+
+function AccountButton() {
+  const account = () => activeAccount();
+  return (
+    <Show when={account()}>
+      {(a) => (
+        <button
+          class="toolbar-button account"
+          aria-label={`GitHub account @${a().login}`}
+          data-tooltip={store.repo && store.accounts.length > 1 ? `@${a().login} is used for ${store.repo.name}` : `Signed in as @${a().login}`}
+          onMouseDown={(e) => e.preventDefault()}
+          onClick={(e) => openContextMenu(e, accountMenu())}
+        >
+          <Avatar url={a().avatar_url} size={22} />
+        </button>
+      )}
+    </Show>
+  );
+}
+
 export function Toolbar() {
   const [dropping, setDropping] = createSignal(false);
   const toggle = (p: "repos" | "branches") => setStore("popover", store.popover === p ? null : p);
@@ -670,6 +715,7 @@ export function Toolbar() {
           </Show>
         </button>
         <span class="toolbar-spacer" data-tauri-drag-region={customTitleBar || undefined} />
+        <AccountButton />
         <Show
           when={customTitleBar}
           fallback={

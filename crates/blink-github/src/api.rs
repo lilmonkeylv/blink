@@ -100,6 +100,14 @@ pub struct Repo {
     pub pushed_at: Option<String>,
     #[serde(default)]
     pub parent: Option<Box<Repo>>,
+    #[serde(default)]
+    pub permissions: Option<Permissions>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+pub struct Permissions {
+    #[serde(default)]
+    pub push: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]

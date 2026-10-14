@@ -257,6 +257,11 @@ export interface Account {
   html_url: string;
 }
 
+export interface RepoAccount {
+  account: Account | null;
+  chosen: string | null;
+}
+
 export interface DeviceCode {
   device_code: string;
   user_code: string;
@@ -323,6 +328,7 @@ export interface Settings {
     foregroundThreads: number | null;
     backgroundThreads: number | null;
     updateChannel: "stable" | "beta";
+    closeToTray: boolean;
   };
   accessibility: {
     underlineLinks: boolean;
@@ -338,6 +344,7 @@ export interface Bootstrap {
   repositories: RepoRecord[];
   settings: Settings;
   account: Account | null;
+  accounts: Account[];
   lastRepository: string | null;
   oauthConfigured: boolean;
   gitFound: boolean;
@@ -631,6 +638,12 @@ export function onFetchAllProgress(handler: (row: FetchAllRow) => void): Promise
   return listen<FetchAllRow>("fetch-all-progress", (e) => handler(e.payload));
 }
 
+export type TrayAction = "fetchAll" | "checkForUpdates";
+
+export function onTrayAction(handler: (action: TrayAction) => void): Promise<UnlistenFn> {
+  return listen<TrayAction>("tray-action", (e) => handler(e.payload));
+}
+
 export function onLaunch(handler: () => void): Promise<UnlistenFn> {
   return listen("launch", () => handler());
 }
@@ -662,7 +675,7 @@ export function onSharedChanged(handler: () => void): Promise<UnlistenFn> {
 
 export const api = {
   bootstrap: () => invoke<Bootstrap>("bootstrap"),
-  sharedState: () => invoke<Pick<Bootstrap, "repositories" | "settings" | "account">>("shared_state"),
+  sharedState: () => invoke<Pick<Bootstrap, "repositories" | "settings" | "account" | "accounts">>("shared_state"),
   addRepository: (path: string) => invokeShared<RepoRecord>("add_repository", { path }),
   initRepository: (path: string) => invokeShared<RepoRecord>("init_repository", { path }),
   createRepository: (
@@ -780,11 +793,11 @@ export const api = {
   conflictVersions: (id: string, path: string) =>
     invoke<[string | null, string | null, string | null]>("conflict_versions", { id, path }),
 
-  githubRepositories: () => invoke<GithubRepo[]>("github_repositories"),
-  githubOrgs: () => invoke<{ login: string; avatar_url: string }[]>("github_orgs"),
+  githubRepositories: (account?: string) => invoke<GithubRepo[]>("github_repositories", { account }),
+  githubOrgs: (account?: string) => invoke<{ login: string; avatar_url: string }[]>("github_orgs", { account }),
   gitignoreTemplates: () => invoke<string[]>("gitignore_templates"),
-  clone: (url: string, parent: string, name: string, depth?: number, partial = false) =>
-    invokeShared<RepoRecord>("clone_repository", { url, parent, name, depth, partial }),
+  clone: (url: string, parent: string, name: string, depth?: number, partial = false, account?: string) =>
+    invokeShared<RepoRecord>("clone_repository", { url, parent, name, options: { depth, partial, account } }),
   publish: (id: string, name: string, description: string, isPrivate: boolean, org?: string) =>
     invokeShared<GithubRepo>("publish_repository", { id, name, description, private: isPrivate, org }),
   pullRequests: (id: string) => invoke<PullRequest[]>("pull_requests", { id }),
@@ -832,7 +845,12 @@ export const api = {
   signIn: () => invokeShared<{ account: Account; primaryEmail: string | null }>("sign_in"),
   deviceStart: () => invoke<DeviceCode>("device_start"),
   deviceComplete: (code: DeviceCode) => invokeShared<{ account: Account; primaryEmail: string | null }>("device_complete", { code }),
-  signOut: () => invokeShared<void>("sign_out"),
+  tokenSignIn: (token: string) => invokeShared<{ account: Account; primaryEmail: string | null }>("token_sign_in", { token }),
+  signOut: (login?: string) => invokeShared<void>("sign_out", { login }),
+  githubAccounts: () => invoke<Account[]>("github_accounts"),
+  setPrimaryAccount: (login: string) => invokeShared<void>("set_primary_account", { login }),
+  repoAccount: (id: string) => invoke<RepoAccount>("repo_account", { id }),
+  setRepoAccount: (id: string, login: string | null) => invokeShared<void>("set_repo_account", { id, login }),
   revokeUrl: () => invoke<string | null>("revoke_url"),
   enterpriseAccounts: () => invoke<EnterpriseAccount[]>("enterprise_accounts"),
   enterpriseSignIn: (host: string, token: string) => invokeShared<EnterpriseAccount>("enterprise_sign_in", { host, token }),

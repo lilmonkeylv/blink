@@ -1,6 +1,6 @@
 import { emit } from "@tauri-apps/api/event";
 import { mockIPC } from "@tauri-apps/api/mocks";
-import type { Bootstrap, CommitSummary, FileDiff, HookAction, HookEvent, RepoView } from "./api";
+import type { Account, Bootstrap, CommitSummary, FileDiff, HookAction, HookEvent, RepoView } from "./api";
 
 const now = Math.floor(Date.now() / 1000);
 
@@ -135,6 +135,12 @@ const jobs = (runId: number) => [
   { id: 3, run_id: runId, name: "bench", status: "in_progress", conclusion: null, html_url: null, steps: [] },
 ];
 
+const accounts: Account[] = [
+  { login: "octocat", id: 1, name: "The Octocat", email: null, avatar_url: "", html_url: "https://github.com/octocat" },
+  { login: "octo-work", id: 2, name: "Octo at Work", email: null, avatar_url: "", html_url: "https://github.com/octo-work" },
+];
+const repoAccounts = new Map<string, string>();
+
 export function installDevMock() {
   const boot: Bootstrap = {
     repositories: [
@@ -142,7 +148,8 @@ export function installDevMock() {
       { path: "C:/dev/desktop", name: "desktop", owner: "desktop", remoteUrl: null, lastOpened: 0 },
     ],
     settings: undefined as never,
-    account: null,
+    account: accounts[0],
+    accounts,
     lastRepository: repo.id,
     oauthConfigured: false,
     gitFound: true,
@@ -153,7 +160,7 @@ export function installDevMock() {
       case "bootstrap":
         return { ...boot, settings: defaultSettings() };
       case "shared_state":
-        return { repositories: boot.repositories, settings: defaultSettings(), account: null };
+        return { repositories: boot.repositories, settings: defaultSettings(), account: accounts[0], accounts };
       case "open_repository":
         return new Promise((resolve) =>
           setTimeout(() => {
@@ -393,8 +400,16 @@ export function installDevMock() {
         throw { kind: "missingScope", message: "Blink's GitHub sign-in isn't allowed to add signing keys. Copy the public key and add it on GitHub instead.", detail: "https://github.com/settings/keys" };
       case "signing_public_key":
         return "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBk0zU1Xv5xmOcBqNnkTAo5f1q2T8ZKcjzkQzRrH7Vbb";
-      case "account":
+      case "github_accounts":
+        return accounts;
+      case "repo_account":
+        return { account: accounts.find((x) => x.login === repoAccounts.get(String(a.id))) ?? accounts[0], chosen: repoAccounts.get(String(a.id)) ?? null };
+      case "set_repo_account":
+        if (a.login) repoAccounts.set(String(a.id), String(a.login));
+        else repoAccounts.delete(String(a.id));
         return null;
+      case "github_repositories":
+        return [];
       default:
         return null;
     }
@@ -409,7 +424,7 @@ function defaultSettings() {
     appearance: { theme: "system", tabSize: 8, accentColor: null, density: "comfortable", diffFont: null, diffFontSize: 12, dateFormat: "relative" },
     notifications: { enabled: true, checksFailed: true, reviewRequested: true, prMerged: false, pushRejected: true, quietHours: null },
     prompts: { removeRepository: true, discardChanges: true, discardChangesPermanently: true, forcePush: true, undoCommit: true, hardReset: true, deleteBranchWithUnpushed: true },
-    advanced: { branchSwitch: "ask", backgroundFetch: true, backgroundFetchMinutes: 60, useSystemOpenssh: false, watcher: "native", cacheLimitMb: 512, logLevel: "info", foregroundThreads: null, backgroundThreads: null, updateChannel: "stable" },
+    advanced: { branchSwitch: "ask", backgroundFetch: true, backgroundFetchMinutes: 60, useSystemOpenssh: false, watcher: "native", cacheLimitMb: 512, logLevel: "info", foregroundThreads: null, backgroundThreads: null, updateChannel: "stable", closeToTray: false },
     accessibility: { underlineLinks: false, diffCheckMarks: false, reducedMotion: false, highContrast: false, largeHitTargets: false, keyboardNavigation: false },
   };
 }

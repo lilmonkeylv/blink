@@ -18,6 +18,7 @@ pub fn save_settings(app: AppHandle, state: State<'_, AppState>, settings: Setti
     settings.save(&state.paths.settings_file())?;
     let previous = std::mem::replace(&mut *state.settings.write(), settings.clone());
     crate::apply::apply_settings(&app, Some(&previous), &settings);
+    crate::tray::sync(&app);
     Ok(())
 }
 

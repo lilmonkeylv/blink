@@ -91,6 +91,10 @@ fn dispatch(app: &AppHandle, launches: Vec<Launch>) {
     let _ = app.emit(LAUNCH, ());
 }
 
+pub fn open_path(app: &AppHandle, path: String) {
+    dispatch(app, vec![Launch::Open { path, from_link: false }]);
+}
+
 pub fn handle_args(app: &AppHandle, argv: &[String], cwd: Option<&Path>) {
     dispatch(app, parse_args(argv, cwd));
 }

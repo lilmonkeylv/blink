@@ -20,6 +20,7 @@ pub struct Bootstrap {
     repositories: Vec<RepoRecord>,
     settings: Settings,
     account: Option<Account>,
+    accounts: Vec<Account>,
     last_repository: Option<String>,
     oauth_configured: bool,
     git_found: bool,
@@ -31,23 +32,28 @@ pub struct SharedState {
     repositories: Vec<RepoRecord>,
     settings: Settings,
     account: Option<Account>,
+    accounts: Vec<Account>,
 }
 
 #[tauri::command]
 pub fn shared_state(state: State<'_, AppState>) -> CmdResult<SharedState> {
+    let accounts = state.github_accounts();
     Ok(SharedState {
         repositories: state.cache.repositories()?,
         settings: state.settings.read().clone(),
-        account: state.account(),
+        account: accounts.first().cloned(),
+        accounts,
     })
 }
 
 #[tauri::command(async)]
 pub fn bootstrap(state: State<'_, AppState>) -> CmdResult<Bootstrap> {
+    let accounts = state.github_accounts();
     Ok(Bootstrap {
         repositories: state.cache.repositories()?,
         settings: state.settings.read().clone(),
-        account: state.account(),
+        account: accounts.first().cloned(),
+        accounts,
         last_repository: state.cache.app_state(LAST_REPO_KEY)?,
         oauth_configured: state.oauth.client_id.is_some(),
         git_found: blink_git::GitCli::new(".").run(&["--version"]).is_ok(),
@@ -343,10 +349,11 @@ pub async fn desktop_repositories(state: State<'_, AppState>) -> CmdResult<Vec<R
 }
 
 #[tauri::command]
-pub fn remove_repository(state: State<'_, AppState>, path: String) -> CmdResult<()> {
+pub fn remove_repository(app: AppHandle, state: State<'_, AppState>, path: String) -> CmdResult<()> {
     stop_watcher(&state, &path);
     state.engine.close(&path);
     state.cache.remove_repository(&path)?;
+    crate::tray::sync(&app);
     Ok(())
 }
 
@@ -357,6 +364,7 @@ pub async fn open_repository(app: AppHandle, state: State<'_, AppState>, path: S
     ensure_watcher(&app, &state, &id)?;
     let _ = state.cache.touch_repository(&id);
     let _ = state.cache.put_app_state(LAST_REPO_KEY, &id);
+    crate::tray::sync(&app);
     let view = RepoView::from_snapshot(&id, handle.repo().name(), &snapshot);
     view.remember(&state.cache);
     Ok(view)

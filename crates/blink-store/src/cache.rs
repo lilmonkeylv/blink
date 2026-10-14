@@ -124,6 +124,11 @@ impl Cache {
         Ok(json.map(|j| serde_json::from_str(&j)).transpose()?)
     }
 
+    pub fn clear_repo_state(&self, key: &str) -> Result<()> {
+        self.writer.lock().execute("DELETE FROM repo_state WHERE key = ?1", [key])?;
+        Ok(())
+    }
+
     pub fn put_app_state<T: Serialize>(&self, key: &str, value: &T) -> Result<()> {
         let json = serde_json::to_string(value)?;
         self.writer.lock().execute(
@@ -239,6 +244,12 @@ mod tests {
         cache.put_repo_state("/r", "tab", &"history").unwrap();
         assert_eq!(cache.repo_state::<String>("/r", "tab").unwrap().as_deref(), Some("history"));
         assert_eq!(cache.repo_state::<String>("/r", "none").unwrap(), None);
+        cache.put_repo_state("/s", "tab", &"changes").unwrap();
+        cache.put_repo_state("/s", "other", &1).unwrap();
+        cache.clear_repo_state("tab").unwrap();
+        assert_eq!(cache.repo_state::<String>("/r", "tab").unwrap(), None);
+        assert_eq!(cache.repo_state::<String>("/s", "tab").unwrap(), None);
+        assert_eq!(cache.repo_state::<i32>("/s", "other").unwrap(), Some(1));
     }
 
     #[test]

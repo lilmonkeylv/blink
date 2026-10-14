@@ -3,8 +3,9 @@ use serde::Serialize;
 use tauri::{AppHandle, Manager, State};
 use tauri_plugin_opener::OpenerExt;
 
+use crate::accounts::{self, same_login};
 use crate::error::{CmdResult, CommandError};
-use crate::state::{ACCOUNT_KEY, AppState, EnterpriseAccount, GITHUB_HOST, api_base, normalize_host};
+use crate::state::{AppState, EnterpriseAccount, GITHUB_HOST, api_base, normalize_host};
 
 fn oauth_app(state: &AppState) -> CmdResult<OAuthApp> {
     let client_id = state.oauth.client_id.clone().ok_or_else(|| {
@@ -20,17 +21,18 @@ pub struct SignedIn {
     primary_email: Option<String>,
 }
 
-async fn finish(state: &AppState, token: Token) -> CmdResult<SignedIn> {
-    let client = Client::github_com(&token.access_token);
+async fn finish(state: &AppState, token: &str) -> CmdResult<SignedIn> {
+    let client = Client::github_com(token);
     let account = client.user().await?;
     let primary_email = client
         .emails()
         .await
         .ok()
         .and_then(|emails| emails.into_iter().find(|e| e.primary && e.verified).map(|e| e.email));
-    state.secrets.set(&AppState::token_key(&account.login), &token.access_token)?;
-    state.cache.put_app_state(ACCOUNT_KEY, &account)?;
-    state.forget_credentials(GITHUB_HOST);
+    state.secrets.set(&AppState::token_key(&account.login), token)?;
+    let mut list = state.github_accounts();
+    accounts::upsert(&mut list, account.clone());
+    state.save_github_accounts(&list)?;
     Ok(SignedIn { account, primary_email })
 }
 
@@ -46,9 +48,9 @@ pub async fn sign_in(app: AppHandle, state: State<'_, AppState>) -> CmdResult<Si
     let oauth = oauth_app(&state)?;
     let request = oauth.begin().await?;
     app.opener().open_url(&request.url, None::<&str>).map_err(|e| CommandError::new("opener", e.to_string()))?;
-    let token = oauth.complete(request).await?;
+    let token: Token = oauth.complete(request).await?;
     focus_main(&app);
-    finish(&state, token).await
+    finish(&state, &token.access_token).await
 }
 
 #[tauri::command]
@@ -62,19 +64,63 @@ pub async fn device_start(app: AppHandle, state: State<'_, AppState>) -> CmdResu
 pub async fn device_complete(app: AppHandle, state: State<'_, AppState>, code: DeviceCode) -> CmdResult<SignedIn> {
     let token = oauth_app(&state)?.wait_for_device_token(&code).await?;
     focus_main(&app);
+    finish(&state, &token.access_token).await
+}
+
+#[tauri::command]
+pub async fn token_sign_in(state: State<'_, AppState>, token: String) -> CmdResult<SignedIn> {
+    let token = token.trim();
+    if token.is_empty() {
+        return Err(CommandError::new("token", "Paste a personal access token"));
+    }
     finish(&state, token).await
 }
 
 #[tauri::command(async)]
-pub fn sign_out(state: State<'_, AppState>) -> CmdResult<()> {
-    if let Some(account) = state.account() {
-        state.secrets.delete(&AppState::token_key(&account.login))?;
-    }
-    state.cache.put_app_state(ACCOUNT_KEY, &Option::<Account>::None)?;
-    state.forget_credentials(GITHUB_HOST);
-    *state.github.lock() = None;
+pub fn sign_out(state: State<'_, AppState>, login: Option<String>) -> CmdResult<()> {
+    let mut list = state.github_accounts();
+    let Some(target) = login.or_else(|| list.first().map(|a| a.login.clone())) else { return Ok(()) };
+    let Some(index) = list.iter().position(|a| same_login(&a.login, &target)) else { return Ok(()) };
+    let removed = list.remove(index);
+    state.secrets.delete(&AppState::token_key(&removed.login))?;
+    state.save_github_accounts(&list)?;
     crate::commands::github::forget_linked_emails(GITHUB_HOST);
     Ok(())
+}
+
+#[tauri::command]
+pub fn github_accounts(state: State<'_, AppState>) -> Vec<Account> {
+    state.github_accounts()
+}
+
+#[tauri::command]
+pub fn set_primary_account(state: State<'_, AppState>, login: String) -> CmdResult<()> {
+    let mut list = state.github_accounts();
+    if accounts::make_primary(&mut list, &login) {
+        state.save_github_accounts(&list)?;
+    }
+    Ok(())
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RepoAccount {
+    account: Option<Account>,
+    chosen: Option<String>,
+}
+
+#[tauri::command]
+pub async fn repo_account(state: State<'_, AppState>, id: String) -> CmdResult<RepoAccount> {
+    let handle = state.engine.get(&id)?;
+    let account = accounts::resolve(&state, &id, handle.repo()).await;
+    let list = state.github_accounts();
+    let chosen = state.repo_account_choice(&id).filter(|c| list.iter().any(|a| same_login(&a.login, c)));
+    Ok(RepoAccount { account, chosen })
+}
+
+#[tauri::command(async)]
+pub fn set_repo_account(state: State<'_, AppState>, id: String, login: Option<String>) -> CmdResult<()> {
+    Ok(state.set_repo_account_choice(&id, login.as_deref())?)
 }
 
 #[tauri::command]
