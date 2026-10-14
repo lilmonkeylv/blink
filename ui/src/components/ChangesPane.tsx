@@ -22,7 +22,7 @@ import {
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { Checkbox } from "./Controls";
 import { DiffLayoutToggle, DiffView } from "./DiffView";
-import { StatusIcon } from "./Icons";
+import { ChevronDown, StatusIcon, WhitespaceIcon } from "./Icons";
 import { ImageDiff, isImagePath } from "./ImageDiff";
 import { VirtualList } from "./VirtualList";
 import { ask } from "./Prompt";
@@ -282,26 +282,28 @@ function OperationBar() {
   const op = () => repo().operation!;
   const conflicts = () => repo().conflicted;
   return (
-    <div class="operation-bar">
-      <span style={{ flex: 1 }}>
+    <div class="operation-bar stacked">
+      <span class="operation-status">
         {OPERATION_LABELS[op()] ?? op()} in progress
         {conflicts() ? ` · ${conflicts()} conflicted file${conflicts() === 1 ? "" : "s"}` : " · conflicts resolved"}
       </span>
-      <Show when={op() === "rebase" || op() === "cherry-pick"}>
-        <button class="btn" onClick={() => run("Skip", () => api.skipOperation(repo().id, op()))}>
-          Skip
+      <div class="operation-actions">
+        <Show when={op() === "rebase" || op() === "cherry-pick"}>
+          <button class="btn" onClick={() => run("Skip", () => api.skipOperation(repo().id, op()))}>
+            Skip
+          </button>
+        </Show>
+        <button class="btn" onClick={() => run("Abort", () => api.abortOperation(repo().id, op()))}>
+          Abort
         </button>
-      </Show>
-      <button class="btn" onClick={() => run("Abort", () => api.abortOperation(repo().id, op()))}>
-        Abort
-      </button>
-      <button
-        class="btn primary"
-        disabled={conflicts() > 0}
-        onClick={() => run("Continue", () => api.continueOperation(repo().id, op()))}
-      >
-        {op() === "merge" ? "Commit merge" : "Continue"}
-      </button>
+        <button
+          class="btn primary"
+          disabled={conflicts() > 0}
+          onClick={() => run("Continue", () => api.continueOperation(repo().id, op()))}
+        >
+          {op() === "merge" ? "Commit merge" : "Continue"}
+        </button>
+      </div>
     </div>
   );
 }
@@ -598,7 +600,15 @@ export function ChangesDiff() {
               )}
             </Show>
             <DiffLayoutToggle />
-            <Checkbox checked={ignoreWhitespace()} onChange={setIgnoreWhitespace} label="Hide whitespace" class="muted small" />
+            <button
+              class="icon-button"
+              classList={{ pressed: ignoreWhitespace() }}
+              aria-pressed={ignoreWhitespace()}
+              aria-label={ignoreWhitespace() ? "Show whitespace changes" : "Hide whitespace changes"}
+              onClick={() => setIgnoreWhitespace(!ignoreWhitespace())}
+            >
+              <WhitespaceIcon />
+            </button>
           </div>
           <Show when={f().kind === "conflicted"}>
             <ConflictActions path={f().path} />
@@ -628,18 +638,24 @@ function ConflictActions(p: { path: string }) {
   const repo = () => store.repo!;
   return (
     <div class="operation-bar" style={{ background: "var(--bg-subtle)" }}>
-      <span style={{ flex: 1 }}>This file has conflicts.</span>
+      <span class="operation-status">This file has conflicts.</span>
       <button class="btn primary" onClick={() => setStore("dialog", { type: "mergeEditor", path: p.path })}>
         Resolve…
       </button>
-      <button class="btn" onClick={() => api.openInEditor(repo().id, p.path).catch(reportError)}>
-        Open in editor
-      </button>
-      <button class="btn" onClick={() => run("Resolve", () => api.resolveConflict(repo().id, p.path, true))}>
-        Use ours
-      </button>
-      <button class="btn" onClick={() => run("Resolve", () => api.resolveConflict(repo().id, p.path, false))}>
-        Use theirs
+      <button
+        class="btn"
+        aria-haspopup="menu"
+        onClick={(e) =>
+          openContextMenu(e, [
+            { label: "Open in editor", run: () => api.openInEditor(repo().id, p.path).catch(reportError) },
+            "separator",
+            { label: "Use our version", run: () => run("Resolve", () => api.resolveConflict(repo().id, p.path, true)) },
+            { label: "Use their version", run: () => run("Resolve", () => api.resolveConflict(repo().id, p.path, false)) },
+          ])
+        }
+      >
+        More
+        <ChevronDown />
       </button>
     </div>
   );

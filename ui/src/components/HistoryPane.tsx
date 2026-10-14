@@ -16,7 +16,7 @@ import { currentBranch, notify, reportError, run, setStore, store } from "../sto
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { Checkbox, Select, Segmented } from "./Controls";
 import { DiffLayoutToggle, DiffView } from "./DiffView";
-import { CloseIcon, StatusIcon } from "./Icons";
+import { CloseIcon, FilterIcon, StatusIcon } from "./Icons";
 import { ImageDiff, isImagePath } from "./ImageDiff";
 import { VirtualList } from "./VirtualList";
 import { ask } from "./Prompt";
@@ -27,6 +27,12 @@ const LANE = 12;
 const MAX_LANES = 16;
 const LANE_COLORS = 8;
 export const DRAG_TYPE = "application/x-blink-commits";
+const SEARCH_PLACEHOLDERS: Record<SearchKind, string> = {
+  message: "Search messages",
+  author: "Search authors",
+  content: "Search contents",
+  path: "Search paths",
+};
 
 const [commits, setCommits] = createSignal<CommitSummary[]>([]);
 const [rows, setRows] = createSignal<GraphRow[]>([]);
@@ -177,7 +183,7 @@ function SearchBar() {
       <input
         id="history-search"
         class="input"
-        placeholder="Search history"
+        placeholder={SEARCH_PLACEHOLDERS[kind()]}
         value={query()}
         onInput={(e) => {
           setQuery(e.currentTarget.value);
@@ -190,22 +196,22 @@ function SearchBar() {
           }
         }}
       />
-      <div style={{ width: "112px", flex: "none" }}>
-        <Select
-          value={kind()}
-          onChange={(k) => {
-            setKind(k);
-            apply();
-          }}
-          ariaLabel="Search in"
-          options={[
-            { value: "message", label: "Message" },
-            { value: "author", label: "Author" },
-            { value: "content", label: "Content" },
-            { value: "path", label: "Path" },
-          ]}
-        />
-      </div>
+      <Select
+        value={kind()}
+        onChange={(k) => {
+          setKind(k);
+          apply();
+        }}
+        ariaLabel="Search in"
+        tooltip="Search in"
+        icon={<FilterIcon />}
+        options={[
+          { value: "message", label: "Message" },
+          { value: "author", label: "Author" },
+          { value: "content", label: "Content" },
+          { value: "path", label: "Path" },
+        ]}
+      />
     </div>
   );
 }
