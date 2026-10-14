@@ -20,8 +20,12 @@ use crate::state::{AppState, GITHUB_HOST};
 
 pub const CHECKS_CHANGED: &str = "checks-changed";
 
-fn client(state: &AppState) -> CmdResult<Client> {
-    state.github().ok_or_else(|| CommandError::new("signedOut", "Sign in to GitHub.com first"))
+fn client(state: &AppState, account: Option<&str>) -> CmdResult<Client> {
+    let client = match account {
+        Some(login) => state.client_as(GITHUB_HOST, login),
+        None => state.github(),
+    };
+    client.ok_or_else(|| CommandError::new("signedOut", "Sign in to GitHub.com first"))
 }
 
 pub struct HostedRepo {
@@ -57,8 +61,12 @@ fn email_is_linked(email: &str, linked: &LinkedEmails) -> bool {
     domain == format!("users.noreply.{}", linked.host) && (local == login || local == format!("{}+{login}", linked.id))
 }
 
-async fn load_linked_emails(host: &str, gh: &Client) {
-    if LINKED_EMAILS.lock().iter().any(|l| l.host == host) {
+fn linked_for<'a>(linked: &'a [LinkedEmails], host: &str, login: &str) -> Option<&'a LinkedEmails> {
+    linked.iter().find(|l| l.host == host && l.login.eq_ignore_ascii_case(login))
+}
+
+async fn load_linked_emails(host: &str, login: &str, gh: &Client) {
+    if linked_for(&LINKED_EMAILS.lock(), host, login).is_some() {
         return;
     }
     let (Ok(user), Ok(emails)) = (gh.user().await, gh.emails().await) else { return };
@@ -76,17 +84,18 @@ pub async fn commit_warnings(state: State<'_, AppState>, id: String) -> CmdResul
     let Some(HostedRepo { host, owner, name }) = hosted_repo(&state, handle.repo(), None) else {
         return Ok(CommitWarnings::default());
     };
-    let Some(gh) = state.client_for_host(&host) else { return Ok(CommitWarnings::default()) };
+    let Some(login) = state.login_for(&host, Some(&id)) else { return Ok(CommitWarnings::default()) };
+    let Some(gh) = state.client_as(&host, &login) else { return Ok(CommitWarnings::default()) };
     let protected_branch = match handle.snapshot().head.clone() {
         Some(HeadState::Branch { name: branch, .. }) => {
             gh.branch_protected(&owner, &name, &branch).await.unwrap_or(false)
         }
         _ => false,
     };
-    load_linked_emails(&host, &gh).await;
+    load_linked_emails(&host, &login, &gh).await;
     let email = handle.repo().cli().config_get("user.email");
     let linked = LINKED_EMAILS.lock();
-    let Some(account) = linked.iter().find(|l| l.host == host) else {
+    let Some(account) = linked_for(&linked, &host, &login) else {
         return Ok(CommitWarnings { protected_branch, ..Default::default() });
     };
     Ok(CommitWarnings {
@@ -128,7 +137,7 @@ pub async fn commit_signature(state: State<'_, AppState>, id: String, sha: Strin
     let Some(HostedRepo { host, owner, name }) = hosted_repo(&state, handle.repo(), None) else {
         return Ok(Some(local));
     };
-    let Some(gh) = state.client_for_host(&host) else { return Ok(Some(local)) };
+    let Some(gh) = state.client_for(&host, Some(&id)) else { return Ok(Some(local)) };
     let signature = match gh.commit_verification(&owner, &name, &sha).await {
         Ok(Some(v)) if v.verified => Signature { state: "verified", reason: None },
         Ok(Some(v)) => Signature { state: "unverified", reason: Some(v.reason) },
@@ -162,23 +171,31 @@ pub(crate) fn hosted(state: &AppState, repo: &Repository) -> CmdResult<HostedRep
     })
 }
 
-pub(crate) fn host_client(state: &AppState, host: &str) -> CmdResult<Client> {
-    state.client_for_host(host).ok_or_else(|| CommandError::new("signedOut", format!("Sign in to {host} first")))
+pub(crate) fn host_client(state: &AppState, host: &str, repo: &str) -> CmdResult<Client> {
+    state.client_for(host, Some(repo)).ok_or_else(|| CommandError::new("signedOut", format!("Sign in to {host} first")))
 }
 
 #[tauri::command]
-pub async fn github_repositories(state: State<'_, AppState>) -> CmdResult<Vec<Repo>> {
-    Ok(client(&state)?.repos().await?)
+pub async fn github_repositories(state: State<'_, AppState>, account: Option<String>) -> CmdResult<Vec<Repo>> {
+    Ok(client(&state, account.as_deref())?.repos().await?)
 }
 
 #[tauri::command]
-pub async fn github_orgs(state: State<'_, AppState>) -> CmdResult<Vec<Org>> {
-    Ok(client(&state)?.orgs().await?)
+pub async fn github_orgs(state: State<'_, AppState>, account: Option<String>) -> CmdResult<Vec<Org>> {
+    Ok(client(&state, account.as_deref())?.orgs().await?)
 }
 
 #[tauri::command]
 pub async fn gitignore_templates(state: State<'_, AppState>) -> CmdResult<Vec<String>> {
-    Ok(client(&state)?.gitignore_templates().await?)
+    Ok(client(&state, None)?.gitignore_templates().await?)
+}
+
+#[derive(Debug, Default, serde::Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct CloneOptions {
+    depth: Option<u32>,
+    partial: bool,
+    account: Option<String>,
 }
 
 #[tauri::command]
@@ -188,25 +205,34 @@ pub async fn clone_repository(
     url: String,
     parent: String,
     name: String,
-    depth: Option<u32>,
-    partial: Option<bool>,
+    options: Option<CloneOptions>,
 ) -> CmdResult<RepoRecord> {
+    let CloneOptions { depth, partial, account } = options.unwrap_or_default();
     let dest = PathBuf::from(&parent).join(&name);
     if dest.exists() && std::fs::read_dir(&dest).map(|mut d| d.next().is_some()).unwrap_or(false) {
         return Err(CommandError::new("exists", format!("{} already exists and is not empty", dest.display())));
     }
-    let template = state.authenticate(GitCli::new(&parent), Some(&url));
+    let account =
+        account.filter(|_| parse_remote(&url).is_some_and(|(host, ..)| host.eq_ignore_ascii_case(GITHUB_HOST)));
+    let template = match &account {
+        Some(login) => state.authenticate_as(GitCli::new(&parent), Some(&url), login),
+        None => state.authenticate(GitCli::new(&parent), Some(&url), None),
+    };
     let emit = progress_emitter(&app, "clone", SyncAction::Fetch);
     let permit =
         state.engine.network().clone().acquire_owned().await.map_err(|e| CommandError::new("core", e.to_string()))?;
     let clone_dest = dest.clone();
     tauri::async_runtime::spawn_blocking(move || {
-        GitCli::clone_repository(&url, &clone_dest, depth, partial.unwrap_or(false), &template, emit)
+        GitCli::clone_repository(&url, &clone_dest, depth, partial, &template, emit)
     })
     .await
     .map_err(|e| CommandError::new("core", e.to_string()))??;
     drop(permit);
-    add_repository(state, dest.to_string_lossy().into_owned()).await
+    let record = add_repository(state.clone(), dest.to_string_lossy().into_owned()).await?;
+    if let Some(login) = account {
+        state.set_repo_account_choice(&record.path, Some(&login))?;
+    }
+    Ok(record)
 }
 
 #[tauri::command]
@@ -218,10 +244,10 @@ pub async fn publish_repository(
     private: bool,
     org: Option<String>,
 ) -> CmdResult<Repo> {
-    let gh = client(&state)?;
+    let gh = host_client(&state, GITHUB_HOST, &id)?;
     let created = gh.create_repo(org.as_deref(), &name, &description, private).await?;
     let handle = state.engine.get(&id)?;
-    let cli = state.authenticate(handle.repo().cli(), Some(&created.clone_url));
+    let cli = state.authenticate(handle.repo().cli(), Some(&created.clone_url), Some(&id));
     let url = created.clone_url.clone();
     state
         .engine
@@ -251,7 +277,7 @@ pub async fn pull_requests(state: State<'_, AppState>, id: String) -> CmdResult<
     let handle = state.engine.get(&id)?;
     let repo = handle.repo();
     let target = hosted_repo(&state, repo, Some("upstream")).map(Ok).unwrap_or_else(|| hosted(&state, repo))?;
-    Ok(host_client(&state, &target.host)?.pulls(&target.owner, &target.name).await?)
+    Ok(host_client(&state, &target.host, &id)?.pulls(&target.owner, &target.name).await?)
 }
 
 #[tauri::command]
@@ -308,7 +334,7 @@ pub async fn branch_checks(state: State<'_, AppState>, id: String) -> CmdResult<
     let handle = state.engine.get(&id)?;
     let Some(target) = hosted_repo(&state, handle.repo(), None) else { return Ok(None) };
     let Some(HeadState::Branch { id: sha, .. }) = handle.snapshot().head.clone() else { return Ok(None) };
-    let Some(gh) = state.client_for_host(&target.host) else { return Ok(None) };
+    let Some(gh) = state.client_for(&target.host, Some(&id)) else { return Ok(None) };
     Ok(Some(gh.checks(&target.owner, &target.name, &sha).await?))
 }
 
@@ -316,7 +342,7 @@ pub async fn branch_checks(state: State<'_, AppState>, id: String) -> CmdResult<
 pub async fn rerun_failed_checks(state: State<'_, AppState>, id: String, suites: Vec<u64>) -> CmdResult<()> {
     let handle = state.engine.get(&id)?;
     let HostedRepo { host, owner, name } = hosted(&state, handle.repo())?;
-    let gh = host_client(&state, &host)?;
+    let gh = host_client(&state, &host, &id)?;
     for suite in suites {
         gh.rerun_check_suite(&owner, &name, suite).await?;
     }
@@ -327,21 +353,21 @@ pub async fn rerun_failed_checks(state: State<'_, AppState>, id: String, suites:
 pub async fn workflow_run_jobs(state: State<'_, AppState>, id: String, run_id: u64) -> CmdResult<Vec<Job>> {
     let handle = state.engine.get(&id)?;
     let HostedRepo { host, owner, name } = hosted(&state, handle.repo())?;
-    Ok(host_client(&state, &host)?.run_jobs(&owner, &name, run_id).await?)
+    Ok(host_client(&state, &host, &id)?.run_jobs(&owner, &name, run_id).await?)
 }
 
 #[tauri::command]
 pub async fn workflow_job(state: State<'_, AppState>, id: String, job_id: u64) -> CmdResult<Job> {
     let handle = state.engine.get(&id)?;
     let HostedRepo { host, owner, name } = hosted(&state, handle.repo())?;
-    Ok(host_client(&state, &host)?.job(&owner, &name, job_id).await?)
+    Ok(host_client(&state, &host, &id)?.job(&owner, &name, job_id).await?)
 }
 
 #[tauri::command]
 pub async fn job_log(state: State<'_, AppState>, id: String, job_id: u64) -> CmdResult<String> {
     let handle = state.engine.get(&id)?;
     let HostedRepo { host, owner, name } = hosted(&state, handle.repo())?;
-    Ok(host_client(&state, &host)?.job_log(&owner, &name, job_id).await?)
+    Ok(host_client(&state, &host, &id)?.job_log(&owner, &name, job_id).await?)
 }
 
 #[derive(Serialize)]
@@ -358,7 +384,7 @@ pub async fn fork_info(state: State<'_, AppState>, id: String) -> CmdResult<Fork
     let handle = state.engine.get(&id)?;
     let has_upstream = handle.repo().remote_url("upstream").is_some();
     let HostedRepo { host, owner, name } = hosted(&state, handle.repo())?;
-    let repo = host_client(&state, &host)?.repo(&owner, &name).await?;
+    let repo = host_client(&state, &host, &id)?.repo(&owner, &name).await?;
     Ok(ForkInfo {
         is_fork: repo.fork,
         parent: repo.parent.as_ref().map(|p| p.full_name.clone()),
@@ -370,7 +396,7 @@ pub async fn fork_info(state: State<'_, AppState>, id: String) -> CmdResult<Fork
 #[tauri::command]
 pub async fn add_upstream(state: State<'_, AppState>, id: String, url: String) -> CmdResult<()> {
     let handle = state.engine.get(&id)?;
-    let cli = state.authenticate(handle.repo().cli(), Some(&url));
+    let cli = state.authenticate(handle.repo().cli(), Some(&url), Some(&id));
     Ok(state
         .engine
         .network_write(&id, move |_| {
@@ -417,7 +443,7 @@ pub fn spawn_checks_poller(app: AppHandle) {
             for id in state.engine.open_repos() {
                 let Ok(handle) = state.engine.get(&id) else { continue };
                 let Some(HostedRepo { host, owner, name }) = hosted_repo(&state, handle.repo(), None) else { continue };
-                let Some(gh) = state.client_for_host(&host) else { continue };
+                let Some(gh) = state.client_for(&host, Some(&id)) else { continue };
                 let Some(HeadState::Branch { id: sha, name: branch }) = handle.snapshot().head.clone() else {
                     continue;
                 };

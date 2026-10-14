@@ -20,6 +20,7 @@ pub struct Bootstrap {
     repositories: Vec<RepoRecord>,
     settings: Settings,
     account: Option<Account>,
+    accounts: Vec<Account>,
     last_repository: Option<String>,
     oauth_configured: bool,
     git_found: bool,
@@ -31,23 +32,28 @@ pub struct SharedState {
     repositories: Vec<RepoRecord>,
     settings: Settings,
     account: Option<Account>,
+    accounts: Vec<Account>,
 }
 
 #[tauri::command]
 pub fn shared_state(state: State<'_, AppState>) -> CmdResult<SharedState> {
+    let accounts = state.github_accounts();
     Ok(SharedState {
         repositories: state.cache.repositories()?,
         settings: state.settings.read().clone(),
-        account: state.account(),
+        account: accounts.first().cloned(),
+        accounts,
     })
 }
 
 #[tauri::command(async)]
 pub fn bootstrap(state: State<'_, AppState>) -> CmdResult<Bootstrap> {
+    let accounts = state.github_accounts();
     Ok(Bootstrap {
         repositories: state.cache.repositories()?,
         settings: state.settings.read().clone(),
-        account: state.account(),
+        account: accounts.first().cloned(),
+        accounts,
         last_repository: state.cache.app_state(LAST_REPO_KEY)?,
         oauth_configured: state.oauth.client_id.is_some(),
         git_found: blink_git::GitCli::new(".").run(&["--version"]).is_ok(),

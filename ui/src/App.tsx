@@ -38,6 +38,7 @@ import {
   refreshLfs,
   refreshSubmodules,
   refreshRepo,
+  refreshRepoAccount,
   reloadSharedState,
   reportError,
   run,
@@ -342,7 +343,7 @@ export function App() {
 
   createEffect(
     on(
-      () => [store.repo?.id, store.repo?.head?.type === "branch" ? store.repo.head.id : null, store.account?.login] as const,
+      () => [store.repo?.id, store.repo?.head?.type === "branch" ? store.repo.head.id : null, store.account?.login, store.repoAccount?.account?.login] as const,
       () => {
         refreshChecks();
         refreshCommitWarnings();
@@ -353,6 +354,12 @@ export function App() {
   );
 
   createEffect(on(() => [store.repo?.id, store.repo?.bisecting, store.repo?.generation] as const, refreshBisect));
+  createEffect(
+    on(
+      () => [store.repo?.id, store.accounts.map((a) => a.login).join(" ")] as const,
+      () => void refreshRepoAccount(),
+    ),
+  );
 
   onMount(async () => {
     window.addEventListener("keydown", onKey);

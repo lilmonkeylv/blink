@@ -1,3 +1,4 @@
+mod accounts;
 mod alerts;
 mod apply;
 mod commands;
@@ -188,6 +189,11 @@ pub fn run() {
             commands::auth::device_start,
             commands::auth::device_complete,
             commands::auth::sign_out,
+            commands::auth::token_sign_in,
+            commands::auth::github_accounts,
+            commands::auth::set_primary_account,
+            commands::auth::repo_account,
+            commands::auth::set_repo_account,
             commands::auth::revoke_url,
             commands::auth::enterprise_accounts,
             commands::auth::enterprise_sign_in,

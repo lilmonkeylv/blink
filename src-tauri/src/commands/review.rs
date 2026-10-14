@@ -46,7 +46,7 @@ fn target(state: &AppState, id: &str) -> CmdResult<HostedRepo> {
 #[tauri::command]
 pub async fn pull_request_review(state: State<'_, AppState>, id: String, number: u64) -> CmdResult<PullRequestReview> {
     let HostedRepo { host, owner, name } = target(&state, &id)?;
-    let gh = host_client(&state, &host)?;
+    let gh = host_client(&state, &host, &id)?;
     let (detail, files, comments, review_comments, reviews) = tokio::try_join!(
         gh.pull(&owner, &name, number),
         gh.pull_files(&owner, &name, number),
@@ -73,7 +73,7 @@ pub async fn submit_pull_request_review(
     comments: Vec<DraftComment>,
 ) -> CmdResult<Review> {
     let HostedRepo { host, owner, name } = target(&state, &id)?;
-    Ok(host_client(&state, &host)?.submit_review(&owner, &name, number, event, body.trim(), &comments).await?)
+    Ok(host_client(&state, &host, &id)?.submit_review(&owner, &name, number, event, body.trim(), &comments).await?)
 }
 
 #[tauri::command]
@@ -84,7 +84,7 @@ pub async fn comment_on_pull_request(
     body: String,
 ) -> CmdResult<IssueComment> {
     let HostedRepo { host, owner, name } = target(&state, &id)?;
-    Ok(host_client(&state, &host)?.add_issue_comment(&owner, &name, number, body.trim()).await?)
+    Ok(host_client(&state, &host, &id)?.add_issue_comment(&owner, &name, number, body.trim()).await?)
 }
 
 #[cfg(test)]

@@ -2,7 +2,7 @@ import { createEffect, createMemo, createResource, createSignal, For, type JSX, 
 import { createStore, unwrap } from "solid-js/store";
 import { api, isCommandError, type Settings } from "../api";
 import { ACCENT_PRESETS, normalizeHex, readableOn } from "../lib/appearance";
-import { applyTheme, notify, reportError, saveSettings, setStore, store } from "../store";
+import { applyTheme, notify, reloadSharedState, reportError, run, saveSettings, setStore, store } from "../store";
 import { Checkbox, Field, Select, type SelectOption } from "./Controls";
 import { Dialog } from "./Dialog";
 import { Avatar } from "./Avatar";
@@ -208,48 +208,69 @@ function EnterpriseAccounts() {
 }
 
 function AccountsTab() {
-  const signOut = async () => {
-    await api.signOut().catch(reportError);
-    setStore({ account: null, checks: null });
+  const signOut = async (login: string) => {
+    try {
+      await api.signOut(login);
+    } catch (e) {
+      return reportError(e, "Could not sign out");
+    }
+    await reloadSharedState().catch(reportError);
+    setStore("checks", null);
     const revoke = await api.revokeUrl().catch(() => null);
     notify(
       "info",
-      "Signed out of GitHub.com. Blink's token is deleted, but GitHub still lists the grant until you revoke it. Git keeps its own GitHub login for push and pull.",
+      `Signed out of @${login}. Blink's token is deleted, but GitHub still lists the grant until you revoke it. Git keeps its own GitHub login for push and pull.`,
       {
         sticky: true,
         action: revoke ? { label: "Revoke on GitHub", run: () => api.openExternal(revoke).catch(reportError) } : undefined,
       },
     );
   };
+  const makePrimary = async (login: string) => {
+    await run("Make primary", () => api.setPrimaryAccount(login));
+    await reloadSharedState().catch(reportError);
+  };
   return (
     <Pane>
       <h3 style={{ margin: 0 }}>GitHub.com</h3>
       <Show
-        when={store.account}
-        fallback={
-          <>
-            <span class="muted">Sign in to your GitHub.com account to access your repositories.</span>
-            <div>
-              <button class="btn primary" onClick={() => setStore("dialog", { type: "signIn" })}>
-                Sign in to GitHub.com
-              </button>
-            </div>
-          </>
-        }
+        when={store.accounts.length}
+        fallback={<span class="muted">Sign in to your GitHub.com account to access your repositories.</span>}
       >
-        {(a) => (
+        <span class="muted">
+          Repositories use the primary account unless another account has access or you pick one in Repository settings.
+        </span>
+      </Show>
+      <For each={store.accounts}>
+        {(a, i) => (
           <div class="summary-row">
-            <Avatar url={a().avatar_url} />
+            <Avatar url={a.avatar_url} />
             <div style={{ flex: 1 }}>
-              <div style={{ "font-weight": 600 }}>{a().name ?? a().login}</div>
-              <div class="muted">@{a().login}</div>
+              <div style={{ "font-weight": 600 }}>
+                {a.name ?? a.login}
+                <Show when={i() === 0 && store.accounts.length > 1}>
+                  {" "}
+                  <span class="badge">Primary</span>
+                </Show>
+              </div>
+              <div class="muted">@{a.login}</div>
             </div>
-            <button class="btn" onClick={signOut}>
+            <Show when={i() > 0}>
+              <button class="btn" onClick={() => makePrimary(a.login)}>
+                Make primary
+              </button>
+            </Show>
+            <button class="btn" onClick={() => signOut(a.login)}>
               Sign out
             </button>
           </div>
         )}
-      </Show>
+      </For>
+      <div>
+        <button class="btn" classList={{ primary: !store.accounts.length }} onClick={() => setStore("dialog", { type: "signIn" })}>
+          {store.accounts.length ? "Add another account" : "Sign in to GitHub.com"}
+        </button>
+      </div>
       <EnterpriseAccounts />
     </Pane>
   );

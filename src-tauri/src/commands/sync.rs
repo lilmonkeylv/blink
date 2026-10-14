@@ -49,6 +49,7 @@ pub async fn sync(
     no_verify: Option<bool>,
 ) -> CmdResult<()> {
     let handle = state.engine.get(&id)?;
+    crate::accounts::resolve(&state, &id, handle.repo()).await;
     let cli = state.git_cli(handle.repo());
     let (prune, pull_strategy) = {
         let settings = state.settings.read();
@@ -147,6 +148,7 @@ async fn fetch_one(state: &AppState, path: &str, prune: bool) -> CmdResult<Fetch
     };
     let fetched = handle.repo().has_remotes();
     if fetched {
+        crate::accounts::resolve(state, path, handle.repo()).await;
         let cli = state.git_cli(handle.repo());
         match registered {
             Some(_) => engine.fetch(path, move |_| cli.fetch(None, prune, |_| {})).await?,

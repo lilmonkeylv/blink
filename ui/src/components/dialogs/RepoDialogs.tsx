@@ -14,7 +14,7 @@ import {
 import { unwrap } from "solid-js/store";
 import { cloneUrl, isShorthand, repoNameFromUrl } from "../../lib/clone";
 import { fuzzyFilter } from "../../lib/fuzzy";
-import { applyTheme, currentBranch, notify, openRepo, reloadRepositories, reportError, run, setStore, store } from "../../store";
+import { applyTheme, currentBranch, notify, openRepo, refreshRepoAccount, reloadRepositories, reportError, run, setStore, store } from "../../store";
 import { Checkbox, Field, Select } from "../Controls";
 import { Dialog } from "../Dialog";
 import { Loading } from "../Loading";
@@ -143,9 +143,11 @@ export function CloneDialog(p: { url?: string }) {
   const [partial, setPartial] = createSignal(false);
   const [busy, setBusy] = createSignal(false);
   const [progress, setProgress] = createSignal<string>("");
+  const [account, setAccount] = createSignal(store.account?.login ?? "");
+  const accountOptions = createMemo(() => store.accounts.map((a) => ({ value: a.login, label: `@${a.login}` })));
   const [repos] = createResource(
-    () => tab() === "github" && !!store.account,
-    (load) => (load ? api.githubRepositories() : Promise.resolve([] as GithubRepo[])),
+    () => (tab() === "github" && store.account ? account() || store.account.login : null),
+    (login) => api.githubRepositories(login),
   );
   const filtered = createMemo(() => fuzzyFilter(repos() ?? [], query(), (r) => r.full_name));
   const source = () => (tab() === "github" ? picked()?.clone_url ?? "" : cloneUrl(url()));
@@ -160,7 +162,8 @@ export function CloneDialog(p: { url?: string }) {
     setBusy(true);
     localStorageSet("blink.cloneParent", parent());
     try {
-      const record = await api.clone(source(), parent(), name().trim(), shallow() ? 1 : undefined, partial());
+      const chosen = store.accounts.length > 1 ? account() || undefined : undefined;
+      const record = await api.clone(source(), parent(), name().trim(), shallow() ? 1 : undefined, partial(), chosen);
       await reloadRepositories();
       await openRepo(record.path);
       closeDialog();
@@ -249,6 +252,19 @@ export function CloneDialog(p: { url?: string }) {
           </Field>
         </Match>
       </Switch>
+      <Show when={store.accounts.length > 1}>
+        <Field label="Account" hint={tab() === "url" ? "Used for GitHub.com repositories." : undefined}>
+          <Select
+            value={account()}
+            options={accountOptions()}
+            onChange={(v) => {
+              setAccount(v);
+              setPicked(null);
+            }}
+            ariaLabel="Account"
+          />
+        </Field>
+      </Show>
       <Field label="Local path" hint={parent() && name() ? `${parent()}${sep(parent())}${name()}` : undefined}>
         <div class="summary-row">
           <input class="input" placeholder="Parent folder" value={parent()} onInput={(e) => setParent(e.currentTarget.value)} />
@@ -285,9 +301,13 @@ export function PublishDialog() {
   const [description, setDescription] = createSignal("");
   const [isPrivate, setPrivate] = createSignal(true);
   const [org, setOrg] = createSignal("");
-  const [orgs] = createResource(() => !!store.account, (yes) => (yes ? api.githubOrgs().catch(() => []) : Promise.resolve([])));
+  const publisher = () => store.repoAccount?.account ?? store.account;
+  const [orgs] = createResource(
+    () => publisher()?.login ?? null,
+    (login) => api.githubOrgs(login).catch(() => []),
+  );
   const owners = createMemo(() => [
-    { value: "", label: store.account?.login ?? "Personal account" },
+    { value: "", label: publisher()?.login ?? "Personal account" },
     ...(orgs() ?? []).map((o) => ({ value: o.login, label: o.login })),
   ]);
 
@@ -369,8 +389,14 @@ function CopyButton(p: { text: string; label: string }) {
 }
 
 export function RepoSettingsDialog() {
-  const [tab, setTab] = createSignal<"remote" | "ignore" | "config" | "sparse" | "fork">("remote");
+  const [tab, setTab] = createSignal<"remote" | "ignore" | "config" | "sparse" | "fork" | "account">("remote");
   const [sparseText, setSparseText] = createSignal<string | null>(null);
+  const initialAccount = store.repoAccount?.chosen ?? "";
+  const [account, setAccount] = createSignal(initialAccount);
+  const accountOptions = createMemo(() => {
+    const automatic = !store.repoAccount?.chosen && store.repoAccount?.account ? ` (@${store.repoAccount.account.login})` : "";
+    return [{ value: "", label: `Automatic${automatic}` }, ...store.accounts.map((a) => ({ value: a.login, label: `@${a.login}` }))];
+  });
   const [settings, setSettings] = createSignal<RepoSettings | null>(null);
   const [fork] = createResource(
     () => (store.repo && store.account ? store.repo.id : null),
@@ -391,7 +417,13 @@ export function RepoSettingsDialog() {
     const text = sparseText();
     const sparse = text === null ? null : text.split("\n").map((l) => l.trim()).filter(Boolean);
     const s = { ...current, sparse };
-    const ok = await run("Save repository settings", () => api.saveRepoSettings(store.repo!.id, s).then(() => true));
+    const id = store.repo.id;
+    const ok = await run("Save repository settings", async () => {
+      await api.saveRepoSettings(id, s);
+      if (account() !== initialAccount) await api.setRepoAccount(id, account() || null);
+      return true;
+    });
+    if (account() !== initialAccount) void refreshRepoAccount();
     if (ok) closeDialog();
   };
 
@@ -420,6 +452,7 @@ export function RepoSettingsDialog() {
           ["config", "Git config"],
           ["sparse", "Sparse checkout"],
           ...(fork()?.isFork ? ([["fork", "Fork behavior"]] as ["fork", string][]) : []),
+          ...(store.accounts.length > 1 ? ([["account", "Account"]] as ["account", string][]) : []),
         ]}
       />
       <Show when={settings()} fallback={<Loading />}>
@@ -495,6 +528,14 @@ export function RepoSettingsDialog() {
                   onInput={(e) => setSparseText(e.currentTarget.value)}
                 />
               </Show>
+            </Match>
+            <Match when={tab() === "account"}>
+              <Field
+                label="GitHub.com account"
+                hint="Used for push, pull and fetch over HTTPS and for pull requests and checks. Automatic picks the first account with access to this repository, or the primary account."
+              >
+                <Select value={account()} options={accountOptions()} onChange={setAccount} ariaLabel="GitHub.com account" />
+              </Field>
             </Match>
             <Match when={tab() === "fork"}>
               <p style={{ margin: 0 }}>

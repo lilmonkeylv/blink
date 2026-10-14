@@ -2817,6 +2817,14 @@ input::-ms-clear {
   border-bottom: 1px solid var(--border);
 }
 
+.toolbar-button.account {
+  flex: none;
+  justify-content: center;
+  padding: 0 12px;
+  border-right: 0;
+  border-left: 1px solid var(--toolbar-border);
+}
+
 .toolbar-button.app-menu {
   flex: none;
   width: 54px;

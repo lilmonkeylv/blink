@@ -6,6 +6,7 @@ import {
   type Account,
   type BisectState,
   type Bootstrap,
+  type RepoAccount,
   type ChecksSummary,
   type CommitWarnings,
   type ReleaseNote,
@@ -87,6 +88,8 @@ interface AppStore {
   repositories: RepoRecord[];
   settings: Settings | null;
   account: Account | null;
+  accounts: Account[];
+  repoAccount: RepoAccount | null;
   oauthConfigured: boolean;
   gitFound: boolean;
   repo: RepoView | null;
@@ -118,6 +121,8 @@ export const [store, setStore] = createStore<AppStore>({
   repositories: [],
   settings: null,
   account: null,
+  accounts: [],
+  repoAccount: null,
   oauthConfigured: false,
   gitFound: true,
   repo: null,
@@ -332,6 +337,7 @@ export async function bootstrap() {
     repositories: boot.repositories,
     settings: boot.settings,
     account: boot.account,
+    accounts: boot.accounts,
     oauthConfigured: boot.oauthConfigured,
     gitFound: boot.gitFound,
     ready: true,
@@ -450,7 +456,7 @@ export async function reloadRepositories() {
 
 export async function reloadSharedState() {
   const shared = await api.sharedState();
-  setStore({ repositories: shared.repositories, settings: shared.settings, account: shared.account });
+  setStore({ repositories: shared.repositories, settings: shared.settings, account: shared.account, accounts: shared.accounts });
   applyTheme();
 }
 
@@ -524,6 +530,28 @@ export async function refreshCommitWarnings() {
   } catch {
     setStore("commitWarnings", null);
   }
+}
+
+export function activeAccount(): Account | null {
+  return store.repoAccount?.account ?? store.account;
+}
+
+export async function refreshRepoAccount() {
+  const repo = store.repo;
+  if (!repo || !store.accounts.length) return setStore("repoAccount", null);
+  try {
+    const resolved = await api.repoAccount(repo.id);
+    if (store.repo?.id === repo.id) setStore("repoAccount", resolved);
+  } catch {
+    setStore("repoAccount", null);
+  }
+}
+
+export async function chooseRepoAccount(login: string | null) {
+  const repo = store.repo;
+  if (!repo) return;
+  await run("Choose account", () => api.setRepoAccount(repo.id, login));
+  await refreshRepoAccount();
 }
 
 export async function refreshChecks() {
