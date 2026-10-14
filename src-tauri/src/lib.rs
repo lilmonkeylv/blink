@@ -6,11 +6,12 @@ mod error;
 mod launch;
 mod logging;
 mod state;
+mod tray;
 mod view;
 mod watch;
 mod wire;
 
-use tauri::Manager;
+use tauri::{Manager, WindowEvent};
 
 use crate::state::AppState;
 
@@ -29,10 +30,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
             launch::handle_args(app, &argv, Some(cwd.as_ref()));
-            if let Some(window) = app.get_webview_window("main") {
-                let _ = window.unminimize();
-                let _ = window.set_focus();
-            }
+            tray::show_main(app);
         }))
         .plugin(tauri_plugin_deep_link::init())
         .plugin(tauri_plugin_dialog::init())
@@ -52,11 +50,21 @@ pub fn run() {
             }
             launch::handle_args(&handle, &std::env::args().collect::<Vec<_>>(), None);
             launch::register_deep_links(&handle);
+            tray::sync(&handle);
             commands::sync::spawn_background_fetch(handle.clone());
             commands::github::spawn_checks_poller(handle.clone());
             apply::spawn_cache_pruning(handle.clone());
             commands::updater::spawn_update_checks(handle);
             Ok(())
+        })
+        .on_window_event(|window, event| {
+            if let WindowEvent::CloseRequested { api, .. } = event
+                && window.label() == "main"
+                && tray::keeps_running(window.app_handle())
+            {
+                api.prevent_close();
+                let _ = window.hide();
+            }
         })
         .invoke_handler(tauri::generate_handler![
             commands::repo::bootstrap,
@@ -217,6 +225,14 @@ pub fn run() {
             commands::notes::open_external,
             launch::take_pending_launch,
         ])
-        .run(tauri::generate_context!())
-        .expect("error while running Blink");
+        .build(tauri::generate_context!())
+        .expect("error while running Blink")
+        .run(|app, event| {
+            #[cfg(target_os = "macos")]
+            if let tauri::RunEvent::Reopen { .. } = event {
+                tray::show_main(app);
+            }
+            #[cfg(not(target_os = "macos"))]
+            let _ = (app, event);
+        });
 }

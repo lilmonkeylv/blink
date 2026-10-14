@@ -323,6 +323,7 @@ export interface Settings {
     foregroundThreads: number | null;
     backgroundThreads: number | null;
     updateChannel: "stable" | "beta";
+    closeToTray: boolean;
   };
   accessibility: {
     underlineLinks: boolean;
@@ -629,6 +630,12 @@ export function onUpdateProgress(handler: (p: { downloaded: number; total: numbe
 
 export function onFetchAllProgress(handler: (row: FetchAllRow) => void): Promise<UnlistenFn> {
   return listen<FetchAllRow>("fetch-all-progress", (e) => handler(e.payload));
+}
+
+export type TrayAction = "fetchAll" | "checkForUpdates";
+
+export function onTrayAction(handler: (action: TrayAction) => void): Promise<UnlistenFn> {
+  return listen<TrayAction>("tray-action", (e) => handler(e.payload));
 }
 
 export function onLaunch(handler: () => void): Promise<UnlistenFn> {

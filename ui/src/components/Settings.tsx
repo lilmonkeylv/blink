@@ -557,6 +557,12 @@ export function SettingsDialog(p: { tab?: string }) {
                 ]}
                 onChange={(v) => set((x) => (x.advanced.backgroundFetchMinutes = Number(v)))}
               />
+              <Check
+                label="Keep running in the tray when the window is closed"
+                checked={s.advanced.closeToTray}
+                onChange={(v) => set((x) => (x.advanced.closeToTray = v))}
+                hint="Background fetch, checks and notifications keep going. Click the tray icon to bring Blink back, or quit from its menu."
+              />
               <Choice
                 label="File watcher"
                 value={s.advanced.watcher}

@@ -132,9 +132,9 @@ pub struct FetchAllRow {
     path: String,
     name: String,
     fetched: bool,
-    error: Option<String>,
+    pub(crate) error: Option<String>,
     ahead: usize,
-    behind: usize,
+    pub(crate) behind: usize,
     changes: usize,
 }
 

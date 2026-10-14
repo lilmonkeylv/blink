@@ -343,10 +343,11 @@ pub async fn desktop_repositories(state: State<'_, AppState>) -> CmdResult<Vec<R
 }
 
 #[tauri::command]
-pub fn remove_repository(state: State<'_, AppState>, path: String) -> CmdResult<()> {
+pub fn remove_repository(app: AppHandle, state: State<'_, AppState>, path: String) -> CmdResult<()> {
     stop_watcher(&state, &path);
     state.engine.close(&path);
     state.cache.remove_repository(&path)?;
+    crate::tray::sync(&app);
     Ok(())
 }
 
@@ -357,6 +358,7 @@ pub async fn open_repository(app: AppHandle, state: State<'_, AppState>, path: S
     ensure_watcher(&app, &state, &id)?;
     let _ = state.cache.touch_repository(&id);
     let _ = state.cache.put_app_state(LAST_REPO_KEY, &id);
+    crate::tray::sync(&app);
     let view = RepoView::from_snapshot(&id, handle.repo().name(), &snapshot);
     view.remember(&state.cache);
     Ok(view)
