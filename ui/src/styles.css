@@ -1360,6 +1360,37 @@ select.input {
   overflow: auto;
 }
 
+.signing-setup {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.signing-setup > .field {
+  align-self: stretch;
+}
+
+.signing-github {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+
+.signing-generate {
+  display: flex;
+  flex-direction: column;
+  align-self: stretch;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+}
+
 .toasts {
   position: fixed;
   right: 16px;
@@ -1833,6 +1864,20 @@ select.input {
   border-bottom: 1px solid var(--border);
   background: var(--del-bg);
   font-size: 12px;
+}
+
+.lfs-lock {
+  display: inline-flex;
+  color: var(--fg-muted);
+}
+
+.lfs-lock .icon {
+  width: 13px;
+  height: 13px;
+}
+
+.operation-bar.notice {
+  background: var(--hunk-bg);
 }
 
 .operation-bar.stacked {

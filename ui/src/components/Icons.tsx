@@ -19,6 +19,7 @@ import GitBranch from "lucide-solid/icons/git-branch";
 import GitPullRequest from "lucide-solid/icons/git-pull-request";
 import Info from "lucide-solid/icons/info";
 import ListFilter from "lucide-solid/icons/list-filter";
+import Lock from "lucide-solid/icons/lock";
 import Menu from "lucide-solid/icons/menu";
 import Pilcrow from "lucide-solid/icons/pilcrow";
 import Plus from "lucide-solid/icons/plus";
@@ -60,6 +61,7 @@ export const CopyIcon = icon(Copy);
 export const StashIcon = icon(Archive);
 export const ExternalIcon = icon(ExternalLink);
 export const FolderOpenIcon = icon(FolderOpen);
+export const LockIcon = icon(Lock);
 
 const statusGlyphs: Record<ChangeKind, Component<LucideProps>> = {
   added: SquarePlus,

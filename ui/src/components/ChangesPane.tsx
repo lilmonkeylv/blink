@@ -5,6 +5,7 @@ import { listRowHeight } from "../lib/appearance";
 import { fuzzyScore } from "../lib/fuzzy";
 import { COMMIT_KEYS } from "../lib/keymap";
 import { nextSelection } from "../lib/multiselect";
+import { missingSubmodules, missingSubmodulesMessage } from "../lib/submodules";
 import { checkState, diffSignature, setLines, toggleFile, toPayload, type CheckState, type FileSel } from "../lib/selection";
 import { EMPTY_DRAFT, type CommitDraft } from "../lib/drafts";
 import {
@@ -12,7 +13,10 @@ import {
   commitDraft,
   confirmUndoCommit,
   currentBranch,
+  lfsLockFor,
+  lockFile,
   notify,
+  openSubmodule,
   refreshRepo,
   reportError,
   run,
@@ -20,12 +24,14 @@ import {
   setStore,
   store,
   storeDiff,
+  unlockFile,
   updateDraft,
+  updateSubmodules,
 } from "../store";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { Checkbox } from "./Controls";
 import { DiffLayoutToggle, DiffView } from "./DiffView";
-import { ChevronDown, ChevronRight, StashIcon, StatusIcon, WhitespaceIcon } from "./Icons";
+import { ChevronDown, ChevronRight, LockIcon, StashIcon, StatusIcon, WhitespaceIcon } from "./Icons";
 import { ImageDiff, isImagePath } from "./ImageDiff";
 import { Loading } from "./Loading";
 import { VirtualList } from "./VirtualList";
@@ -158,6 +164,18 @@ export function ChangesList() {
       ]);
       return;
     }
+    const submodule = store.submodules.find((s) => s.path === f.path);
+    if (submodule) {
+      openContextMenu(e, [
+        { label: "Open as repository", run: () => openSubmodule(submodule.path), disabled: !submodule.initialized },
+        { label: "Update submodule", run: () => updateSubmodules([submodule.path]), disabled: !!store.sync },
+        "separator",
+        { label: "Discard changes…", run: () => discard([f.path]) },
+        { label: "Show in file manager", run: () => api.reveal(repo.id, f.path).catch(reportError) },
+        { label: "Copy path", run: () => navigator.clipboard.writeText(f.path) },
+      ]);
+      return;
+    }
     const ext = f.path.includes(".") ? f.path.slice(f.path.lastIndexOf(".")) : null;
     openContextMenu(
       e,
@@ -170,8 +188,19 @@ export function ChangesList() {
         { label: "Ignore file (add to .gitignore)", run: () => ignore(f.path), disabled: f.kind !== "untracked" },
         ...(ext ? [{ label: `Ignore all ${ext} files`, run: () => ignore(`*${ext}`) }] : []),
         "separator",
+        { label: "Track with LFS…", run: () => setStore("dialog", { type: "lfsTrack", path: f.path }), disabled: !store.lfs?.version },
+        ...lockItems(f.path),
+        "separator",
       ]),
     );
+  };
+
+  const lockItems = (path: string): MenuItem[] => {
+    if (!store.lfs?.locks) return [];
+    const lock = lfsLockFor(path);
+    if (!lock) return [{ label: "Lock file", run: () => lockFile(path) }];
+    const mine = !lock.owner || lock.owner === store.account?.login;
+    return [mine ? { label: "Unlock file", run: () => unlockFile(path) } : { label: `Force unlock (locked by ${lock.owner})…`, run: () => unlockFile(path, true) }];
   };
 
   const onKeyDown = (e: KeyboardEvent) => {
@@ -201,6 +230,7 @@ export function ChangesList() {
       <Show when={store.repo?.operation}>
         <OperationBar />
       </Show>
+      <SubmoduleBanner />
       <div class="list-header">
         <Show when={files().length}>
           <Checkbox checked={toCheck(allState())} onChange={toggleAll} ariaLabel="Include all changes" />
@@ -278,6 +308,13 @@ export function ChangesList() {
                 <span class="path">
                   <bdi>{f.oldPath ? `${f.oldPath} -> ${f.path}` : f.path}</bdi>
                 </span>
+                <Show when={lfsLockFor(f.path)}>
+                  {(lock) => (
+                    <span class="lfs-lock" data-tooltip={lock().owner ? `Locked by ${lock().owner}` : "Locked"}>
+                      <LockIcon />
+                    </span>
+                  )}
+                </Show>
                 <StatusIcon kind={f.kind} />
               </div>
             )}
@@ -303,6 +340,27 @@ function StashedChangesRow() {
         <span class="grow">Stashed changes ({count()})</span>
         <ChevronRight />
       </button>
+    </Show>
+  );
+}
+
+const [hiddenSubmoduleBanners, setHiddenSubmoduleBanners] = createSignal<Set<string>>(new Set());
+
+function SubmoduleBanner() {
+  const missing = () => missingSubmodules(store.submodules);
+  const key = () => `${store.repo?.id}:${store.repo?.head && "id" in store.repo.head ? store.repo.head.id : ""}`;
+  const hide = () => setHiddenSubmoduleBanners((keys) => new Set(keys).add(key()));
+  return (
+    <Show when={missing().length && !hiddenSubmoduleBanners().has(key())}>
+      <div class="operation-bar notice">
+        <span class="operation-status">{missingSubmodulesMessage(missing())}</span>
+        <button class="btn" onClick={hide}>
+          Not now
+        </button>
+        <button class="btn primary" disabled={!!store.sync} onClick={() => updateSubmodules()}>
+          Initialize
+        </button>
+      </div>
     </Show>
   );
 }

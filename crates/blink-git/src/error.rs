@@ -10,6 +10,8 @@ pub enum Error {
     Git(String),
     #[error("git {command} failed: {stderr}")]
     Cli { command: String, stderr: String, code: Option<i32> },
+    #[error("{tool} failed: {stderr}")]
+    Tool { tool: String, stderr: String },
     #[error("git executable not found")]
     GitNotFound,
     #[error("invalid argument: {0}")]

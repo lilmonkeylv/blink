@@ -35,6 +35,51 @@ pub struct Email {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SshSigningKey {
+    pub id: u64,
+    pub key: String,
+    #[serde(default)]
+    pub title: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GpgKeyEmail {
+    pub email: String,
+    pub verified: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GpgSubkey {
+    pub key_id: String,
+    #[serde(default)]
+    pub can_sign: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GpgKey {
+    pub id: u64,
+    pub key_id: String,
+    #[serde(default)]
+    pub can_sign: bool,
+    #[serde(default)]
+    pub emails: Vec<GpgKeyEmail>,
+    #[serde(default)]
+    pub subkeys: Vec<GpgSubkey>,
+}
+
+impl GpgKey {
+    pub fn matches(&self, key_id: &str) -> bool {
+        let wanted = key_id.trim_start_matches("0x");
+        let same = |id: &str| {
+            let n = id.len().min(wanted.len());
+            let tail = |s: &str| s.get(s.len() - n..).map(str::to_ascii_uppercase);
+            n >= 8 && tail(id).is_some() && tail(id) == tail(wanted)
+        };
+        same(&self.key_id) || self.subkeys.iter().any(|s| same(&s.key_id))
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Owner {
     pub login: String,
 }
@@ -461,6 +506,24 @@ impl Client {
         self.get_all("/user/orgs?per_page=100", 5).await
     }
 
+    pub async fn ssh_signing_keys(&self, login: &str) -> Result<Vec<SshSigningKey>> {
+        self.get_all(&format!("/users/{login}/ssh_signing_keys?per_page=100"), 3).await
+    }
+
+    pub async fn gpg_keys(&self, login: &str) -> Result<Vec<GpgKey>> {
+        self.get_all(&format!("/users/{login}/gpg_keys?per_page=100"), 3).await
+    }
+
+    pub async fn add_ssh_signing_key(&self, title: &str, key: &str) -> Result<SshSigningKey> {
+        let body = serde_json::json!({ "title": title, "key": key });
+        self.send(Method::POST, "/user/ssh_signing_keys", &body).await
+    }
+
+    pub async fn add_gpg_key(&self, name: &str, armored: &str) -> Result<GpgKey> {
+        let body = serde_json::json!({ "name": name, "armored_public_key": armored });
+        self.send(Method::POST, "/user/gpg_keys", &body).await
+    }
+
     pub async fn branch_protected(&self, owner: &str, name: &str, branch: &str) -> Result<bool> {
         #[derive(Deserialize)]
         struct Branch {
@@ -619,6 +682,22 @@ mod tests {
         assert_eq!(parse_remote("git@github.com:acme/app.git"), expect);
         assert_eq!(parse_remote("ssh://git@github.com/acme/app"), expect);
         assert_eq!(parse_remote("not a url"), None);
+    }
+
+    #[test]
+    fn matches_gpg_keys_by_long_or_short_id() {
+        let key: GpgKey = serde_json::from_str(
+            r#"{"id": 3, "key_id": "3AA5C34371567BD2", "can_sign": true,
+                "emails": [{"email": "mona@example.com", "verified": true}],
+                "subkeys": [{"key_id": "4A595D4C72EE49C7", "can_sign": false}]}"#,
+        )
+        .unwrap();
+        assert!(key.matches("3aa5c34371567bd2"));
+        assert!(key.matches("71567BD2"));
+        assert!(key.matches("0x4A595D4C72EE49C7"));
+        assert!(!key.matches("1111111111111111"));
+        assert!(!key.matches("BD2"));
+        assert!(key.emails[0].verified);
     }
 
     #[test]

@@ -17,6 +17,7 @@ const repo: RepoView = {
     { path: "ui/src/App.tsx", oldPath: null, staged: null, unstaged: "modified", kind: "modified" },
     { path: "docs/notes.md", oldPath: null, staged: null, unstaged: "untracked", kind: "untracked" },
     { path: "old.txt", oldPath: null, staged: null, unstaged: "deleted", kind: "deleted" },
+    { path: "vendor/libgit2", oldPath: null, staged: null, unstaged: "modified", kind: "modified" },
   ],
 };
 
@@ -276,6 +277,37 @@ export function installDevMock() {
             800,
           ),
         );
+      case "lfs_status":
+        return { version: "git-lfs/3.7.1 (GitHub; windows amd64; go 1.25.1)", usesLfs: true };
+      case "lfs_locks":
+        return [{ id: "1", path: "ui/src/App.tsx", owner: "hubot", lockedAt: new Date().toISOString() }];
+      case "lfs_pull":
+        return new Promise((resolve) => setTimeout(() => resolve(null), 1500));
+      case "submodules":
+        return [
+          { name: "vendor/libgit2", path: "vendor/libgit2", url: "https://github.com/libgit2/libgit2.git", initialized: true },
+          { name: "docs/theme", path: "docs/theme", url: "https://github.com/acme/theme.git", initialized: false },
+        ];
+      case "submodule_update":
+        return new Promise((resolve) => setTimeout(() => resolve(null), 1500));
+      case "open_submodule":
+        return { path: `${a.id}/${a.path}`, name: String(a.path).split("/").pop(), owner: null, remoteUrl: null, lastOpened: now };
+      case "signing_status":
+        return { format: "ssh", key: "C:/Users/dev/.ssh/id_ed25519.pub", scope: "global", enabled: true, gpgFound: false, sshKeygenFound: true };
+      case "signing_keys":
+        if (a.format === "gpg") throw { kind: "gpgNotFound", message: "GnuPG is not installed", detail: null };
+        return [
+          { format: "ssh", id: "C:/Users/dev/.ssh/id_ed25519.pub", label: "dev@example.com", detail: "id_ed25519.pub - ssh-ed25519" },
+          { format: "ssh", id: "C:/Users/dev/.ssh/work.pub", label: "work laptop", detail: "work.pub - ssh-rsa" },
+        ];
+      case "generate_ssh_signing_key":
+        return { format: "ssh", id: `C:/Users/dev/.ssh/${a.name}.pub`, label: a.comment, detail: `${a.name}.pub - ssh-ed25519` };
+      case "github_signing_key":
+        return { login: "octocat", added: String(a.key).endsWith("id_ed25519.pub"), verifiedEmails: [], unverifiedEmails: [] };
+      case "add_signing_key_to_github":
+        throw { kind: "missingScope", message: "Blink's GitHub sign-in isn't allowed to add signing keys. Copy the public key and add it on GitHub instead.", detail: "https://github.com/settings/keys" };
+      case "signing_public_key":
+        return "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBk0zU1Xv5xmOcBqNnkTAo5f1q2T8ZKcjzkQzRrH7Vbb";
       case "account":
         return null;
       case "plugin:event|listen":

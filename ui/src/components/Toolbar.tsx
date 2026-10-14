@@ -11,7 +11,9 @@ import {
   notify,
   openInNewTab,
   openInNewWindow,
+  initSubmodules,
   openRepo,
+  pullLfs,
   reloadRepositories,
   reportError,
   run,
@@ -19,7 +21,9 @@ import {
   shortcut,
   showWhatsNew,
   store,
+  syncSubmodules,
   undoLastOperation,
+  updateSubmodules,
 } from "../store";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { customTitleBar, WindowControls } from "./WindowControls";
@@ -481,6 +485,16 @@ export function appMenu(): MenuItem[] {
         { label: "Worktrees…", run: () => setStore("dialog", { type: "worktrees" }), disabled: !repo },
         { label: "Apply patch…", run: () => setStore("dialog", { type: "applyPatch" }), disabled: !repo },
         { label: "Undo history…", run: () => setStore("dialog", { type: "undoHistory" }), disabled: !repo },
+        {
+          label: "Submodules",
+          disabled: !repo || !store.submodules.length,
+          items: [
+            { label: "Initialize", run: initSubmodules },
+            { label: "Update (recursive)", run: () => updateSubmodules(), disabled: !!store.sync },
+            { label: "Sync URLs", run: syncSubmodules },
+          ],
+        },
+        { label: "Pull LFS files", run: pullLfs, disabled: !repo || !store.lfs?.version || !store.lfs.usesLfs || !!store.sync },
         "separator",
         { label: "Repository settings…", run: () => setStore("dialog", { type: "repoSettings" }), disabled: !repo },
       ],
@@ -611,7 +625,7 @@ export function Toolbar() {
             <SyncIcon />
           )}
           <span class="labels">
-            <span class="value">{store.sync ? `${store.sync.action[0].toUpperCase()}${store.sync.action.slice(1)}ing…` : state().label}</span>
+            <span class="value">{store.sync ? (store.sync.label ?? `${store.sync.action[0].toUpperCase()}${store.sync.action.slice(1)}ing`) + "…" : state().label}</span>
             <span class="title">
               {store.sync
                 ? syncPhase()

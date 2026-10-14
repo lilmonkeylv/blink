@@ -48,7 +48,7 @@ pub struct GitCli {
     ssh_batch_mode: bool,
 }
 
-const NETWORK_COMMANDS: &[&str] = &["fetch", "pull", "push", "clone", "ls-remote"];
+const NETWORK_COMMANDS: &[&str] = &["fetch", "pull", "push", "clone", "ls-remote", "submodule", "lfs"];
 const STALL_GUARD: [&str; 4] = ["-c", "http.lowSpeedLimit=1000", "-c", "http.lowSpeedTime=60"];
 const SSH_KEEPALIVE: &str = "-o ServerAliveInterval=15 -o ServerAliveCountMax=4";
 
