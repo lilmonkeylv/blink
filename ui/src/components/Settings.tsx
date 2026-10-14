@@ -7,6 +7,7 @@ import { Checkbox, Field, Select, type SelectOption } from "./Controls";
 import { Dialog } from "./Dialog";
 import { Avatar } from "./Avatar";
 import { CheckIcon } from "./Icons";
+import { SigningSetup } from "./SigningSetup";
 
 const TABS = ["Accounts", "Integrations", "Git", "Appearance", "Notifications", "Prompts", "Advanced", "Accessibility"] as const;
 type TabName = (typeof TABS)[number];
@@ -353,6 +354,7 @@ function GitTab(p: { s: Settings; set: Update }) {
         hint="A GPG key ID, or the path to an SSH key when gpg.format is ssh."
       />
       <GitExecutableField value={p.s.git.executablePath ?? ""} onChange={(v) => p.set((s) => (s.git.executablePath = v.trim() ? v : null))} />
+      <SigningSetup />
     </Pane>
   );
 }

@@ -47,6 +47,9 @@ impl From<blink_git::Error> for CommandError {
             blink_git::Error::Cli { command, stderr, .. } => {
                 Self { kind: "git", message: format!("git {command} failed"), detail: Some(stderr) }
             }
+            blink_git::Error::Tool { tool, stderr } => {
+                Self { kind: "tool", message: format!("{tool} failed"), detail: Some(blink_git::redact(&stderr)) }
+            }
             blink_git::Error::NotARepository(path) => Self::new("notARepository", path),
             blink_git::Error::GitNotFound => Self::new("gitNotFound", "Git is not installed or not on PATH"),
             blink_git::Error::InvalidArgument(message) => Self::new("invalidArgument", message),

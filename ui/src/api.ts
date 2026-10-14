@@ -517,6 +517,32 @@ export interface Tool {
   name: string;
 }
 
+export type SigningFormat = "ssh" | "gpg";
+export type ConfigScope = "global" | "local";
+
+export interface SigningKey {
+  format: SigningFormat;
+  id: string;
+  label: string;
+  detail: string;
+}
+
+export interface SigningStatus {
+  format: SigningFormat | null;
+  key: string | null;
+  scope: string | null;
+  enabled: boolean;
+  gpgFound: boolean;
+  sshKeygenFound: boolean;
+}
+
+export interface GithubSigningKey {
+  login: string;
+  added: boolean;
+  verifiedEmails: string[];
+  unverifiedEmails: string[];
+}
+
 export type Launch = { type: "open"; path: string; fromLink: boolean } | { type: "clone"; url: string };
 
 export function onChecksChanged(handler: (e: { repo: string; summary: ChecksSummary }) => void): Promise<UnlistenFn> {
@@ -753,6 +779,16 @@ export const api = {
   enterpriseAccounts: () => invoke<EnterpriseAccount[]>("enterprise_accounts"),
   enterpriseSignIn: (host: string, token: string) => invokeShared<EnterpriseAccount>("enterprise_sign_in", { host, token }),
   enterpriseSignOut: (host: string) => invokeShared<void>("enterprise_sign_out", { host }),
+
+  signingStatus: (id?: string) => invoke<SigningStatus>("signing_status", { id }),
+  signingKeys: (format: SigningFormat) => invoke<SigningKey[]>("signing_keys", { format }),
+  generateSshSigningKey: (name: string, comment: string) => invoke<SigningKey>("generate_ssh_signing_key", { name, comment }),
+  configureSigning: (scope: ConfigScope, format: SigningFormat, key: string, id?: string) =>
+    invoke<void>("configure_signing", { id, scope, format, key }),
+  signingPublicKey: (format: SigningFormat, key: string) => invoke<string>("signing_public_key", { format, key }),
+  githubSigningKey: (format: SigningFormat, key: string) => invoke<GithubSigningKey | null>("github_signing_key", { format, key }),
+  addSigningKeyToGithub: (format: SigningFormat, key: string) =>
+    invoke<GithubSigningKey>("add_signing_key_to_github", { format, key }),
 
   getSettings: () => invoke<Settings>("get_settings"),
   avatar: (url: string) => invoke<string | null>("avatar", { url }),

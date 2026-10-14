@@ -10,8 +10,8 @@ mod review;
 
 pub use activity::{PullActivity, PullBrief};
 pub use api::{
-    Account, CheckApp, CheckRun, CheckState, ChecksSummary, Client, CommitStatus, Email, Job, JobStep, Org,
-    PullRequest, Repo, Verification, parse_remote, summarize_checks,
+    Account, CheckApp, CheckRun, CheckState, ChecksSummary, Client, CommitStatus, Email, GpgKey, GpgKeyEmail,
+    GpgSubkey, Job, JobStep, Org, PullRequest, Repo, SshSigningKey, Verification, parse_remote, summarize_checks,
 };
 pub use device::{DeviceCode, DevicePoll};
 pub use error::{Error, Result};
