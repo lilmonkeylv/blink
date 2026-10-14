@@ -27,6 +27,11 @@ pub fn open_logs_folder(app: AppHandle, state: State<'_, AppState>) -> CmdResult
     app.opener().open_path(dir.to_string_lossy(), None::<&str>).map_err(|e| CommandError::new("opener", e.to_string()))
 }
 
+#[tauri::command]
+pub fn take_crash_report(state: State<'_, AppState>) -> Option<String> {
+    crate::crash::take_pending(&state.paths.log_dir).map(|p| p.to_string_lossy().into_owned())
+}
+
 const KEYMAP_TEMPLATE: &str = "# Blink keyboard shortcuts. Uncomment a line to change it, or set it to \"\" to turn it off.\n# Changes apply when you switch back to Blink.\n[bindings]\n# \"sync.push\" = \"Ctrl+P\"\n# \"sync.pull\" = \"Ctrl+Shift+P\"\n# \"repo.list\" = \"Ctrl+T\"\n# \"palette\" = \"Ctrl+K\"\n";
 
 #[derive(Deserialize, Default)]

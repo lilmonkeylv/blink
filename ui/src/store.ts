@@ -307,6 +307,16 @@ export async function bootstrap() {
   });
   applyTheme();
   setTimeout(() => document.documentElement.classList.remove("preload"), 60);
+  api
+    .takeCrashReport()
+    .then(
+      (report) =>
+        report &&
+        notify("error", "Blink closed unexpectedly last time. A crash report was saved to the logs folder.", {
+          action: { label: "Open logs folder", run: () => api.openLogsFolder().catch(reportError) },
+        }),
+    )
+    .catch(() => {});
   const known = new Set(boot.repositories.map((r) => r.path));
   if (!windowRepo) setStore("tabs", savedTabs().filter((t) => known.has(t)));
   const last = windowRepo ?? boot.lastRepository ?? boot.repositories[0]?.path;

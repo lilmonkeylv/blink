@@ -1,4 +1,5 @@
 mod commands;
+mod crash;
 mod error;
 mod launch;
 mod logging;
@@ -14,6 +15,9 @@ use crate::state::AppState;
 pub fn run() {
     let paths = blink_store::AppPaths::system().ok();
     logging::init(paths.as_ref().map(|p| p.log_dir.as_path()));
+    if let Some(paths) = &paths {
+        crash::install(&paths.log_dir);
+    }
 
     tauri::Builder::default()
         .plugin(tauri_plugin_single_instance::init(|app, argv, cwd| {
@@ -166,6 +170,7 @@ pub fn run() {
             commands::settings::get_settings,
             commands::settings::save_settings,
             commands::settings::open_logs_folder,
+            commands::settings::take_crash_report,
             commands::settings::keymap,
             commands::settings::open_keymap,
             commands::settings::open_devtools,

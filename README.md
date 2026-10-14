@@ -73,7 +73,7 @@ Measured on a mid-range laptop. GitHub Desktop figures are approximate baselines
 | Open history, 500k commits    | several seconds | < 50 ms first page |
 | Switch repository             | 1-3 s           | < 150 ms           |
 
-Benchmarks run in CI on every pull request; a regression over 10% fails the build.
+These are targets, not measurements yet. Run `cargo bench` to check them locally; benchmarks aren't gated in CI.
 
 ## Architecture
 
@@ -145,7 +145,7 @@ blink/
 
 ### Installing on Linux
 
-Releases ship an `.AppImage`, a `.deb` and an `.rpm`. The `.deb` and `.rpm` pull in `git` as a dependency and register the `blink://` link handler, and they're updated through your package manager. The AppImage updates itself like the Windows and macOS builds; just make sure `git` is on your `PATH`.
+Published releases are Windows only for now, so on Linux build from source with `bun tauri build`. It produces an `.AppImage`, a `.deb` and an `.rpm`. The `.deb` and `.rpm` pull in `git` as a dependency and register the `blink://` link handler, and they're updated through your package manager. The AppImage updates itself like the Windows and macOS builds; just make sure `git` is on your `PATH`.
 
 #### Flatpak
 
@@ -189,7 +189,19 @@ git push origin master v0.2.0
 
 `version:set` also regenerates `CHANGELOG.md` from the commit history with [git-cliff](https://git-cliff.org), so write commits in [conventional](https://www.conventionalcommits.org) style (`feat:`, `fix:`, `perf:`). `ci:`, `chore:`, `build:` and `test:` commits are left out of the notes.
 
-Pushing a `v*` tag runs `.github/workflows/release.yml`. It builds the Windows, macOS and Linux installers and attaches them to a draft release. Check it over and publish it from the Releases page. Tags with a suffix like `-beta.1` or `-rc.1` are marked as prereleases. To rebuild an existing tag, run the workflow by hand from the Actions tab.
+With GitHub Actions enabled, pushing a `v*` tag runs `.github/workflows/release.yml`, which builds the Windows, macOS and Linux installers and attaches them to a draft release. Tags with a suffix like `-beta.1` or `-rc.1` are marked as prereleases.
+
+Actions is currently turned off for this repository, so releases are built on a Windows machine instead:
+
+```bash
+bun tauri build --bundles nsis,msi --config '{"bundle":{"windows":{"wix":{"version":"0.1.0.7"}}}}'
+TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" bun tauri signer sign -f ~/.tauri/blink.key target/release/bundle/nsis/Blink_<version>_x64-setup.exe
+gh release create v<version> --prerelease target/release/bundle/nsis/*.exe target/release/bundle/msi/*.msi
+```
+
+MSI versions have to be numeric, which is why prereleases pass a four part WiX version.
+
+`.github/workflows/ci.yml` runs formatting, clippy, the Rust and UI tests and the UI build on every pull request once Actions is on. Until then, run the commands under [Tests and benchmarks](#tests-and-benchmarks) before merging.
 
 #### Update channels
 
@@ -212,7 +224,7 @@ Windows installers are not code signed, so SmartScreen may warn the first time y
 
 ### macOS signing and notarization
 
-macOS releases are a universal `.dmg` (Apple Silicon and Intel). With an Apple Developer account, add these secrets and the workflow signs with your Developer ID and notarizes:
+The release workflow builds macOS as a universal `.dmg` (Apple Silicon and Intel). With an Apple Developer account, add these secrets and it signs with your Developer ID and notarizes:
 
 | Secret | Value |
 | --- | --- |
@@ -289,7 +301,7 @@ Blink does not collect telemetry. It talks to other systems only in these cases:
 - **Your Git remotes**, when you fetch, pull, push or clone, and during background fetch if it is turned on in Settings
 - **Update checks**, a request to `github.com` for the latest release a few hours apart
 
-There are no usage statistics or crash reports. The full [privacy policy](PRIVACY.md) lists what's stored on your computer and what's sent where.
+There are no usage statistics, and crash reports are never sent anywhere. If Blink crashes it writes a `crash-*.txt` file to its logs folder and points you to it on the next launch. The full [privacy policy](PRIVACY.md) lists what's stored on your computer and what's sent where.
 
 ## License
 
