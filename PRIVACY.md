@@ -18,6 +18,7 @@ Everything below stays on your machine. None of it is uploaded anywhere by Blink
 | GitHub access tokens | Let Blink call the GitHub API and push on your behalf. One for github.com and one per GitHub Enterprise server you add | Your operating system's credential store (Windows Credential Manager, macOS Keychain, or the Secret Service on Linux) under `dev.blink.app`. Never written to a file |
 | GitHub Enterprise accounts | The server address and your username, ID and display name on each server you add | `cache.sqlite3` in the data folder |
 | Logs | Errors and warnings to help you debug problems. They can contain file paths, branch names and Git output | `logs/blink.log` in the data folder |
+| Crash reports | Written only if Blink crashes: the version, the panic message and a backtrace, with tokens and passwords removed. Never sent anywhere | `logs/crash-*.txt` in the data folder |
 
 Folder locations:
 

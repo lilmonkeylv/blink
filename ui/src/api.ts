@@ -726,6 +726,7 @@ export const api = {
   openInEditor: (id: string, path?: string) => invoke<void>("open_in_editor", { id, path }),
   openInShell: (id: string, path?: string) => invoke<void>("open_in_shell", { id, path }),
   openLogsFolder: () => invoke<void>("open_logs_folder"),
+  takeCrashReport: () => invoke<string | null>("take_crash_report"),
   openDevtools: () => invoke<void>("open_devtools"),
   checkForUpdate: () => invoke<UpdateInfo | null>("check_for_update"),
   installUpdate: () => invoke<void>("install_update"),
