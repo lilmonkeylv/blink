@@ -1,8 +1,10 @@
 pub mod auth;
+pub mod bisect;
 pub mod branches;
 pub mod changes;
 pub mod github;
 pub mod history;
+pub mod hooks;
 pub mod images;
 pub mod inspect;
 pub mod integrations;

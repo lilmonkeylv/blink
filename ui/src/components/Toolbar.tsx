@@ -1,11 +1,12 @@
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
-import { api, type Branch, type PullRequest, type RepoRecord, type SyncAction } from "../api";
+import { api, isCommandError, type Branch, type PullRequest, type RepoRecord, type SyncAction } from "../api";
 import { fuzzyFilter } from "../lib/fuzzy";
 import { relativeTime } from "../lib/time";
 import {
   addRepository,
   checkForUpdates,
+  clearFailedHooks,
   closeRepoTab,
   currentBranch,
   notify,
@@ -437,12 +438,21 @@ function syncState() {
   return { action: "fetch" as SyncAction, label: "Fetch origin", kind: "fetch" as const };
 }
 
-export async function doSync(action?: SyncAction, force = false) {
+async function pushWithoutHooks(force: boolean) {
+  const ok = await ask("Push without running the pre-push hook? Whatever it checks will be skipped for this push.", {
+    title: "Push without hooks",
+    kind: "warning",
+    okLabel: "Push without hooks",
+  });
+  if (ok) await doSync("push", force, true);
+}
+
+export async function doSync(action?: SyncAction, force = false, noVerify = false) {
   const repo = store.repo;
   if (!repo || store.sync) return;
   if (!action && syncState().kind === "publish") return setStore("dialog", { type: "publish" });
   const act = action ?? syncState().action;
-  if (force && store.settings?.prompts.forcePush !== false) {
+  if (force && !noVerify && store.settings?.prompts.forcePush !== false) {
     const ok = await ask("Force pushing rewrites history on the remote. Others who pulled this branch may lose work.", {
       title: "Force push",
       kind: "warning",
@@ -452,10 +462,14 @@ export async function doSync(action?: SyncAction, force = false) {
   }
   setStore("sync", { action: act, progress: null });
   try {
-    await api.sync(repo.id, act, force);
+    await api.sync(repo.id, act, force, false, noVerify);
+    if (act === "push") clearFailedHooks("push");
   } catch (e) {
     const detail = typeof e === "object" && e && "detail" in e ? String((e as { detail: unknown }).detail ?? "") : "";
-    if (act === "push" && /rejected|non-fast-forward|fetch first/i.test(detail)) {
+    if (act === "push" && isCommandError(e) && e.kind === "hookFailed" && !noVerify) {
+      setStore("hookRetry", { label: "Push without hooks", run: () => void pushWithoutHooks(force) });
+      notify("error", `${e.message}, so nothing was pushed. See the hook output in the sidebar.`);
+    } else if (act === "push" && /rejected|non-fast-forward|fetch first/i.test(detail)) {
       await message("The remote has commits you don't have. Pull first, then push.", { title: "Push rejected", kind: "warning" });
     } else {
       reportError(e, `${act[0].toUpperCase()}${act.slice(1)} failed`);
@@ -543,6 +557,7 @@ export function Toolbar() {
   const syncPhase = createMemo<string>((previous) => {
     const progress = store.sync?.progress;
     if (!store.sync) return "";
+    if (store.hookRun?.action === "push" && store.hookRun.status === "running") return "Running pre-push hook";
     return progress && progress.percent !== null ? `${progress.phase} ${progress.percent}%` : previous;
   }, "");
   const state = () => syncState();

@@ -68,6 +68,7 @@ impl RepoHandle {
                     ahead_behind,
                     operation: repo.is_operation_in_progress(),
                     has_remote: repo.has_remotes(),
+                    bisecting: blink_git::is_bisecting(repo.git_dir()),
                     taken_at: Instant::now(),
                 })
             })

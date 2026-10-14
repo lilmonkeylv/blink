@@ -1900,6 +1900,178 @@ select.input {
   margin-left: auto;
 }
 
+.bisect-bar {
+  background: var(--hunk-bg);
+}
+
+.history-row.bisect-bad {
+  box-shadow: inset 3px 0 0 var(--del-fg);
+}
+
+.history-row.bisect-good {
+  box-shadow: inset 3px 0 0 var(--add-fg);
+}
+
+.history-row.bisect-skipped {
+  box-shadow: inset 3px 0 0 var(--fg-muted);
+}
+
+.history-row.bisect-current {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.bisect-tag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 0 5px;
+  border: 1px solid currentColor;
+  border-radius: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 15px;
+}
+
+.bisect-tag.bad {
+  color: var(--del-fg);
+}
+
+.bisect-tag.good {
+  color: var(--add-fg);
+}
+
+.bisect-tag.current {
+  color: var(--accent);
+}
+
+.list:focus .row.selected .bisect-tag {
+  color: var(--fg-selected-focus);
+}
+
+.merge-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 20px;
+}
+
+.merge-preview-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.merge-preview-status.ok .icon {
+  color: var(--add-fg);
+}
+
+.merge-preview-status.warn {
+  color: var(--conflict);
+}
+
+.merge-preview-status.info .icon {
+  color: var(--fg-muted);
+}
+
+.merge-preview-files {
+  margin: 0;
+  padding: 6px 8px;
+  max-height: 120px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  user-select: text;
+}
+
+.merge-preview-files li {
+  list-style: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hook-panel {
+  --tone: var(--accent);
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border);
+  box-shadow: inset 3px 0 0 var(--tone);
+  background: var(--bg-subtle);
+  font-size: 12px;
+}
+
+.hook-panel.passed {
+  --tone: var(--add-fg);
+}
+
+.hook-panel.failed {
+  --tone: var(--del-fg);
+  background: var(--del-bg);
+}
+
+.hook-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px 2px 4px;
+}
+
+.hook-toggle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  text-align: left;
+}
+
+.hook-toggle:hover {
+  background: var(--bg-hover);
+}
+
+.hook-toggle > .icon:first-child,
+.hook-toggle > .spinner {
+  color: var(--tone);
+}
+
+.hook-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hook-output {
+  margin: 0 10px 8px;
+  padding: 6px 8px;
+  max-height: 180px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+}
+
+.hook-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 0 10px 8px;
+}
+
 .palette {
   align-self: start;
   margin-top: 12vh;

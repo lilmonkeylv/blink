@@ -1,5 +1,6 @@
+import { emit } from "@tauri-apps/api/event";
 import { mockIPC } from "@tauri-apps/api/mocks";
-import type { Bootstrap, CommitSummary, FileDiff, RepoView } from "./api";
+import type { Bootstrap, CommitSummary, FileDiff, HookAction, HookEvent, RepoView } from "./api";
 
 const now = Math.floor(Date.now() / 1000);
 
@@ -12,6 +13,7 @@ const repo: RepoView = {
   conflicted: 0,
   operation: null,
   hasRemote: true,
+  bisecting: false,
   files: [
     { path: "crates/blink-core/src/engine.rs", oldPath: null, staged: null, unstaged: "modified", kind: "modified" },
     { path: "ui/src/App.tsx", oldPath: null, staged: null, unstaged: "modified", kind: "modified" },
@@ -71,6 +73,49 @@ const history: CommitSummary[] = Array.from({ length: 60 }, (_, i) => ({
 }));
 
 const opened = new Set<string>();
+let bisect: { bad: string; good: string[]; skipped: string[]; current: string } | null = null;
+
+function bisectView() {
+  if (!bisect) return null;
+  const at = (sha: string) => history.findIndex((c) => c.id === sha);
+  const bad = at(bisect.bad);
+  const good = Math.min(...bisect.good.map(at), history.length);
+  const span = good - bad;
+  const found = bisect.good.length > 0 && span <= 1;
+  const current = history[at(bisect.current)];
+  return {
+    ...bisect,
+    good: [...bisect.good],
+    skipped: [...bisect.skipped],
+    currentSummary: current?.summary ?? null,
+    revisionsLeft: bisect.good.length && !found ? Math.max(0, Math.floor(span / 2) - 1) : null,
+    stepsLeft: bisect.good.length && !found ? Math.max(1, Math.ceil(Math.log2(Math.max(span, 2))) - 1) : null,
+    firstBad: found ? bisect.bad : null,
+    firstBadSummary: found ? history[bad].summary : null,
+  };
+}
+
+function moveBisect() {
+  if (!bisect || !bisect.good.length) return;
+  const at = (sha: string) => history.findIndex((c) => c.id === sha);
+  const bad = at(bisect.bad);
+  const good = Math.min(...bisect.good.map(at));
+  if (good - bad > 1) bisect.current = history[bad + Math.floor((good - bad) / 2)].id;
+}
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
+async function mockHooks(id: string, action: HookAction, hooks: string[], lines: string[], failing: string | null) {
+  const send = (event: HookEvent) => emit("hook-output", { repo: id, action, event });
+  await send({ type: "started", hooks });
+  for (const line of lines) {
+    await sleep(160);
+    await send({ type: "output", line });
+  }
+  await sleep(200);
+  await send({ type: "finished", results: hooks.map((name) => ({ name, code: name === failing ? 1 : 0 })) });
+  if (failing) throw { kind: "hookFailed", message: `The ${failing} hook failed`, detail: lines.join("\n") };
+}
 
 let tags: [string, string][] = [
   ["v0.2.0", history[0].id],
@@ -248,7 +293,47 @@ export function installDevMock() {
           reviewComments: [{ id: 2, path: "crates/blink-core/src/engine.rs", line: 12, original_line: 12, side: "RIGHT", body: "Why 256?", user: { login: "hubot" }, created_at: new Date().toISOString(), in_reply_to_id: null }],
           reviews: [],
         };
+      case "bisect_state":
+        return bisectView();
+      case "bisect_start":
+        bisect = { bad: String(a.bad), good: a.good ? [String(a.good)] : [], skipped: [], current: repo.head?.type === "branch" ? history[0].id : "" };
+        repo.bisecting = true;
+        moveBisect();
+        return bisectView();
+      case "bisect_mark": {
+        if (!bisect) return null;
+        const sha = String(a.sha ?? bisect.current);
+        if (a.mark === "good") bisect.good.push(sha);
+        else if (a.mark === "bad") bisect.bad = sha;
+        else bisect.skipped.push(sha);
+        moveBisect();
+        if (a.mark === "skip" && bisect.current === sha) {
+          const next = history[history.findIndex((c) => c.id === sha) + 1];
+          if (next) bisect.current = next.id;
+        }
+        return bisectView();
+      }
+      case "bisect_reset":
+        bisect = null;
+        repo.bisecting = false;
+        return null;
+      case "predict_merge":
+        return sleep(250).then(() => {
+          if (a.branch === "feature/watcher") return { type: "conflicts", files: ["crates/blink-watch/src/lib.rs", "ui/src/App.tsx"] };
+          if (a.branch === "origin/release") return { type: "upToDate" };
+          return { type: "clean" };
+        });
+      case "commit": {
+        if (a.noVerify) return history[0].id;
+        const failing = String((a.message as { summary?: string })?.summary ?? "").includes("fail-hook") ? "pre-commit" : null;
+        const lines = ["> lint-staged", "Running tasks for staged files...", "eslint --fix ui/src/App.tsx"];
+        if (failing) lines.push("ui/src/App.tsx:12:7  error  'unused' is assigned a value but never used", "1 problem (1 error, 0 warnings)");
+        return mockHooks(String(a.id), "commit", ["pre-commit", "commit-msg"], lines, failing).then(() => history[0].id);
+      }
       case "sync":
+        if (a.action === "push" && !a.noVerify) {
+          return mockHooks(String(a.id), "push", ["pre-push"], ["running cargo test", "test result: ok. 214 passed"], null).then(() => sleep(1000)).then(() => null);
+        }
         return new Promise((resolve) => setTimeout(() => resolve(null), 1500));
       case "whats_new":
         return [];
@@ -310,12 +395,10 @@ export function installDevMock() {
         return "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBk0zU1Xv5xmOcBqNnkTAo5f1q2T8ZKcjzkQzRrH7Vbb";
       case "account":
         return null;
-      case "plugin:event|listen":
-        return 1;
       default:
         return null;
     }
-  });
+  }, { shouldMockEvents: true });
 }
 
 function defaultSettings() {

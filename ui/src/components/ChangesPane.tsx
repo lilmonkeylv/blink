@@ -1,5 +1,5 @@
 import { createEffect, createMemo, createResource, createSignal, on, Show } from "solid-js";
-import { api, type FileChange, type FileDiff, type FileSelection } from "../api";
+import { api, isCommandError, type FileChange, type FileDiff, type FileSelection } from "../api";
 import { recentMessages, rememberMessage } from "../lib/messages";
 import { listRowHeight } from "../lib/appearance";
 import { fuzzyScore } from "../lib/fuzzy";
@@ -10,6 +10,7 @@ import { checkState, diffSignature, setLines, toggleFile, toPayload, type CheckS
 import { EMPTY_DRAFT, type CommitDraft } from "../lib/drafts";
 import {
   cachedDiff,
+  clearFailedHooks,
   commitDraft,
   confirmUndoCommit,
   currentBranch,
@@ -497,7 +498,16 @@ function CommitBox() {
     return out;
   };
 
-  const commit = async () => {
+  const commitWithoutHooks = async () => {
+    const ok = await ask("Commit without running the pre-commit and commit-msg hooks? Whatever they check will be skipped for this commit.", {
+      title: "Commit without hooks",
+      kind: "warning",
+      okLabel: "Commit without hooks",
+    });
+    if (ok) await commit(true);
+  };
+
+  const commit = async (noVerify = false) => {
     const repo = store.repo;
     if (!repo || !canCommit()) return;
     const { summary, description, coAuthors, amend: amended } = commitDraft(repo.id);
@@ -509,7 +519,8 @@ function CommitBox() {
         .split(/[\n,]/)
         .map((s) => s.trim())
         .filter(Boolean);
-      await api.commit(repo.id, files, { summary, description, coAuthors: authors }, amended);
+      await api.commit(repo.id, files, { summary, description, coAuthors: authors }, amended, noVerify);
+      clearFailedHooks("commit");
       const count = files.length;
       rememberMessage(repo.id, { summary, description });
       setRecall(-1);
@@ -528,11 +539,16 @@ function CommitBox() {
         },
       );
     } catch (e) {
-      reportError(e, "Commit failed");
+      if (isCommandError(e) && e.kind === "hookFailed" && !noVerify) {
+        setStore("hookRetry", { label: "Commit without hooks", run: () => void commitWithoutHooks() });
+        notify("error", `${e.message}, so nothing was committed. See the hook output below the commit button.`);
+      } else reportError(e, "Commit failed");
     } finally {
       setCommitting(false);
     }
   };
+
+  const hooksRunning = () => store.hookRun?.action === "commit" && store.hookRun.status === "running";
 
   const onKey = (e: KeyboardEvent) => {
     if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
@@ -599,8 +615,8 @@ function CommitBox() {
           </div>
         )}
       </Show>
-      <button class="btn primary block" disabled={!canCommit()} onClick={commit} data-tooltip="Commit" data-shortcut={COMMIT_KEYS}>
-        {committing() ? "Committing…" : amend() ? "Amend last commit" : `Commit to ${branch()}`}
+      <button class="btn primary block" disabled={!canCommit()} onClick={() => commit()} data-tooltip="Commit" data-shortcut={COMMIT_KEYS}>
+        {committing() ? (hooksRunning() ? "Running hooks…" : "Committing…") : amend() ? "Amend last commit" : `Commit to ${branch()}`}
       </button>
     </div>
   );

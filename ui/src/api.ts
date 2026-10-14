@@ -62,6 +62,7 @@ export interface RepoView {
   aheadBehind: AheadBehind | null;
   operation: string | null;
   hasRemote: boolean;
+  bisecting: boolean;
 }
 
 export type LineKind = "context" | "added" | "removed";
@@ -356,6 +357,18 @@ export interface Progress {
 
 export type SyncAction = "fetch" | "pull" | "push";
 
+export type HookAction = "commit" | "push";
+
+export interface HookResult {
+  name: string;
+  code: number | null;
+}
+
+export type HookEvent =
+  | { type: "started"; hooks: string[] }
+  | { type: "output"; line: string }
+  | { type: "finished"; results: HookResult[] };
+
 export interface FileSelection {
   path: string;
   lines?: [number, number][];
@@ -365,6 +378,27 @@ export interface CommitMessage {
   summary: string;
   description: string;
   coAuthors: string[];
+}
+
+export type MergePrediction =
+  | { type: "upToDate" }
+  | { type: "fastForward" }
+  | { type: "clean" }
+  | { type: "conflicts"; files: string[] }
+  | { type: "unknown" };
+
+export type BisectMark = "good" | "bad" | "skip";
+
+export interface BisectState {
+  bad: string | null;
+  good: string[];
+  skipped: string[];
+  current: string | null;
+  currentSummary: string | null;
+  revisionsLeft: number | null;
+  stepsLeft: number | null;
+  firstBad: string | null;
+  firstBadSummary: string | null;
 }
 
 export type ResetMode = "soft" | "mixed" | "hard";
@@ -653,8 +687,8 @@ export const api = {
 
   fileDiff: (id: string, path: string, ignoreWhitespace = false, full = false, highlight = true) =>
     invoke("file_diff", { id, path, ignoreWhitespace, full, highlight }).then(wire(decodeDiff)),
-  commit: (id: string, files: FileSelection[], message: CommitMessage, amend = false) =>
-    invoke<string>("commit", { id, files, message, amend }),
+  commit: (id: string, files: FileSelection[], message: CommitMessage, amend = false, noVerify = false) =>
+    invoke<string>("commit", { id, files, message, amend, noVerify }),
   discardFiles: (id: string, paths: string[]) => invoke<void>("discard_files", { id, paths }),
   discardLines: (id: string, path: string, lines: [number, number][]) =>
     invoke<void>("discard_lines", { id, path, lines }),
@@ -684,6 +718,7 @@ export const api = {
   pruneRemotes: (id: string) => invoke<string[]>("prune_remotes", { id }),
   merge: (id: string, branch: string, squash = false) =>
     invoke<{ conflicted: boolean; output: string }>("merge_branch", { id, branch, squash }),
+  predictMerge: (id: string, branch: string) => invoke<MergePrediction>("predict_merge", { id, branch }),
   abortMerge: (id: string) => invoke<void>("abort_merge", { id }),
   resolveConflict: (id: string, path: string, ours: boolean) => invoke<void>("resolve_conflict", { id, path, ours }),
   stash: (id: string, message?: string, paths?: string[]) => invoke<void>("stash_changes", { id, message, paths }),
@@ -692,8 +727,8 @@ export const api = {
   stashPop: (id: string, reference: string) => invoke<void>("stash_pop", { id, reference }),
   stashDrop: (id: string, reference: string) => invoke<void>("stash_drop", { id, reference }),
 
-  sync: (id: string, action: SyncAction, forceWithLease = false, tags = false) =>
-    invoke<void>("sync", { id, action, forceWithLease, tags }),
+  sync: (id: string, action: SyncAction, forceWithLease = false, tags = false, noVerify = false) =>
+    invoke<void>("sync", { id, action, forceWithLease, tags, noVerify }),
 
   revert: (id: string, sha: string) => invoke<void>("revert_commit", { id, sha }),
   cherryPick: (id: string, shas: string[], target?: string) => invoke<void>("cherry_pick", { id, shas, target }),
@@ -712,6 +747,10 @@ export const api = {
   abortOperation: (id: string, operation: string) => invoke<void>("abort_operation", { id, operation }),
   skipOperation: (id: string, operation: string) => invoke<void>("skip_operation", { id, operation }),
   undoHistory: (id: string) => invoke<UndoEntry[]>("undo_history", { id }),
+  bisectState: (id: string) => invoke<BisectState | null>("bisect_state", { id }),
+  bisectStart: (id: string, bad: string, good?: string) => invoke<BisectState | null>("bisect_start", { id, bad, good }),
+  bisectMark: (id: string, mark: BisectMark, sha?: string) => invoke<BisectState | null>("bisect_mark", { id, mark, sha }),
+  bisectReset: (id: string) => invoke<void>("bisect_reset", { id }),
   undo: (id: string) => invoke<UndoEntry>("undo", { id }),
 
   blame: (id: string, path: string, rev?: string) => invoke<Blame>("blame", { id, path, rev }),
@@ -831,6 +870,10 @@ export const api = {
 
 export function onRepoChanged(handler: (view: RepoView) => void): Promise<UnlistenFn> {
   return listen<RepoView>("repo-changed", (e) => handler(e.payload));
+}
+
+export function onHookOutput(handler: (e: { repo: string; action: HookAction; event: HookEvent }) => void): Promise<UnlistenFn> {
+  return listen<{ repo: string; action: HookAction; event: HookEvent }>("hook-output", (e) => handler(e.payload));
 }
 
 export function onSyncProgress(

@@ -4,6 +4,7 @@ import {
   api,
   isCommandError,
   type Account,
+  type BisectState,
   type Bootstrap,
   type ChecksSummary,
   type CommitWarnings,
@@ -22,6 +23,7 @@ import {
 } from "./api";
 import { accentTokens, monoStack } from "./lib/appearance";
 import { EMPTY_DRAFT, persistDraft, savedDrafts, type CommitDraft } from "./lib/drafts";
+import type { HookRun } from "./lib/hooks";
 import { ask } from "./components/Prompt";
 import { applySidebarWidth, lastSidebarWidth, repoLayout } from "./lib/layout";
 import { claimMissingLfsWarning, LFS_INSTALL_URL } from "./lib/lfs";
@@ -95,6 +97,9 @@ interface AppStore {
   dialog: Dialog | null;
   banners: Banner[];
   sync: { action: SyncAction; progress: Progress | null; label?: string } | null;
+  hookRun: HookRun | null;
+  hookRetry: { label: string; run: () => void } | null;
+  bisect: BisectState | null;
   busy: string | null;
   opening: string | null;
   checks: ChecksSummary | null;
@@ -123,6 +128,9 @@ export const [store, setStore] = createStore<AppStore>({
   dialog: null,
   banners: [],
   sync: null,
+  hookRun: null,
+  hookRetry: null,
+  bisect: null,
   busy: null,
   opening: null,
   checks: null,
@@ -135,6 +143,11 @@ export const [store, setStore] = createStore<AppStore>({
   pickingNewTab: false,
   drafts: savedDrafts(),
 });
+
+export function clearFailedHooks(action: HookRun["action"]) {
+  if (store.hookRun?.action === action && store.hookRun.status === "failed") setStore("hookRun", null);
+  setStore("hookRetry", null);
+}
 
 export function commitDraft(repo: string): CommitDraft {
   return store.drafts[repo] ?? EMPTY_DRAFT;
@@ -362,6 +375,9 @@ function showRepo(view: RepoView) {
       lfs: null,
       historySearch: null,
       compareWith: null,
+      hookRun: null,
+      hookRetry: null,
+      bisect: null,
     });
   });
   setDiffVersion((v) => v + 1);
@@ -487,6 +503,16 @@ export function currentBranch(): string | null {
   const head = store.repo?.head;
   if (!head) return null;
   return head.type === "detached" ? null : head.name;
+}
+
+let bisectToken = 0;
+
+export async function refreshBisect() {
+  const repo = store.repo;
+  const mine = ++bisectToken;
+  if (!repo?.bisecting) return setStore("bisect", null);
+  const state = await api.bisectState(repo.id).catch(() => null);
+  if (mine === bisectToken && store.repo?.id === repo.id) setStore("bisect", state);
 }
 
 export async function refreshCommitWarnings() {

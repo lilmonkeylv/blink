@@ -1,5 +1,5 @@
 use blink_core::ops::{self, FileSelection};
-use blink_git::{Branch, BranchKind};
+use blink_git::{Branch, BranchKind, MergePrediction};
 use serde::{Deserialize, Serialize};
 use tauri::State;
 
@@ -176,6 +176,11 @@ pub async fn merge_branch(
         }
         Err(e) => Err(e.into()),
     }
+}
+
+#[tauri::command]
+pub async fn predict_merge(state: State<'_, AppState>, id: String, branch: String) -> CmdResult<MergePrediction> {
+    Ok(state.engine.read(&id, move |repo| repo.cli().predict_merge(&branch)).await?)
 }
 
 #[tauri::command]

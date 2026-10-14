@@ -1,9 +1,10 @@
-import { createResource, createSignal, For, Show } from "solid-js";
-import { api, type CommitFile } from "../../api";
+import { createEffect, createResource, createSignal, For, on, onCleanup, Show } from "solid-js";
+import { api, type CommitFile, type MergePrediction } from "../../api";
+import { describePrediction, latestRequest } from "../../lib/prediction";
 import { currentBranch, notify, run, setStore, store } from "../../store";
 import { Select } from "../Controls";
 import { DiffView } from "../DiffView";
-import { StatusIcon } from "../Icons";
+import { ErrorIcon, InfoIcon, StatusIcon, SuccessIcon } from "../Icons";
 import { Dialog } from "../Dialog";
 import { Loading } from "../Loading";
 import { BranchPicker, closeDialog, sanitizeBranchName } from "./common";
@@ -124,6 +125,61 @@ export function SetUpstreamDialog(p: { branch: string; current: string | null })
   );
 }
 
+const PREDICT_DELAY_MS = 200;
+
+function MergePreview(p: { branch: string | null; mode: "merge" | "rebase" }) {
+  const [prediction, setPrediction] = createSignal<MergePrediction | null>(null);
+  const [pending, setPending] = createSignal(false);
+  const latest = latestRequest(
+    ({ id, branch }: { id: string; branch: string }) => api.predictMerge(id, branch),
+    PREDICT_DELAY_MS,
+    (result, busy) => {
+      setPrediction(result);
+      setPending(busy);
+    },
+  );
+  createEffect(
+    on(
+      () => [store.repo?.id, p.branch] as const,
+      ([id, branch]) => latest.request(id && branch ? { id, branch } : null),
+    ),
+  );
+  onCleanup(latest.cancel);
+  const summary = () => {
+    const result = prediction();
+    return result && p.branch ? describePrediction(result, p.mode, p.branch, currentBranch() ?? "HEAD") : null;
+  };
+  return (
+    <Show when={p.branch}>
+      <div class="merge-preview" aria-live="polite">
+        <Show when={!pending()} fallback={<span class="muted small">Checking for conflicts…</span>}>
+          <Show when={summary()}>
+            {(s) => (
+              <>
+                <div class={`merge-preview-status ${s().tone}`}>
+                  {s().tone === "warn" ? <ErrorIcon /> : s().tone === "ok" ? <SuccessIcon /> : <InfoIcon />}
+                  <span>{s().text}</span>
+                </div>
+                <Show when={s().files.length}>
+                  <ul class="merge-preview-files">
+                    <For each={s().files}>
+                      {(path) => (
+                        <li title={path}>
+                          <bdi>{path}</bdi>
+                        </li>
+                      )}
+                    </For>
+                  </ul>
+                </Show>
+              </>
+            )}
+          </Show>
+        </Show>
+      </div>
+    </Show>
+  );
+}
+
 export function MergeDialog() {
   const [picked, setPicked] = createSignal<string | null>(null);
   const merge = async (squash: boolean) => {
@@ -151,6 +207,7 @@ export function MergeDialog() {
       }
     >
       <BranchPicker value={picked()} onChange={setPicked} excludeCurrent />
+      <MergePreview branch={picked()} mode="merge" />
     </Dialog>
   );
 }
@@ -194,6 +251,7 @@ export function RebaseDialog() {
       }
     >
       <BranchPicker value={picked()} onChange={setPicked} excludeCurrent />
+      <MergePreview branch={picked()} mode="rebase" />
     </Dialog>
   );
 }
