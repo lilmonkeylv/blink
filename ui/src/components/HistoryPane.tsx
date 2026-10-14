@@ -42,6 +42,7 @@ const [anchor, setAnchor] = createSignal<string | null>(null);
 const [compareSide, setCompareSide] = createSignal<"behind" | "ahead">("behind");
 const [compareResult, setCompareResult] = createSignal<{ ahead: CommitSummary[]; behind: CommitSummary[] } | null>(null);
 const [showGraph, setShowGraph] = createSignal(readGraphPref());
+const [tagsBySha, setTagsBySha] = createSignal<Map<string, string[]>>(new Map());
 let loading = false;
 let exhausted = false;
 let loadedFor = "";
@@ -94,6 +95,26 @@ export function reloadHistory() {
   loadMore(true);
 }
 
+export async function reloadTags() {
+  const repo = store.repo;
+  if (!repo) return;
+  try {
+    const bySha = new Map<string, string[]>();
+    for (const [name, sha] of await api.tags(repo.id)) bySha.set(sha, [...(bySha.get(sha) ?? []), name]);
+    if (store.repo?.id === repo.id) setTagsBySha(bySha);
+  } catch (e) {
+    reportError(e, "Could not load tags");
+  }
+}
+
+async function deleteTag(name: string) {
+  const repo = store.repo!;
+  const ok = await ask(`Delete the tag ${name}? This only removes it locally.`, { title: "Delete tag", kind: "warning", okLabel: "Delete" });
+  if (!ok) return;
+  await run("Delete tag", () => api.deleteTag(repo.id, name));
+  await reloadTags();
+}
+
 function Graph(p: { row: GraphRow; width: number }) {
   const x = (lane: number) => 8 + lane * LANE;
   const color = (c: number) => `var(--lane-${c % LANE_COLORS})`;
@@ -126,6 +147,13 @@ export function commitMenu(c: CommitSummary, list: CommitSummary[]): MenuItem[] 
     ];
   }
   const isHead = c.id === headId();
+  const tags = tagsBySha().get(c.id) ?? [];
+  const deleteTagItem: MenuItem[] =
+    tags.length === 0
+      ? []
+      : tags.length === 1
+        ? [{ label: `Delete tag ${tags[0]}…`, run: () => deleteTag(tags[0]) }]
+        : [{ label: "Delete tag", items: tags.map((name) => ({ label: `${name}…`, run: () => deleteTag(name) })) }];
   return [
     { label: "Reset to commit…", run: () => setStore("dialog", { type: "reset", sha: c.id }), disabled: isHead },
     { label: "Check out commit", run: () => checkoutDetached(c) },
@@ -133,6 +161,7 @@ export function commitMenu(c: CommitSummary, list: CommitSummary[]): MenuItem[] 
     "separator",
     { label: "Create branch from commit…", run: () => setStore("dialog", { type: "newBranch", start: c.id }) },
     { label: "Create tag…", run: () => setStore("dialog", { type: "tag", sha: c.id }) },
+    ...deleteTagItem,
     { label: "Cherry-pick commit…", run: () => setStore("dialog", { type: "cherryPick", shas: [c.id] }) },
     { label: "Edit history from here…", run: () => setStore("dialog", { type: "interactiveRebase", sha: c.id }), disabled: isMerge(c) },
     "separator",
@@ -270,6 +299,7 @@ export function HistoryList() {
         loadedFor = key;
         exhausted = false;
         loadMore(true);
+        reloadTags();
       },
     ),
   );
@@ -425,7 +455,10 @@ export function HistoryList() {
                 <Graph row={rows()[i]} width={graphWidth()} />
               </Show>
               <div class="history-text">
-                <span class="summary">{c.summary || "(no message)"}</span>
+                <span class="summary">
+                  <For each={tagsBySha().get(c.id)}>{(name) => <span class="badge tag">{name}</span>}</For>
+                  {c.summary || "(no message)"}
+                </span>
                 <span class="meta">
                   {c.authorName} · {dateFormat() === "relative" ? relativeTime(c.time) : absoluteTime(c.time)} · {c.shortId}
                 </span>

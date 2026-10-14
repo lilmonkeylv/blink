@@ -8,7 +8,7 @@ import { Field, Select } from "../Controls";
 import { Dialog } from "../Dialog";
 import { Loading } from "../Loading";
 import { DiffView, Tokens } from "../DiffView";
-import { focusCommit } from "../HistoryPane";
+import { focusCommit, reloadTags } from "../HistoryPane";
 import { DownIcon, UpIcon } from "../Icons";
 import { VirtualList } from "../VirtualList";
 import { closeDialog, Tabs } from "./common";
@@ -26,6 +26,7 @@ export function TagDialog(p: { sha: string }) {
     const ok = await run("Create tag", () => api.createTag(repo.id, name().trim(), p.sha, message() || undefined).then(() => true));
     if (ok) {
       closeDialog();
+      reloadTags();
       notify("success", `Created tag ${name().trim()}. Push with tags to publish it.`, {
         action: { label: "Push tags", run: () => run("Push tags", () => api.sync(repo.id, "push", false, true)) },
       });

@@ -500,6 +500,19 @@ a {
   color: var(--warn);
 }
 
+.badge.tag {
+  margin-right: 6px;
+  border: 1px solid currentColor;
+  background: transparent;
+  color: var(--lane-0);
+  font-weight: 500;
+  vertical-align: 1px;
+}
+
+.list:focus .row.selected .badge.tag {
+  color: var(--fg-selected-focus);
+}
+
 .main {
   display: grid;
   grid-template-columns: min(var(--sidebar), calc(100vw - 360px)) 1fr;
