@@ -225,6 +225,13 @@ export function installDevMock() {
           },
           { version: "0.1.0", date: "2026-10-13", body: "### Features\n\n- First release" },
         ];
+      case "read_worktree_file":
+        return new Promise((resolve) =>
+          setTimeout(
+            () => resolve(["fn main() {", "<<<<<<< HEAD", "    run(64);", "=======", "    run(256);", ">>>>>>> feature", "}", ""].join("\n")),
+            800,
+          ),
+        );
       case "account":
         return null;
       case "plugin:event|listen":
