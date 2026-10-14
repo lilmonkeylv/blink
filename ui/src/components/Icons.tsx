@@ -10,6 +10,7 @@ import ChevronRightGlyph from "lucide-solid/icons/chevron-right";
 import CircleAlert from "lucide-solid/icons/circle-alert";
 import CircleCheck from "lucide-solid/icons/circle-check";
 import Columns2 from "lucide-solid/icons/columns-2";
+import Copy from "lucide-solid/icons/copy";
 import Ellipsis from "lucide-solid/icons/ellipsis";
 import FolderGit from "lucide-solid/icons/folder-git-2";
 import GitBranch from "lucide-solid/icons/git-branch";
@@ -53,6 +54,7 @@ export const UnifiedIcon = icon(Rows2);
 export const SplitIcon = icon(Columns2);
 export const MoreIcon = icon(Ellipsis);
 export const FilterIcon = icon(ListFilter);
+export const CopyIcon = icon(Copy);
 export const StashIcon = icon(Archive);
 
 const statusGlyphs: Record<ChangeKind, Component<LucideProps>> = {
