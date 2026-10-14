@@ -2,6 +2,56 @@
 
 All notable changes to Blink are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.1.0-alpha.8] - 2026-10-14
+
+### Features
+
+- Save crash reports locally and add a CI workflow ([323d315](https://github.com/lilmonkeylv/blink/commit/323d315cec46698fb0443e62a60d980e92aae006))
+- **ui:** Show notifications as a bottom-right toast stack ([a1bf8e9](https://github.com/lilmonkeylv/blink/commit/a1bf8e9c64938a65d5372e5e439875f9a18c0f82))
+- **ui:** Keyboard navigation and shortcut hints in context menus ([f71af2b](https://github.com/lilmonkeylv/blink/commit/f71af2bfb651293baccbb19fd0eef5123faf6867))
+- **ui:** Themed tooltips and controls in place of native ones ([b96f250](https://github.com/lilmonkeylv/blink/commit/b96f250f9385b2d4b2192aff9fa806e3158660a6))
+- **history:** Show tags on commits and allow deleting them ([72ba89d](https://github.com/lilmonkeylv/blink/commit/72ba89d1477266b882662fceff2dc73704806223))
+- **changes:** Add a stashed changes row below the changes list ([561b70b](https://github.com/lilmonkeylv/blink/commit/561b70b9c201b57de67770a7f9b11d745e844ccc))
+- **merge:** Show the common ancestor of each conflict ([0176658](https://github.com/lilmonkeylv/blink/commit/0176658fae7eed7cdc03c4339935cf561218a543))
+- **checks:** Expand Actions runs into their jobs ([d90c2cc](https://github.com/lilmonkeylv/blink/commit/d90c2cc3fd906d6c01453e593fca3fe60af22fca))
+- **repo:** Copy remote URLs from repository settings ([f30a8d0](https://github.com/lilmonkeylv/blink/commit/f30a8d0b082f8d9cbc6a6ba673e703b8e98f120f))
+- **app:** Add an About Blink dialog ([364af6b](https://github.com/lilmonkeylv/blink/commit/364af6b06dd0af484396559025e409668a8e9403))
+- Apply git, watcher, logging and cache settings ([23fce85](https://github.com/lilmonkeylv/blink/commit/23fce85ec36c24f83f4d1616fdcf3427a11b31d0))
+- **notifications:** Honour quiet hours and every notification switch ([012afe8](https://github.com/lilmonkeylv/blink/commit/012afe8f33cc216f9a6745f82a159781156c2af7))
+- **ui:** Wire the remaining appearance, prompt and accessibility settings ([e94c1af](https://github.com/lilmonkeylv/blink/commit/e94c1af55aba00f587b0a242c3cd171870b6bd7a))
+- **signing:** Guided commit signing setup in Settings ([a7e80b1](https://github.com/lilmonkeylv/blink/commit/a7e80b14e14d22b5a7e832da823655ac7adfcc94))
+- **submodules:** Initialize, update and sync submodules ([61658c3](https://github.com/lilmonkeylv/blink/commit/61658c31fd50d548f89015dfbbaa830617bdb12a))
+- **lfs:** Track, pull and lock files with Git LFS ([e2db3cc](https://github.com/lilmonkeylv/blink/commit/e2db3cc58fac4ce7b41ac0b6a11c5b4f281439bf))
+- Stream git hook output and offer to skip failing hooks ([9015da3](https://github.com/lilmonkeylv/blink/commit/9015da35b54729de12dca05b12befdc7c9438406))
+- Predict merge conflicts before merging or rebasing ([0eeb5fa](https://github.com/lilmonkeylv/blink/commit/0eeb5faf8e1daaea80ff26602fb850c034dee101))
+- Bisect from the history list ([479dd66](https://github.com/lilmonkeylv/blink/commit/479dd6643f284cbaed9a3dfcca31eb47adf1f625))
+- Keep Blink running in the system tray ([1244e32](https://github.com/lilmonkeylv/blink/commit/1244e32ed8c9c5439f675a0330109a8e21e7c134))
+- Support multiple GitHub.com accounts ([faa4742](https://github.com/lilmonkeylv/blink/commit/faa474252bc430c3dc7d473776f580b50b9aec50))
+
+### Fixes
+
+- **windows:** Keep the title bar buttons from taking focus ([25edcf7](https://github.com/lilmonkeylv/blink/commit/25edcf720406af3d2e84552666e3ee1b36d2a431))
+- **ui:** Lighten the dark theme and separate the toolbar buttons ([e8eb15d](https://github.com/lilmonkeylv/blink/commit/e8eb15dedf7bedc8eef533a45da346e51895b5c3))
+- **changes:** Keep the commit draft per repository ([a57e2ef](https://github.com/lilmonkeylv/blink/commit/a57e2efa2d46d5a6fd9f40957f2d279559fa8691))
+- **merge-editor:** Wait for the file before allowing a resolve ([f155105](https://github.com/lilmonkeylv/blink/commit/f1551056b173ec610e31efe38f5a62dc2e019358))
+- **clone:** Stop rewriting the URL field while typing ([8800508](https://github.com/lilmonkeylv/blink/commit/8800508b1441351084c45fb233a473f61f65ac97))
+- **layout:** Re-clamp the sidebar when the window shrinks ([73fa401](https://github.com/lilmonkeylv/blink/commit/73fa4011a8214d197c22e50f58595e06d45abd9f))
+- **ui:** Trap focus in dialogs and pause shortcuts while one is open ([46aee1b](https://github.com/lilmonkeylv/blink/commit/46aee1b17060db6cc9e9c8ca010e96c21d9b5bbc))
+- **ui:** Move hardcoded colors onto theme tokens ([1ff1cca](https://github.com/lilmonkeylv/blink/commit/1ff1cca207e0d999e431ae6fa0f94641c8dee835))
+- **ui:** Keep panes usable at narrow widths ([a3f101c](https://github.com/lilmonkeylv/blink/commit/a3f101cc4deda6147b8e088f226881b65693045b))
+- **ui:** Clearer sign-in dialog states ([1dc45fe](https://github.com/lilmonkeylv/blink/commit/1dc45fe70ced29018853d77edc75fc05e811d420))
+- **git:** Correct commit cleanup, pathspecs, push target, index safety and line staging ([be29976](https://github.com/lilmonkeylv/blink/commit/be29976d35a10543c92f1ed427e7c50bff375cc6))
+- **security:** Validate deep links, paths and commit ids from the webview ([631a948](https://github.com/lilmonkeylv/blink/commit/631a94849743bfc607708412783e1820cbe7a069))
+
+### Performance
+
+- Keep network git and file watching from stalling the app ([f054fa5](https://github.com/lilmonkeylv/blink/commit/f054fa55329b04f551f68e775f87949e60b39c69))
+
+### Refactoring
+
+- **ui:** Share one delayed loading indicator ([258eb86](https://github.com/lilmonkeylv/blink/commit/258eb8664a97fe860d9cfab509ff280bd2f7f46c))
+- **ui:** Build shortcut hints from the keymap ([b093515](https://github.com/lilmonkeylv/blink/commit/b0935156d50d003b39a03d52773ec02c30ae39f4))
+
 ## [0.1.0-alpha.7] - 2026-10-13
 
 ### Features
