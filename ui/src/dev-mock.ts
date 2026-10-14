@@ -288,6 +288,8 @@ export function installDevMock() {
         ];
       case "unpushed_commits":
         return 1;
+      case "unpushed_shas":
+        return history.slice(0, repo.aheadBehind?.ahead ?? 0).map((c) => c.id);
       case "check_git_executable":
         return "2.47.1.windows.1";
       case "keymap":

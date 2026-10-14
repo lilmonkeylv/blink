@@ -2,10 +2,12 @@ use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use blink_core::EngineEvent;
 use blink_git::{GitCli, Repository};
 use blink_store::WatcherMode;
 use blink_watch::{Change, DEFAULT_DEBOUNCE, POLL_INTERVAL, RepoWatcher, WatchMode};
 use tauri::{AppHandle, Emitter, Manager};
+use tokio::sync::broadcast::error::RecvError;
 
 use crate::error::CmdResult;
 use crate::state::AppState;
@@ -40,17 +42,9 @@ pub fn ensure_watcher(app: &AppHandle, state: &AppState, id: &str) -> CmdResult<
                 last_refresh = Some(Instant::now());
                 let (app, id) = (&app, &id);
                 tauri::async_runtime::block_on(async move {
-                    let state = app.state::<AppState>();
-                    let engine = Arc::clone(&state.engine);
+                    let engine = Arc::clone(&app.state::<AppState>().engine);
                     match engine.refresh(id).await {
-                        Ok(snapshot) => {
-                            let name = engine.get(id).map(|h| h.repo().name()).unwrap_or_default();
-                            let view = RepoView::from_snapshot(id, name, &snapshot);
-                            view.remember(&state.cache);
-                            let _ = app.emit(REPO_CHANGED, view);
-                        }
-                        Err(blink_core::Error::Cancelled) => {}
-                        Err(blink_core::Error::UnknownRepo(_)) => {}
+                        Ok(_) | Err(blink_core::Error::Cancelled) | Err(blink_core::Error::UnknownRepo(_)) => {}
                         Err(e) => tracing::warn!(repo = %id, error = %e, "background refresh failed"),
                     }
                 });
@@ -58,6 +52,39 @@ pub fn ensure_watcher(app: &AppHandle, state: &AppState, id: &str) -> CmdResult<
         })
         .map_err(|e| crate::error::CommandError::new("watch", e.to_string()))?;
     Ok(())
+}
+
+pub fn forward_snapshots(app: &AppHandle) {
+    let app = app.clone();
+    let mut events = app.state::<AppState>().engine.subscribe();
+    tauri::async_runtime::spawn(async move {
+        loop {
+            match events.recv().await {
+                Ok(EngineEvent::SnapshotChanged { repo, generation }) => {
+                    publish_snapshot(&app, &repo, Some(generation))
+                }
+                Ok(EngineEvent::RepoClosed { .. }) => {}
+                Err(RecvError::Lagged(_)) => {
+                    for repo in app.state::<AppState>().engine.open_repos() {
+                        publish_snapshot(&app, &repo, None);
+                    }
+                }
+                Err(RecvError::Closed) => break,
+            }
+        }
+    });
+}
+
+fn publish_snapshot(app: &AppHandle, id: &str, generation: Option<u64>) {
+    let state = app.state::<AppState>();
+    let Ok(handle) = state.engine.get(id) else { return };
+    let snapshot = handle.snapshot();
+    if generation.is_some_and(|g| g != snapshot.generation) {
+        return;
+    }
+    let view = RepoView::from_snapshot(id, handle.repo().name(), &snapshot);
+    view.remember(&state.cache);
+    let _ = app.emit(REPO_CHANGED, view);
 }
 
 pub fn stop_watcher(state: &AppState, id: &str) {

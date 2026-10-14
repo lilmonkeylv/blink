@@ -726,6 +726,7 @@ export const api = {
   deleteBranch: (id: string, name: string, force: boolean, includeRemote: boolean) =>
     invoke<void>("delete_branch", { id, name, force, includeRemote }),
   unpushedCommits: (id: string, name: string) => invoke<number>("unpushed_commits", { id, name }),
+  unpushedShas: (id: string) => invoke<string[]>("unpushed_shas", { id }),
   deleteRemoteBranch: (id: string, name: string) => invoke<void>("delete_remote_branch", { id, name }),
   setUpstream: (id: string, branch: string, upstream: string | null) => invoke<void>("set_upstream", { id, branch, upstream }),
   pruneRemotes: (id: string) => invoke<string[]>("prune_remotes", { id }),
