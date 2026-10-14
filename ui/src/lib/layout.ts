@@ -45,6 +45,13 @@ export function lastSidebarWidth(): number {
   return widths[widths.length - 1] ?? SIDEBAR_DEFAULT;
 }
 
+let preferredSidebar = SIDEBAR_DEFAULT;
+
 export function applySidebarWidth(px: number) {
+  preferredSidebar = px;
   document.documentElement.style.setProperty("--sidebar", `${clampSidebar(px)}px`);
+}
+
+export function reclampSidebar() {
+  applySidebarWidth(preferredSidebar);
 }

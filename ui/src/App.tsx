@@ -8,7 +8,7 @@ import { Dialog } from "./components/Dialog";
 import { Dialogs } from "./components/Dialogs";
 import { CommitView, HistoryList } from "./components/HistoryPane";
 import { TabStrip } from "./components/TabStrip";
-import { applySidebarWidth, clampSidebar, saveRepoLayout } from "./lib/layout";
+import { applySidebarWidth, clampSidebar, reclampSidebar, saveRepoLayout } from "./lib/layout";
 import { appMenu, doSync, pickAndAddRepository, Toolbar } from "./components/Toolbar";
 import { fuzzyFilter } from "./lib/fuzzy";
 import { comboFromEvent } from "./lib/keymap";
@@ -334,6 +334,7 @@ export function App() {
   ]);
   onCleanup(() => {
     window.removeEventListener("keydown", onKey);
+    window.removeEventListener("resize", reclampSidebar);
     listeners.then((fns) => fns.forEach((u) => u()));
   });
 
@@ -360,6 +361,7 @@ export function App() {
   onMount(async () => {
     window.addEventListener("keydown", onKey);
     window.addEventListener("focus", loadKeymap);
+    window.addEventListener("resize", reclampSidebar);
     loadKeymap();
     window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
     try {
