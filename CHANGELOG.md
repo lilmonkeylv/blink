@@ -2,6 +2,16 @@
 
 All notable changes to Blink are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.1.0-alpha.12] - 2026-10-14
+
+### Features
+
+- **history:** Mark commits that haven't been pushed yet ([ef3e5fc](https://github.com/lilmonkeylv/blink/commit/ef3e5fc20c606f9154a72f4873a972a7c3ec30d8))
+
+### Fixes
+
+- **sync:** Send every repository refresh to the UI so pushes update the view ([0939736](https://github.com/lilmonkeylv/blink/commit/093973617d28dc67975e1660a52e8ca1b0c87442))
+
 ## [0.1.0-alpha.11] - 2026-10-14
 
 ### Fixes
