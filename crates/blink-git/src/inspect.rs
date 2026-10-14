@@ -121,7 +121,7 @@ impl GitCli {
     pub fn file_history(&self, path: &str, offset: usize, limit: usize) -> Result<Vec<CommitSummary>> {
         let skip = format!("--skip={offset}");
         let max = format!("-n{limit}");
-        Ok(parse_log(&self.run(&["log", "--follow", LOG_FORMAT, &skip, &max, "--", path])?))
+        Ok(parse_log(&self.literal_pathspecs().run(&["log", "--follow", LOG_FORMAT, &skip, &max, "--", path])?))
     }
 
     pub fn search(&self, kind: SearchKind, query: &str, limit: usize) -> Result<Vec<CommitSummary>> {

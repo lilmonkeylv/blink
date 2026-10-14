@@ -25,6 +25,19 @@ pub enum SyncAction {
     Push,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PushTarget {
+    pub remote: String,
+    pub refspec: String,
+    pub set_upstream: bool,
+}
+
+impl PushTarget {
+    pub fn new_branch(remote: impl Into<String>, branch: &str) -> Self {
+        Self { remote: remote.into(), refspec: format!("refs/heads/{branch}:refs/heads/{branch}"), set_upstream: true }
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct GitCli {
     workdir: PathBuf,
@@ -195,13 +208,22 @@ impl GitCli {
         GitCli::new(dir).run(&["init", "-b", default_branch]).map(drop)
     }
 
+    pub(crate) fn literal_pathspecs(&self) -> Self {
+        self.clone().with_env("GIT_LITERAL_PATHSPECS", "1")
+    }
+
+    fn run_with_pathspecs(&self, args: &[&str], paths: &[&str]) -> Result<String> {
+        let mut args = args.to_vec();
+        args.extend(["--pathspec-from-file=-", "--pathspec-file-nul"]);
+        let input: Vec<u8> = paths.iter().flat_map(|p| p.bytes().chain([0])).collect();
+        self.literal_pathspecs().run_with_stdin(&args, &input)
+    }
+
     pub fn stage(&self, paths: &[&str]) -> Result<()> {
         if paths.is_empty() {
             return Ok(());
         }
-        let mut args = vec!["add", "--all", "--"];
-        args.extend_from_slice(paths);
-        self.run(&args).map(drop)
+        self.run_with_pathspecs(&["add", "--all"], paths).map(drop)
     }
 
     pub fn stage_all(&self) -> Result<()> {
@@ -213,10 +235,8 @@ impl GitCli {
             return Ok(());
         }
         let has_head = self.run(&["rev-parse", "--verify", "-q", "HEAD"]).is_ok();
-        let mut args: Vec<&str> =
-            if has_head { vec!["reset", "-q", "HEAD", "--"] } else { vec!["rm", "--cached", "-r", "-q", "--"] };
-        args.extend_from_slice(paths);
-        self.run(&args).map(drop)
+        let args: &[&str] = if has_head { &["reset", "-q", "HEAD"] } else { &["rm", "--cached", "-r", "-q"] };
+        self.run_with_pathspecs(args, paths).map(drop)
     }
 
     pub fn unstage_all(&self) -> Result<()> {
@@ -227,25 +247,31 @@ impl GitCli {
         }
     }
 
-    pub fn apply_to_index(&self, patch: &str) -> Result<()> {
-        self.run_with_stdin(&["apply", "--cached", "--recount", "--whitespace=nowarn", "-"], patch.as_bytes()).map(drop)
+    pub fn write_tree(&self) -> Result<String> {
+        Ok(self.run(&["write-tree"])?.trim().to_string())
     }
 
-    pub fn reverse_apply_to_worktree(&self, patch: &str) -> Result<()> {
-        self.run_with_stdin(&["apply", "-R", "--recount", "--whitespace=nowarn", "-"], patch.as_bytes()).map(drop)
+    pub fn read_tree(&self, tree: &str) -> Result<()> {
+        self.run(&["read-tree", "--reset", tree]).map(drop)
+    }
+
+    pub fn apply_to_index(&self, patch: &[u8]) -> Result<()> {
+        self.run_with_stdin(&["apply", "--cached", "--recount", "--whitespace=nowarn", "-"], patch).map(drop)
+    }
+
+    pub fn reverse_apply_to_worktree(&self, patch: &[u8]) -> Result<()> {
+        self.run_with_stdin(&["apply", "-R", "--recount", "--whitespace=nowarn", "-"], patch).map(drop)
     }
 
     pub fn discard_tracked(&self, paths: &[&str]) -> Result<()> {
         if paths.is_empty() {
             return Ok(());
         }
-        let mut args = vec!["checkout", "HEAD", "--"];
-        args.extend_from_slice(paths);
-        self.run(&args).map(drop)
+        self.run_with_pathspecs(&["checkout", "HEAD"], paths).map(drop)
     }
 
     pub fn commit(&self, message: &str, amend: bool) -> Result<String> {
-        let mut args = vec!["commit", "-F", "-", "--cleanup=strip"];
+        let mut args = vec!["commit", "-F", "-", "--cleanup=whitespace"];
         if amend {
             args.push("--amend");
         }
@@ -318,7 +344,7 @@ impl GitCli {
     }
 
     pub fn checkout_conflict_side(&self, path: &str, ours: bool) -> Result<()> {
-        self.run(&["checkout", if ours { "--ours" } else { "--theirs" }, "--", path])?;
+        self.literal_pathspecs().run(&["checkout", if ours { "--ours" } else { "--theirs" }, "--", path])?;
         self.stage(&[path])
     }
 
@@ -339,23 +365,34 @@ impl GitCli {
         self.run_with_progress(&args, progress).map(drop)
     }
 
-    pub fn push(
-        &self,
-        remote: &str,
-        branch: &str,
-        set_upstream: bool,
-        force_with_lease: bool,
-        progress: impl FnMut(Progress),
-    ) -> Result<()> {
-        let refspec = format!("refs/heads/{branch}:refs/heads/{branch}");
+    pub fn push_target(&self, branch: &str) -> Result<PushTarget> {
+        let remote = self.config_get(&format!("branch.{branch}.remote")).filter(|r| r != ".");
+        let merge = self.config_get(&format!("branch.{branch}.merge"));
+        if let (Some(remote), Some(merge)) = (remote, merge) {
+            return Ok(PushTarget { remote, refspec: format!("refs/heads/{branch}:{merge}"), set_upstream: false });
+        }
+        if let Some(remote) = self.config_get("remote.pushDefault") {
+            return Ok(PushTarget::new_branch(remote, branch));
+        }
+        let mut names: Vec<String> = self.remotes()?.into_iter().map(|(name, _)| name).collect();
+        let remote = match names.iter().position(|n| n == "origin") {
+            Some(origin) => names.swap_remove(origin),
+            None if names.len() == 1 => names.remove(0),
+            None if names.is_empty() => return Err(Error::Git("This repository has no remote to push to".into())),
+            None => return Err(Error::Git("This branch has no upstream and no origin remote to push to".into())),
+        };
+        Ok(PushTarget::new_branch(remote, branch))
+    }
+
+    pub fn push(&self, target: &PushTarget, force_with_lease: bool, progress: impl FnMut(Progress)) -> Result<()> {
         let mut args = vec!["push", "--progress"];
-        if set_upstream {
+        if target.set_upstream {
             args.push("--set-upstream");
         }
         if force_with_lease {
             args.push("--force-with-lease");
         }
-        args.extend([remote, refspec.as_str()]);
+        args.extend([target.remote.as_str(), target.refspec.as_str()]);
         self.run_with_progress(&args, progress).map(drop)
     }
 
@@ -376,12 +413,11 @@ impl GitCli {
     }
 
     pub fn stash_push(&self, message: &str, paths: &[&str]) -> Result<()> {
-        let mut args = vec!["stash", "push", "--include-untracked", "-m", message];
-        if !paths.is_empty() {
-            args.push("--");
-            args.extend_from_slice(paths);
+        let args = ["stash", "push", "--include-untracked", "-m", message];
+        if paths.is_empty() {
+            return self.run(&args).map(drop);
         }
-        self.run(&args).map(drop)
+        self.run_with_pathspecs(&args, paths).map(drop)
     }
 
     pub fn stash_list(&self) -> Result<Vec<(String, String)>> {

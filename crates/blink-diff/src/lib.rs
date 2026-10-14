@@ -31,6 +31,10 @@ pub struct DiffLine {
     pub no_newline: bool,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     pub tokens: Vec<Span>,
+    #[serde(skip)]
+    pub old_raw: Vec<u8>,
+    #[serde(skip)]
+    pub new_raw: Vec<u8>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
@@ -141,24 +145,23 @@ pub fn is_binary(data: &[u8]) -> bool {
 }
 
 struct SplitLines<'a> {
+    raw: Vec<&'a [u8]>,
     lines: Vec<&'a [u8]>,
     missing_final_newline: bool,
 }
 
 fn split_lines(data: &[u8]) -> SplitLines<'_> {
-    let mut lines: Vec<&[u8]> = data.split_inclusive(|&b| b == b'\n').collect();
-    let missing_final_newline = lines.last().is_some_and(|l| !l.ends_with(b"\n"));
-    for line in &mut lines {
-        let mut end = line.len();
-        if end > 0 && line[end - 1] == b'\n' {
-            end -= 1;
-            if end > 0 && line[end - 1] == b'\r' {
-                end -= 1;
-            }
-        }
-        *line = &line[..end];
+    let raw: Vec<&[u8]> = data.split_inclusive(|&b| b == b'\n').collect();
+    let missing_final_newline = raw.last().is_some_and(|l| !l.ends_with(b"\n"));
+    let lines = raw.iter().map(|line| strip_line_ending(line)).collect();
+    SplitLines { raw, lines, missing_final_newline }
+}
+
+fn strip_line_ending(line: &[u8]) -> &[u8] {
+    match line.strip_suffix(b"\n") {
+        Some(line) => line.strip_suffix(b"\r").unwrap_or(line),
+        None => line,
     }
-    SplitLines { lines, missing_final_newline }
 }
 
 fn normalize_whitespace(line: &[u8]) -> Vec<u8> {
@@ -276,6 +279,8 @@ fn build_hunks(diff: &Diff, before: &SplitLines<'_>, after: &SplitLines<'_>, con
             text: text(before.lines[old_idx as usize]),
             no_newline: old_idx + 1 == old_total && before.missing_final_newline,
             tokens: Vec::new(),
+            old_raw: before.raw[old_idx as usize].to_vec(),
+            new_raw: after.raw[new_idx as usize].to_vec(),
         });
     };
 
@@ -305,6 +310,8 @@ fn build_hunks(diff: &Diff, before: &SplitLines<'_>, after: &SplitLines<'_>, con
                         text: text(before.lines[i as usize]),
                         no_newline: i + 1 == old_total && before.missing_final_newline,
                         tokens: Vec::new(),
+                        old_raw: before.raw[i as usize].to_vec(),
+                        new_raw: Vec::new(),
                     });
                 }
                 for i in h.after.clone() {
@@ -315,6 +322,8 @@ fn build_hunks(diff: &Diff, before: &SplitLines<'_>, after: &SplitLines<'_>, con
                         text: text(after.lines[i as usize]),
                         no_newline: i + 1 == new_total && after.missing_final_newline,
                         tokens: Vec::new(),
+                        old_raw: Vec::new(),
+                        new_raw: after.raw[i as usize].to_vec(),
                     });
                 }
                 o = h.before.end;

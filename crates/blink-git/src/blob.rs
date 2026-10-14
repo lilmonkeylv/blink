@@ -30,6 +30,30 @@ impl Repository {
         }
     }
 
+    pub fn read_cleaned_worktree(&self, path: &str) -> Result<Option<Vec<u8>>> {
+        use gix::filter::plumbing::pipeline::convert::ToGitOutcome;
+        use std::io::Read;
+
+        let file = match std::fs::File::open(self.workdir().join(path)) {
+            Ok(file) => file,
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
+            Err(e) => return Err(e.into()),
+        };
+        let repo = self.local();
+        let (mut pipeline, index) = repo.filter_pipeline(None).git()?;
+        let mut data = Vec::new();
+        match pipeline.convert_to_git(file, std::path::Path::new(path), &index).git()? {
+            ToGitOutcome::Unchanged(mut file) => {
+                file.read_to_end(&mut data)?;
+            }
+            ToGitOutcome::Process(mut stream) => {
+                stream.read_to_end(&mut data)?;
+            }
+            ToGitOutcome::Buffer(buf) => data.extend_from_slice(buf),
+        }
+        Ok(Some(data))
+    }
+
     pub fn gitlink_at(&self, rev: &str, path: &str) -> Result<Option<String>> {
         let repo = self.local();
         let Ok(id) = repo.rev_parse_single(rev) else { return Ok(None) };

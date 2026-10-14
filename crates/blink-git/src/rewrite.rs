@@ -113,7 +113,7 @@ fn render_todo(steps: &[RebaseStep], messages: &mut Vec<ScratchFile>) -> Result<
         };
         if let Some(message) = custom {
             let file = ScratchFile::new("msg", message)?;
-            let _ = writeln!(todo, "exec git commit --amend --no-verify --cleanup=strip -F {}", file.shell_path());
+            let _ = writeln!(todo, "exec git commit --amend --no-verify --cleanup=whitespace -F {}", file.shell_path());
             messages.push(file);
         }
     }

@@ -64,12 +64,12 @@ fn interactive_rebase_reorders_squashes_rewords_and_drops() {
             Some(&ids[0]),
             &[
                 step(RebaseAction::Pick, 2, None),
-                step(RebaseAction::Reword, 1, Some("renamed b")),
+                step(RebaseAction::Reword, 1, Some("#12 renamed b")),
                 step(RebaseAction::Drop, 3, None),
             ],
         )
         .unwrap();
-    assert_eq!(summaries(&repo), ["renamed b", "add c", "base"]);
+    assert_eq!(summaries(&repo), ["#12 renamed b", "add c", "base"]);
 
     let ids: Vec<String> = repo.log(None, 0, 10).unwrap().into_iter().map(|c| c.id).collect();
     repo.cli()
