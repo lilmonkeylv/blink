@@ -69,6 +69,8 @@ export interface Banner {
   action?: { label: string; run: () => void };
   onDismiss?: () => void;
   sticky?: boolean;
+  duration?: number;
+  leaving?: boolean;
 }
 
 interface AppStore {
@@ -155,15 +157,18 @@ export function storeDiff(path: string, diff: FileDiff) {
   setDiffVersion((v) => v + 1);
 }
 
+export const TOAST_EXIT_MS = 180;
 let bannerSeq = 0;
 export function notify(tone: Banner["tone"], message: string, extra: Partial<Banner> = {}) {
   const id = ++bannerSeq;
-  setStore("banners", (b) => [...b.slice(-3), { id, tone, message, ...extra }]);
-  if (tone !== "error" && !extra.sticky) setTimeout(() => dismiss(id), extra.action ? 8000 : 4000);
+  const duration = tone === "error" || extra.sticky ? undefined : extra.action ? 8000 : 4000;
+  setStore("banners", (b) => [...b.slice(-5), { id, tone, message, duration, ...extra }]);
 }
 
 export function dismiss(id: number) {
-  setStore("banners", (b) => b.filter((x) => x.id !== id));
+  if (!store.banners.some((b) => b.id === id && !b.leaving)) return;
+  setStore("banners", (b) => b.id === id, "leaving", true);
+  setTimeout(() => setStore("banners", (b) => b.filter((x) => x.id !== id)), TOAST_EXIT_MS);
 }
 
 function authorizeAction(url: string | null): Banner["action"] {

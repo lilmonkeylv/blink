@@ -6,9 +6,12 @@ import ArrowUp from "lucide-solid/icons/arrow-up";
 import Check from "lucide-solid/icons/check";
 import ChevronDownGlyph from "lucide-solid/icons/chevron-down";
 import ChevronRightGlyph from "lucide-solid/icons/chevron-right";
+import CircleAlert from "lucide-solid/icons/circle-alert";
+import CircleCheck from "lucide-solid/icons/circle-check";
 import FolderGit from "lucide-solid/icons/folder-git-2";
 import GitBranch from "lucide-solid/icons/git-branch";
 import GitPullRequest from "lucide-solid/icons/git-pull-request";
+import Info from "lucide-solid/icons/info";
 import Menu from "lucide-solid/icons/menu";
 import Plus from "lucide-solid/icons/plus";
 import RefreshCw from "lucide-solid/icons/refresh-cw";
@@ -36,6 +39,9 @@ export const PullRequestIcon = icon(GitPullRequest);
 export const PlusIcon = icon(Plus);
 export const CheckIcon = icon(Check);
 export const CloseIcon = icon(X);
+export const SuccessIcon = icon(CircleCheck);
+export const ErrorIcon = icon(CircleAlert);
+export const InfoIcon = icon(Info);
 
 const statusGlyphs: Record<ChangeKind, Component<LucideProps>> = {
   added: SquarePlus,

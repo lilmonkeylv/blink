@@ -8,6 +8,7 @@ import { Dialog } from "./components/Dialog";
 import { Dialogs } from "./components/Dialogs";
 import { CommitView, HistoryList } from "./components/HistoryPane";
 import { TabStrip } from "./components/TabStrip";
+import { Toasts } from "./components/Toasts";
 import { applySidebarWidth, clampSidebar, reclampSidebar, saveRepoLayout } from "./lib/layout";
 import { appMenu, doSync, pickAndAddRepository, Toolbar } from "./components/Toolbar";
 import { fuzzyFilter } from "./lib/fuzzy";
@@ -18,7 +19,6 @@ import {
   bootstrap,
   closeRepoTab,
   cycleRepoTab,
-  dismiss,
   handleLaunches,
   keymap,
   loadKeymap,
@@ -38,49 +38,6 @@ import {
   windowRepo,
 } from "./store";
 import { nativeWindow } from "./components/WindowControls";
-
-function Banners() {
-  return (
-    <div class="banners">
-      <For each={store.banners}>
-        {(b) => (
-          <div class={`banner ${b.tone}`} role={b.tone === "error" ? "alert" : "status"}>
-            <div class="msg">
-              {b.message}
-              <Show when={b.detail}>
-                <details>
-                  <summary class="muted">Show Git output</summary>
-                  <pre>{b.detail}</pre>
-                </details>
-              </Show>
-            </div>
-            <Show when={b.action}>
-              {(a) => (
-                <a
-                  onClick={() => {
-                    dismiss(b.id);
-                    a().run();
-                  }}
-                >
-                  {a().label}
-                </a>
-              )}
-            </Show>
-            <a
-              class="muted"
-              onClick={() => {
-                b.onDismiss?.();
-                dismiss(b.id);
-              }}
-            >
-              Dismiss
-            </a>
-          </div>
-        )}
-      </For>
-    </div>
-  );
-}
 
 function Welcome() {
   return (
@@ -383,7 +340,6 @@ export function App() {
     >
       <Toolbar />
       <TabStrip />
-      <Banners />
       <Show when={store.ready} fallback={<Loading label="Starting Blink" />}>
         <Show when={store.repo} fallback={store.opening ? <Loading label="Opening repository" /> : <Welcome />}>
           <div
@@ -414,6 +370,7 @@ export function App() {
       </Show>
       <PromptHost />
       <ContextMenuHost />
+      <Toasts />
     </div>
   );
 }
