@@ -2,6 +2,12 @@
 
 All notable changes to Blink are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.1.0-alpha.9] - 2026-10-14
+
+### Fixes
+
+- **ui:** Give stash rows a rounded hover that fits their buttons ([6cabcee](https://github.com/lilmonkeylv/blink/commit/6cabcee63786740a73c89411aa213863441b2cbd))
+
 ## [0.1.0-alpha.8] - 2026-10-14
 
 ### Features
