@@ -18,6 +18,7 @@ import {
   type UpdateInfo,
 } from "./api";
 import { EMPTY_DRAFT, persistDraft, savedDrafts, type CommitDraft } from "./lib/drafts";
+import { ask } from "./components/Prompt";
 import { applySidebarWidth, lastSidebarWidth, repoLayout } from "./lib/layout";
 import { resolveBindings } from "./lib/keymap";
 import { reconcile, type FileSel } from "./lib/selection";
@@ -546,7 +547,15 @@ export async function showWhatsNew(all = false) {
 export async function handleLaunches() {
   const launches = await api.takePendingLaunch().catch(() => []);
   for (const launch of launches) {
-    if (launch.type === "open") await addRepository(launch.path);
-    else setStore("dialog", { type: "clone", url: launch.url });
+    if (launch.type === "open") {
+      const trusted =
+        !launch.fromLink ||
+        (await ask(`A link wants to add ${launch.path} to Blink. Only continue if you trust this folder.`, {
+          title: "Add repository",
+          kind: "warning",
+          okLabel: "Add",
+        }));
+      if (trusted) await addRepository(launch.path);
+    } else setStore("dialog", { type: "clone", url: launch.url });
   }
 }

@@ -10,8 +10,14 @@ pub const LAUNCH: &str = "launch";
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "type", rename_all = "camelCase")]
 pub enum Launch {
-    Open { path: String },
-    Clone { url: String },
+    Open {
+        path: String,
+        #[serde(rename = "fromLink")]
+        from_link: bool,
+    },
+    Clone {
+        url: String,
+    },
 }
 
 static PENDING: Mutex<Vec<Launch>> = Mutex::new(Vec::new());
@@ -23,7 +29,7 @@ pub fn parse_url(raw: &str) -> Option<Launch> {
     }
     let param = |name: &str| url.query_pairs().find(|(k, _)| k == name).map(|(_, v)| v.into_owned());
     match url.host_str()? {
-        "open" => param("path").map(|path| Launch::Open { path }),
+        "open" => param("path").and_then(|raw| local_dir(&raw)).map(|path| Launch::Open { path, from_link: true }),
         "clone" => {
             param("url").filter(|u| u.starts_with("https://") || u.starts_with("git@")).map(|url| Launch::Clone { url })
         }
@@ -42,9 +48,34 @@ pub fn parse_args(argv: &[String], cwd: Option<&Path>) -> Vec<Launch> {
             let path = PathBuf::from(arg);
             let path = if path.is_absolute() { path } else { cwd.map(|c| c.join(&path)).unwrap_or(path) };
             let path = std::fs::canonicalize(&path).unwrap_or(path);
-            path.is_dir().then(|| Launch::Open { path: strip_verbatim(&path) })
+            path.is_dir().then(|| Launch::Open { path: strip_verbatim(&path), from_link: false })
         })
         .collect()
+}
+
+fn on_local_disk(path: &Path) -> bool {
+    #[cfg(windows)]
+    {
+        use std::path::{Component, Prefix};
+        matches!(
+            path.components().next(),
+            Some(Component::Prefix(p)) if matches!(p.kind(), Prefix::Disk(_) | Prefix::VerbatimDisk(_))
+        )
+    }
+    #[cfg(not(windows))]
+    {
+        path.has_root()
+    }
+}
+
+fn local_dir(raw: &str) -> Option<String> {
+    let unc = raw.as_bytes().get(..2).is_some_and(|lead| lead.iter().all(|b| matches!(b, b'/' | b'\\')));
+    let path = Path::new(raw);
+    if unc || !path.is_absolute() || !on_local_disk(path) {
+        return None;
+    }
+    let canonical = std::fs::canonicalize(path).ok()?;
+    (on_local_disk(&canonical) && canonical.is_dir()).then(|| strip_verbatim(&canonical))
 }
 
 fn strip_verbatim(path: &Path) -> String {
@@ -95,7 +126,32 @@ mod tests {
         );
         assert_eq!(parse_url("blink://clone?url=file%3A%2F%2F%2Fetc"), None);
         assert_eq!(parse_url("https://example.com"), None);
-        assert_eq!(parse_url("blink://open?path=C%3A%2Fx"), Some(Launch::Open { path: "C:/x".into() }));
+
+        let dir = tempfile::tempdir().unwrap();
+        let file = dir.path().join("file.txt");
+        std::fs::write(&file, "x").unwrap();
+        let open = |path: &str| {
+            let encoded: String = url::form_urlencoded::byte_serialize(path.as_bytes()).collect();
+            parse_url(&format!("blink://open?path={encoded}"))
+        };
+        let expected = strip_verbatim(&std::fs::canonicalize(dir.path()).unwrap());
+        assert_eq!(open(&dir.path().to_string_lossy()), Some(Launch::Open { path: expected, from_link: true }));
+
+        for rejected in [
+            r"\\server\share\repo",
+            "//server/share/repo",
+            r"\/server\share",
+            r"\\?\C:\Windows",
+            r"\\?\UNC\server\share",
+            r"\\.\C:\Windows",
+            "relative/repo",
+            "C:relative",
+            "",
+        ] {
+            assert_eq!(open(rejected), None, "{rejected}");
+        }
+        assert_eq!(open(&file.to_string_lossy()), None);
+        assert_eq!(open(&dir.path().join("missing").to_string_lossy()), None);
     }
 
     #[test]
@@ -105,6 +161,14 @@ mod tests {
         let launches =
             parse_args(&["blink".into(), "repo".into(), "--flag".into(), "missing".into()], Some(dir.path()));
         assert_eq!(launches.len(), 1);
-        assert!(matches!(&launches[0], Launch::Open { path } if path.ends_with("repo")));
+        assert!(matches!(&launches[0], Launch::Open { path, from_link: false } if path.ends_with("repo")));
+    }
+
+    #[test]
+    fn deep_links_in_args_are_marked() {
+        let dir = tempfile::tempdir().unwrap();
+        let encoded: String = url::form_urlencoded::byte_serialize(dir.path().to_string_lossy().as_bytes()).collect();
+        let launches = parse_args(&["blink".into(), format!("blink://open?path={encoded}")], None);
+        assert!(matches!(&launches[..], [Launch::Open { from_link: true, .. }]));
     }
 }

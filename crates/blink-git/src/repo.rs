@@ -1,4 +1,6 @@
 use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex, PoisonError};
+use std::time::SystemTime;
 
 use crate::cli::GitCli;
 use crate::error::{Error, Result};
@@ -11,6 +13,13 @@ pub struct Repository {
     workdir: PathBuf,
     git_dir: PathBuf,
     common_dir: PathBuf,
+    remotes: Arc<Mutex<RemoteCache>>,
+}
+
+#[derive(Default)]
+struct RemoteCache {
+    config_modified: Option<SystemTime>,
+    remotes: Option<Vec<(String, String)>>,
 }
 
 impl std::fmt::Debug for Repository {
@@ -28,7 +37,13 @@ impl Repository {
         let workdir = local.workdir().ok_or(Error::Bare)?.to_path_buf();
         let git_dir = local.git_dir().to_path_buf();
         let common_dir = local.common_dir().to_path_buf();
-        Ok(Self { shared, workdir: dunce(workdir), git_dir: dunce(git_dir), common_dir: dunce(common_dir) })
+        Ok(Self {
+            shared,
+            workdir: dunce(workdir),
+            git_dir: dunce(git_dir),
+            common_dir: dunce(common_dir),
+            remotes: Arc::default(),
+        })
     }
 
     pub fn is_repository(path: impl AsRef<Path>) -> bool {
@@ -62,7 +77,34 @@ impl Repository {
     }
 
     pub fn has_remotes(&self) -> bool {
-        !self.local().remote_names().is_empty()
+        !self.remotes().is_empty()
+    }
+
+    pub fn remotes(&self) -> Vec<(String, String)> {
+        let modified = std::fs::metadata(self.common_dir.join("config")).and_then(|m| m.modified()).ok();
+        let mut cache = self.remotes.lock().unwrap_or_else(PoisonError::into_inner);
+        if cache.remotes.is_none() || cache.config_modified != modified {
+            *cache = RemoteCache { config_modified: modified, remotes: Some(self.read_remotes()) };
+        }
+        cache.remotes.clone().unwrap_or_default()
+    }
+
+    pub fn remote_url(&self, name: &str) -> Option<String> {
+        self.remotes().into_iter().find(|(n, _)| n == name).map(|(_, url)| url)
+    }
+
+    fn read_remotes(&self) -> Vec<(String, String)> {
+        // The shared handle keeps the config it was opened with, so remotes added later need a fresh open.
+        let Ok(repo) = gix::open(&self.workdir) else { return Vec::new() };
+        repo.remote_names()
+            .iter()
+            .filter_map(|name| {
+                let name: &gix::bstr::BStr = name.as_ref();
+                let remote = repo.find_remote(name).ok()?;
+                let url = remote.url(gix::remote::Direction::Fetch)?;
+                Some((name.to_string(), url.to_bstring().to_string()))
+            })
+            .collect()
     }
 
     pub fn is_operation_in_progress(&self) -> Option<&'static str> {

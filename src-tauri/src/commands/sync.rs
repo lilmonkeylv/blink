@@ -1,9 +1,11 @@
+use std::sync::Arc;
 use std::time::Duration;
 
-use blink_git::{HeadState, Progress, SyncAction};
+use blink_git::{GitCli, HeadState, Progress, Repository, SyncAction};
 use blink_store::PullStrategy;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
+use tokio::sync::Semaphore;
 
 use crate::error::{CmdResult, CommandError};
 use crate::state::AppState;
@@ -11,6 +13,8 @@ use crate::view::RepoView;
 use crate::watch::REPO_CHANGED;
 
 pub const SYNC_PROGRESS: &str = "sync-progress";
+
+const FETCH_ALL_CONCURRENCY: usize = 4;
 
 #[derive(Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -51,36 +55,44 @@ pub async fn sync(
     let push_tags = tags.unwrap_or(false);
     let mut emit = progress_emitter(&app, &id, action);
 
-    let label = match action {
-        SyncAction::Pull => "Pull",
-        _ => "Sync",
-    };
-    let result = state
-        .engine
-        .rewrite(&id, label, move |repo| match action {
-            SyncAction::Fetch => cli.fetch(None, prune, emit),
-            SyncAction::Pull => match pull_strategy {
-                PullStrategy::FfOnly => cli.run(&["pull", "--ff-only"]).map(drop),
-                strategy => cli.pull(strategy == PullStrategy::Rebase, emit),
-            },
-            SyncAction::Push => {
-                let HeadState::Branch { name, .. } = repo.head()? else {
-                    return Err(blink_git::Error::Git("Cannot push a detached HEAD".into()));
-                };
-                let target = cli.push_target(&name)?;
-                cli.push(&target, force, &mut emit)?;
-                if push_tags {
-                    cli.push_tags(&target.remote, &mut emit)?;
-                }
-                Ok(())
-            }
-        })
-        .await
-        .map_err(CommandError::from);
+    let engine = &state.engine;
+    let result = match action {
+        SyncAction::Fetch => engine.fetch(&id, move |_| cli.fetch(None, prune, emit)).await,
+        SyncAction::Pull => {
+            engine
+                .network_rewrite(&id, "Pull", move |_| match pull_strategy {
+                    PullStrategy::FfOnly => cli.run(&["pull", "--ff-only"]).map(drop),
+                    strategy => cli.pull(strategy == PullStrategy::Rebase, emit),
+                })
+                .await
+        }
+        SyncAction::Push => {
+            engine.network_write(&id, move |repo| push_current_branch(repo, &cli, force, push_tags, &mut emit)).await
+        }
+    }
+    .map_err(CommandError::from);
     if result.is_ok() && action != SyncAction::Push {
         maintain_commit_graph(&state, id);
     }
     result
+}
+
+fn push_current_branch(
+    repo: &Repository,
+    cli: &GitCli,
+    force: bool,
+    push_tags: bool,
+    emit: &mut impl FnMut(Progress),
+) -> blink_git::Result<()> {
+    let HeadState::Branch { name, .. } = repo.head()? else {
+        return Err(blink_git::Error::Git("Cannot push a detached HEAD".into()));
+    };
+    let target = cli.push_target(&name)?;
+    cli.push(&target, force, &mut *emit)?;
+    if push_tags {
+        cli.push_tags(&target.remote, &mut *emit)?;
+    }
+    Ok(())
 }
 
 fn maintain_commit_graph(state: &AppState, id: String) {
@@ -107,14 +119,24 @@ pub struct FetchAllRow {
 }
 
 async fn fetch_one(state: &AppState, path: &str, prune: bool) -> CmdResult<FetchAllRow> {
-    let (id, handle) = state.engine.open(path).await?;
-    let mut fetched = false;
-    if handle.snapshot().has_remote {
+    let engine = &state.engine;
+    let registered = engine.get(path).ok();
+    let handle = match &registered {
+        Some(handle) => handle.clone(),
+        None => engine.open_detached(path).await?,
+    };
+    let fetched = handle.repo().has_remotes();
+    if fetched {
         let cli = state.git_cli(handle.repo());
-        state.engine.network_write(&id, move |_| cli.fetch(None, prune, |_| {})).await?;
-        fetched = true;
+        match registered {
+            Some(_) => engine.fetch(path, move |_| cli.fetch(None, prune, |_| {})).await?,
+            None => engine.fetch_detached(&handle, move |_| cli.fetch(None, prune, |_| {})).await?,
+        }
     }
-    let snapshot = state.engine.refresh(&id).await?;
+    let snapshot = match registered {
+        Some(_) => engine.refresh(path).await?,
+        None => handle.refresh(engine.pools()).await?,
+    };
     let (ahead, behind) = snapshot.ahead_behind.map(|ab| (ab.ahead, ab.behind)).unwrap_or_default();
     Ok(FetchAllRow {
         path: path.to_string(),
@@ -130,13 +152,16 @@ async fn fetch_one(state: &AppState, path: &str, prune: bool) -> CmdResult<Fetch
 #[tauri::command]
 pub async fn fetch_all(app: AppHandle, state: State<'_, AppState>) -> CmdResult<Vec<FetchAllRow>> {
     let prune = state.settings.read().git.prune_on_fetch;
+    let limit = Arc::new(Semaphore::new(FETCH_ALL_CONCURRENCY));
     let tasks: Vec<_> = state
         .cache
         .repositories()?
         .into_iter()
         .map(|record| {
             let app = app.clone();
+            let limit = limit.clone();
             tauri::async_runtime::spawn(async move {
+                let _permit = limit.acquire_owned().await.ok();
                 let state = app.state::<AppState>();
                 let row = fetch_one(&state, &record.path, prune).await.unwrap_or_else(|e| FetchAllRow {
                     path: record.path.clone(),
@@ -184,8 +209,8 @@ pub fn spawn_background_fetch(app: AppHandle) {
             let engine = state.engine.clone();
             for id in engine.open_repos() {
                 let Ok(handle) = engine.get(&id) else { continue };
-                let cli = state.git_cli(handle.repo());
-                let fetched = engine.network_write(&id, move |_| cli.fetch(None, prune, |_| {})).await;
+                let cli = state.git_cli(handle.repo()).with_ssh_batch_mode();
+                let fetched = engine.fetch(&id, move |_| cli.fetch(None, prune, |_| {})).await;
                 if let Err(e) = fetched {
                     tracing::debug!(repo = %id, error = %e, "background fetch failed");
                     continue;

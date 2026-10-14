@@ -104,6 +104,16 @@ impl RepoHandle {
         Ok(result)
     }
 
+    pub async fn network<F, R>(self: &Arc<Self>, pools: &Pools, exclusive: bool, op: F) -> Result<R>
+    where
+        F: FnOnce(&Repository) -> blink_git::Result<R> + Send + 'static,
+        R: Send + 'static,
+    {
+        let _guard = if exclusive { Some(self.writer.lock().await) } else { None };
+        let this = self.clone();
+        Ok(pools.run_network(move || op(&this.repo)).await??)
+    }
+
     pub async fn read<F, R>(self: &Arc<Self>, pools: &Pools, op: F) -> Result<R>
     where
         F: FnOnce(&Repository) -> blink_git::Result<R> + Send + 'static,

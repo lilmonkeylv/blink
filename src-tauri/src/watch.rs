@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use blink_watch::{DEFAULT_DEBOUNCE, RepoWatcher};
 use tauri::{AppHandle, Emitter, Manager};
@@ -9,6 +10,8 @@ use crate::view::RepoView;
 
 pub const REPO_CHANGED: &str = "repo-changed";
 
+const MIN_REFRESH_INTERVAL: Duration = Duration::from_millis(300);
+
 pub fn ensure_watcher(app: &AppHandle, state: &AppState, id: &str) -> CmdResult<()> {
     let mut watchers = state.watchers.lock();
     if watchers.contains_key(id) {
@@ -17,7 +20,7 @@ pub fn ensure_watcher(app: &AppHandle, state: &AppState, id: &str) -> CmdResult<
     let handle = state.engine.get(id)?;
     let repo = handle.repo();
     let (tx, rx) = crossbeam_channel::unbounded();
-    let watcher = RepoWatcher::start(repo.workdir(), repo.git_dir(), DEFAULT_DEBOUNCE, tx)?;
+    let watcher = RepoWatcher::start(repo, DEFAULT_DEBOUNCE, tx)?;
     watchers.insert(id.to_string(), watcher);
 
     let app = app.clone();
@@ -25,8 +28,13 @@ pub fn ensure_watcher(app: &AppHandle, state: &AppState, id: &str) -> CmdResult<
     std::thread::Builder::new()
         .name(format!("blink-watch-{}", repo.name()))
         .spawn(move || {
+            let mut last_refresh: Option<Instant> = None;
             while rx.recv().is_ok() {
+                if let Some(at) = last_refresh {
+                    std::thread::sleep(MIN_REFRESH_INTERVAL.saturating_sub(at.elapsed()));
+                }
                 while rx.try_recv().is_ok() {}
+                last_refresh = Some(Instant::now());
                 let (app, id) = (&app, &id);
                 tauri::async_runtime::block_on(async move {
                     let state = app.state::<AppState>();

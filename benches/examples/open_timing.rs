@@ -18,8 +18,7 @@ fn main() {
     println!("branches    {:?}", t.elapsed());
     let (tx, _rx) = crossbeam_channel::unbounded();
     let t = Instant::now();
-    let _w =
-        blink_watch::RepoWatcher::start(repo.workdir(), repo.git_dir(), blink_watch::DEFAULT_DEBOUNCE, tx).unwrap();
+    let _w = blink_watch::RepoWatcher::start(&repo, blink_watch::DEFAULT_DEBOUNCE, tx).unwrap();
     println!("watcher     {:?}", t.elapsed());
     let t = Instant::now();
     let _ = repo.log(None, 0, 300).unwrap();

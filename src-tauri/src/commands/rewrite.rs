@@ -1,5 +1,5 @@
 use blink_core::undo::UndoEntry;
-use blink_git::{Operation, RebaseAction, RebaseStep, ResetMode};
+use blink_git::{Operation, RebaseAction, RebaseStep, ResetMode, validate_sha};
 use serde::Deserialize;
 use tauri::State;
 
@@ -7,11 +7,19 @@ use crate::error::{CmdResult, CommandError};
 use crate::state::AppState;
 
 fn short(sha: &str) -> &str {
-    &sha[..sha.len().min(7)]
+    sha.get(..7).unwrap_or(sha)
+}
+
+fn validate_all<'a>(shas: impl IntoIterator<Item = &'a String>) -> CmdResult<()> {
+    for sha in shas {
+        validate_sha(sha)?;
+    }
+    Ok(())
 }
 
 #[tauri::command]
 pub async fn revert_commit(state: State<'_, AppState>, id: String, sha: String) -> CmdResult<()> {
+    validate_sha(&sha)?;
     let label = format!("Revert {}", short(&sha));
     Ok(state.engine.rewrite(&id, label, move |repo| repo.cli().revert(&sha)).await?)
 }
@@ -23,6 +31,7 @@ pub async fn cherry_pick(
     shas: Vec<String>,
     target: Option<String>,
 ) -> CmdResult<()> {
+    validate_all(&shas)?;
     let label = format!("Cherry-pick {} commit{}", shas.len(), if shas.len() == 1 { "" } else { "s" });
     Ok(state
         .engine
@@ -39,12 +48,14 @@ pub async fn cherry_pick(
 
 #[tauri::command]
 pub async fn reset_to_commit(state: State<'_, AppState>, id: String, sha: String, mode: ResetMode) -> CmdResult<()> {
+    validate_sha(&sha)?;
     let label = format!("Reset to {}", short(&sha));
     Ok(state.engine.rewrite(&id, label, move |repo| repo.cli().reset(&sha, mode)).await?)
 }
 
 #[tauri::command]
 pub async fn checkout_commit(state: State<'_, AppState>, id: String, sha: String) -> CmdResult<()> {
+    validate_sha(&sha)?;
     Ok(state.engine.write(&id, move |repo| repo.cli().checkout(&sha)).await?)
 }
 
@@ -61,6 +72,7 @@ pub async fn create_tag(
     sha: String,
     message: Option<String>,
 ) -> CmdResult<()> {
+    validate_sha(&sha)?;
     Ok(state.engine.write(&id, move |repo| repo.cli().create_tag(&name, &sha, message.as_deref())).await?)
 }
 
@@ -101,6 +113,7 @@ pub async fn rebase_interactive(state: State<'_, AppState>, id: String, plan: Re
     if plan.steps.is_empty() {
         return Err(CommandError::new("empty", "Nothing to rewrite"));
     }
+    validate_all(plan.base.iter().chain(plan.steps.iter().map(|s| &s.sha)))?;
     let label = plan.label.clone().unwrap_or_else(|| "Rewrite history".into());
     Ok(state
         .engine
@@ -119,6 +132,7 @@ pub async fn squash_commits(
     commits: Vec<String>,
     message: String,
 ) -> CmdResult<()> {
+    validate_all(std::iter::once(&target).chain(&commits))?;
     let label = format!("Squash {} commits", commits.len() + 1);
     Ok(state
         .engine
@@ -184,4 +198,23 @@ pub fn undo_history(state: State<'_, AppState>, id: String) -> CmdResult<Vec<Und
 pub async fn undo(state: State<'_, AppState>, id: String) -> CmdResult<UndoEntry> {
     let handle = state.engine.get(&id)?;
     Ok(state.engine.write(&id, move |repo| handle.undo().undo(repo)).await?)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn short_never_splits_a_character() {
+        assert_eq!(short("0123456789abcdef"), "0123456");
+        assert_eq!(short("abc"), "abc");
+        assert_eq!(short("\u{e9}\u{e9}\u{e9}\u{e9}\u{e9}"), "\u{e9}\u{e9}\u{e9}\u{e9}\u{e9}");
+    }
+
+    #[test]
+    fn rejects_non_hex_shas() {
+        let shas = ["abc1234".to_string(), "--output=x".to_string()];
+        assert!(validate_all(&shas[..1]).is_ok());
+        assert_eq!(validate_all(&shas).unwrap_err().kind, "invalidArgument");
+    }
 }

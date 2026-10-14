@@ -5,6 +5,7 @@ edition.workspace = true
 license.workspace = true
 
 [dependencies]
+blink-git.workspace = true
 crossbeam-channel.workspace = true
 notify-debouncer-full.workspace = true
 thiserror.workspace = true

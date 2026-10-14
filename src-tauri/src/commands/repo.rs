@@ -42,7 +42,7 @@ pub fn shared_state(state: State<'_, AppState>) -> CmdResult<SharedState> {
     })
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn bootstrap(state: State<'_, AppState>) -> CmdResult<Bootstrap> {
     Ok(Bootstrap {
         repositories: state.cache.repositories()?,
@@ -65,7 +65,7 @@ fn owner_from_remote(url: &str) -> Option<String> {
 }
 
 pub(crate) fn origin_url(repo: &Repository) -> Option<String> {
-    let remotes = repo.cli().remotes().ok()?;
+    let remotes = repo.remotes();
     remotes.iter().find(|(name, _)| name == "origin").or(remotes.first()).map(|(_, url)| url.clone())
 }
 
@@ -451,7 +451,7 @@ pub fn reveal_in_file_manager(
 ) -> CmdResult<()> {
     let handle = state.engine.get(&id)?;
     let target = match path {
-        Some(p) => handle.repo().workdir().join(p),
+        Some(p) => handle.repo().workdir().join(blink_git::safe_rel_path(&p)?),
         None => handle.repo().workdir().to_path_buf(),
     };
     app.opener().reveal_item_in_dir(target).map_err(|e| CommandError::new("opener", e.to_string()))
@@ -473,7 +473,7 @@ pub(crate) fn web_url(remote: &str) -> Option<String> {
     Some(url.to_string())
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn open_on_github(app: AppHandle, state: State<'_, AppState>, id: String) -> CmdResult<()> {
     let handle = state.engine.get(&id)?;
     let url = origin_url(handle.repo())

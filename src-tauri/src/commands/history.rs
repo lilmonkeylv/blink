@@ -1,6 +1,6 @@
 use blink_core::ops;
 use blink_diff::DiffOptions;
-use blink_git::CommitDetail;
+use blink_git::{CommitDetail, safe_rel_path, validate_sha};
 use tauri::State;
 use tauri::ipc::Response;
 
@@ -24,6 +24,7 @@ pub async fn history(
 
 #[tauri::command]
 pub async fn commit_detail(state: State<'_, AppState>, id: String, sha: String) -> CmdResult<CommitDetail> {
+    validate_sha(&sha)?;
     Ok(state.engine.read(&id, move |repo| repo.commit_detail(&sha)).await?)
 }
 
@@ -37,6 +38,8 @@ pub async fn commit_file_diff(
     ignore_whitespace: Option<bool>,
     highlight: Option<bool>,
 ) -> CmdResult<Response> {
+    validate_sha(&sha)?;
+    safe_rel_path(&path)?;
     let opts = DiffOptions {
         ignore_whitespace: ignore_whitespace.unwrap_or(false),
         highlight: highlight.unwrap_or(true),

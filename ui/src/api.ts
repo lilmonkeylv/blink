@@ -517,7 +517,7 @@ export interface Tool {
   name: string;
 }
 
-export type Launch = { type: "open"; path: string } | { type: "clone"; url: string };
+export type Launch = { type: "open"; path: string; fromLink: boolean } | { type: "clone"; url: string };
 
 export function onChecksChanged(handler: (e: { repo: string; summary: ChecksSummary }) => void): Promise<UnlistenFn> {
   return listen<{ repo: string; summary: ChecksSummary }>("checks-changed", (e) => handler(e.payload));

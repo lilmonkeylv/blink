@@ -12,6 +12,8 @@ pub enum Error {
     Cli { command: String, stderr: String, code: Option<i32> },
     #[error("git executable not found")]
     GitNotFound,
+    #[error("invalid argument: {0}")]
+    InvalidArgument(String),
     #[error("operation cancelled")]
     Cancelled,
     #[error(transparent)]

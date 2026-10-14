@@ -39,6 +39,43 @@ pub fn https_host(url: &str) -> Option<String> {
     (parsed.scheme() == "https").then(|| parsed.host_str().map(str::to_ascii_lowercase)).flatten()
 }
 
+type Credentials = (String, String);
+
+#[derive(Default)]
+struct CredentialEntries {
+    epoch: u64,
+    hosts: HashMap<String, Credentials>,
+}
+
+#[derive(Default)]
+pub struct CredentialCache {
+    inner: Mutex<CredentialEntries>,
+}
+
+impl CredentialCache {
+    fn get_or_load(&self, host: &str, load: impl FnOnce() -> Option<Credentials>) -> Option<Credentials> {
+        let epoch = {
+            let inner = self.inner.lock();
+            if let Some(known) = inner.hosts.get(host) {
+                return Some(known.clone());
+            }
+            inner.epoch
+        };
+        let loaded = load()?;
+        let mut inner = self.inner.lock();
+        if inner.epoch == epoch {
+            inner.hosts.insert(host.to_string(), loaded.clone());
+        }
+        Some(loaded)
+    }
+
+    fn forget(&self, host: &str) {
+        let mut inner = self.inner.lock();
+        inner.epoch += 1;
+        inner.hosts.remove(host);
+    }
+}
+
 pub struct OAuthConfig {
     pub client_id: Option<String>,
     pub client_secret: Option<String>,
@@ -54,6 +91,7 @@ pub struct AppState {
     pub oauth: OAuthConfig,
     pub github: Mutex<Option<(String, Client)>>,
     pub check_states: Mutex<HashMap<String, CheckState>>,
+    credentials: CredentialCache,
 }
 
 fn env_or_build(name: &str, built: Option<&'static str>) -> Option<String> {
@@ -107,6 +145,7 @@ impl AppState {
             },
             github: Mutex::new(None),
             check_states: Mutex::new(HashMap::new()),
+            credentials: CredentialCache::default(),
         })
     }
 
@@ -130,13 +169,20 @@ impl AppState {
         self.cache.put_app_state(ENTERPRISE_KEY, &accounts)
     }
 
-    pub fn credentials_for_host(&self, host: &str) -> Option<(String, String)> {
-        if host == GITHUB_HOST {
-            return self.token().map(|(account, token)| (account.login, token));
-        }
-        let account = self.enterprise_accounts().into_iter().find(|a| a.host == host)?;
-        let token = self.secrets.get(&Self::host_token_key(host, &account.account.login)).ok().flatten()?;
-        Some((account.account.login, token))
+    pub fn credentials_for_host(&self, host: &str) -> Option<Credentials> {
+        self.credentials.get_or_load(host, || {
+            let login = if host == GITHUB_HOST {
+                self.account()?.login
+            } else {
+                self.enterprise_accounts().into_iter().find(|a| a.host == host)?.account.login
+            };
+            let token = self.secrets.get(&Self::host_token_key(host, &login)).ok().flatten()?;
+            Some((login, token))
+        })
+    }
+
+    pub fn forget_credentials(&self, host: &str) {
+        self.credentials.forget(host);
     }
 
     pub fn client_for_host(&self, host: &str) -> Option<Client> {
@@ -149,8 +195,8 @@ impl AppState {
 
     pub fn token(&self) -> Option<(Account, String)> {
         let account = self.account()?;
-        let token = self.secrets.get(&Self::token_key(&account.login)).ok().flatten()?;
-        Some((account, token))
+        let (login, token) = self.credentials_for_host(GITHUB_HOST)?;
+        (login == account.login).then_some((account, token))
     }
 
     pub fn github(&self) -> Option<Client> {
@@ -201,6 +247,34 @@ mod tests {
         assert!(!is_github_https("https://gitlab.com/a/b.git"));
         assert!(!is_github_https("git@github.com:a/b.git"));
         assert!(!is_github_https("https://github.com.evil.io/a/b.git"));
+    }
+
+    #[test]
+    fn credentials_are_cached_until_forgotten() {
+        let cache = CredentialCache::default();
+        let loads = std::cell::Cell::new(0);
+        let load = || {
+            loads.set(loads.get() + 1);
+            Some(("me".to_string(), format!("token{}", loads.get())))
+        };
+        assert_eq!(cache.get_or_load("github.com", load).unwrap().1, "token1");
+        assert_eq!(cache.get_or_load("github.com", load).unwrap().1, "token1");
+        assert_eq!(loads.get(), 1);
+        assert_eq!(cache.get_or_load("ghe.acme.com", || None), None);
+        assert_eq!(cache.get_or_load("ghe.acme.com", || None), None);
+        cache.forget("github.com");
+        assert_eq!(cache.get_or_load("github.com", load).unwrap().1, "token2");
+    }
+
+    #[test]
+    fn a_sign_out_during_a_load_is_not_undone() {
+        let cache = CredentialCache::default();
+        let stale = cache.get_or_load("github.com", || {
+            cache.forget("github.com");
+            Some(("me".to_string(), "stale".to_string()))
+        });
+        assert_eq!(stale.unwrap().1, "stale");
+        assert_eq!(cache.get_or_load("github.com", || None), None);
     }
 
     #[test]

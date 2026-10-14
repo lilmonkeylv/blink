@@ -56,6 +56,12 @@ impl Engine {
         Ok((id, handle))
     }
 
+    pub async fn open_detached(&self, path: impl AsRef<Path>) -> Result<Arc<RepoHandle>> {
+        let path = path.as_ref().to_path_buf();
+        let repo = self.pools.run_foreground(move || Repository::open(path)).await??;
+        Ok(Arc::new(RepoHandle::new(repo)))
+    }
+
     pub fn get(&self, id: &str) -> Result<Arc<RepoHandle>> {
         self.repos.get(id).map(|r| r.clone()).ok_or_else(|| Error::UnknownRepo(id.to_string()))
     }
@@ -85,11 +91,15 @@ impl Engine {
     {
         let handle = self.get(id)?;
         let result = handle.write(&self.pools, op).await;
+        self.refresh_after_write(id).await;
+        result
+    }
+
+    async fn refresh_after_write(&self, id: &str) {
         match self.refresh(id).await {
             Ok(_) | Err(Error::Cancelled) => {}
             Err(e) => tracing::warn!(repo = id, error = %e, "refresh after write failed"),
         }
-        result
     }
 
     pub async fn rewrite<F, R>(&self, id: &str, label: impl Into<String>, op: F) -> Result<R>
@@ -115,8 +125,48 @@ impl Engine {
         F: FnOnce(&Repository) -> blink_git::Result<R> + Send + 'static,
         R: Send + 'static,
     {
+        let handle = self.get(id)?;
+        let result = self.network_on(&handle, true, op).await;
+        self.refresh_after_write(id).await;
+        result
+    }
+
+    pub async fn network_rewrite<F, R>(&self, id: &str, label: impl Into<String>, op: F) -> Result<R>
+    where
+        F: FnOnce(&Repository) -> blink_git::Result<R> + Send + 'static,
+        R: Send + 'static,
+    {
+        let handle = self.get(id)?;
+        let label = label.into();
+        self.network_write(id, move |repo| handle.undo().record(repo, &label, || op(repo))).await
+    }
+
+    pub async fn fetch<F, R>(&self, id: &str, op: F) -> Result<R>
+    where
+        F: FnOnce(&Repository) -> blink_git::Result<R> + Send + 'static,
+        R: Send + 'static,
+    {
+        let handle = self.get(id)?;
+        let result = self.network_on(&handle, false, op).await;
+        self.refresh_after_write(id).await;
+        result
+    }
+
+    pub async fn fetch_detached<F, R>(&self, handle: &Arc<RepoHandle>, op: F) -> Result<R>
+    where
+        F: FnOnce(&Repository) -> blink_git::Result<R> + Send + 'static,
+        R: Send + 'static,
+    {
+        self.network_on(handle, false, op).await
+    }
+
+    async fn network_on<F, R>(&self, handle: &Arc<RepoHandle>, exclusive: bool, op: F) -> Result<R>
+    where
+        F: FnOnce(&Repository) -> blink_git::Result<R> + Send + 'static,
+        R: Send + 'static,
+    {
         let _permit = self.network.clone().acquire_owned().await.map_err(|_| Error::PoolClosed)?;
-        self.write(id, op).await
+        handle.network(&self.pools, exclusive, op).await
     }
 
     pub async fn maintain_commit_graph(&self, id: &str) -> Result<bool> {
@@ -217,6 +267,49 @@ mod tests {
         let topic = handle.repo().common_dir().join("refs/heads/topic");
         std::fs::File::options().write(true).open(topic).unwrap().set_modified(later).unwrap();
         assert!(engine.maintain_commit_graph(&id).await.unwrap());
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn fetch_runs_beside_a_held_write_lock() {
+        let dir = fixture();
+        let engine = Arc::new(Engine::new(PoolConfig { foreground_threads: 4, ..PoolConfig::default() }));
+        let (id, _) = engine.open(dir.path()).await.unwrap();
+        let (started_tx, started_rx) = tokio::sync::oneshot::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+        let writer = {
+            let engine = engine.clone();
+            let id = id.clone();
+            tokio::spawn(async move {
+                engine
+                    .write(&id, move |_| {
+                        let _ = started_tx.send(());
+                        let _ = release_rx.recv();
+                        Ok(())
+                    })
+                    .await
+            })
+        };
+        started_rx.await.unwrap();
+        let fetched = tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            engine.fetch(&id, |_| Ok(std::thread::current().name().map(str::to_string))),
+        )
+        .await
+        .expect("fetch waited on the write lock")
+        .unwrap();
+        assert!(fetched.unwrap_or_default().starts_with("blink-net-"));
+        release_tx.send(()).unwrap();
+        writer.await.unwrap().unwrap();
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn detached_handles_are_not_registered() {
+        let dir = fixture();
+        let engine = Engine::new(PoolConfig::default());
+        let handle = engine.open_detached(dir.path()).await.unwrap();
+        let has_remote = engine.fetch_detached(&handle, |repo| Ok(repo.has_remotes())).await.unwrap();
+        assert!(!has_remote);
+        assert!(engine.open_repos().is_empty());
     }
 
     #[tokio::test(flavor = "multi_thread")]

@@ -1,5 +1,10 @@
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
+use std::sync::LazyLock;
+
 use blink_core::RepoSnapshot;
 use blink_git::{AheadBehind, ChangeKind, FileChange, HeadState};
+use parking_lot::Mutex;
 use serde::Serialize;
 
 #[derive(Debug, Clone, Serialize)]
@@ -27,13 +32,30 @@ pub struct RepoView {
 const CACHED_VIEW_KEY: &str = "view";
 const CACHED_VIEW_MAX_FILES: usize = 5_000;
 
+static REMEMBERED: LazyLock<Mutex<HashMap<String, u64>>> = LazyLock::new(Default::default);
+
 impl RepoView {
+    fn fingerprint(&self) -> u64 {
+        let mut hasher = std::collections::hash_map::DefaultHasher::new();
+        let unversioned = Self { generation: 0, ..self.clone() };
+        serde_json::to_string(&unversioned).unwrap_or_default().hash(&mut hasher);
+        hasher.finish()
+    }
+
     pub fn remember(&self, cache: &blink_store::Cache) {
         if self.files.len() > CACHED_VIEW_MAX_FILES {
             return;
         }
-        if let Err(e) = cache.put_repo_state(&self.id, CACHED_VIEW_KEY, self) {
-            tracing::debug!(repo = %self.id, error = %e, "could not cache repository view");
+        let fingerprint = self.fingerprint();
+        let mut remembered = REMEMBERED.lock();
+        if remembered.get(&self.id) == Some(&fingerprint) {
+            return;
+        }
+        match cache.put_repo_state(&self.id, CACHED_VIEW_KEY, self) {
+            Ok(()) => {
+                remembered.insert(self.id.clone(), fingerprint);
+            }
+            Err(e) => tracing::debug!(repo = %self.id, error = %e, "could not cache repository view"),
         }
     }
 
@@ -87,5 +109,20 @@ mod tests {
         assert_eq!(small["files"].as_array().unwrap().len(), 2);
         assert_eq!(small["hasRemote"], true);
         assert!(RepoView::cached(&cache, "/huge").is_none());
+    }
+
+    #[test]
+    fn rewrites_the_cached_view_only_when_it_changes() {
+        let cache = blink_store::Cache::in_memory().unwrap();
+        view("/dedup", 2).remember(&cache);
+        let mut next = view("/dedup", 2);
+        next.generation = 8;
+        next.remember(&cache);
+        assert_eq!(RepoView::cached(&cache, "/dedup").unwrap()["generation"], 7);
+        let mut changed = view("/dedup", 3);
+        changed.generation = 9;
+        changed.remember(&cache);
+        let cached = RepoView::cached(&cache, "/dedup").unwrap();
+        assert_eq!((cached["generation"].as_u64(), cached["files"].as_array().unwrap().len()), (Some(9), 3));
     }
 }
