@@ -6,6 +6,7 @@ pub mod history;
 pub mod images;
 pub mod inspect;
 pub mod integrations;
+pub mod lfs;
 pub mod notes;
 pub mod repo;
 pub mod review;

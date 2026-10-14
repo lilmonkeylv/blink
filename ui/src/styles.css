@@ -1866,6 +1866,16 @@ select.input {
   font-size: 12px;
 }
 
+.lfs-lock {
+  display: inline-flex;
+  color: var(--fg-muted);
+}
+
+.lfs-lock .icon {
+  width: 13px;
+  height: 13px;
+}
+
 .operation-bar.notice {
   background: var(--hunk-bg);
 }

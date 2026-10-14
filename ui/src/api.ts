@@ -524,6 +524,18 @@ export interface Submodule {
   initialized: boolean;
 }
 
+export interface LfsStatus {
+  version: string | null;
+  usesLfs: boolean;
+}
+
+export interface LfsLock {
+  id: string;
+  path: string;
+  owner: string | null;
+  lockedAt: string | null;
+}
+
 export type SigningFormat = "ssh" | "gpg";
 export type ConfigScope = "global" | "local";
 
@@ -792,6 +804,13 @@ export const api = {
   submoduleUpdate: (id: string, paths?: string[]) => invoke<void>("submodule_update", { id, paths }),
   submoduleSync: (id: string) => invoke<void>("submodule_sync", { id }),
   openSubmodule: (id: string, path: string) => invokeShared<RepoRecord>("open_submodule", { id, path }),
+
+  lfsStatus: (id: string) => invoke<LfsStatus>("lfs_status", { id }),
+  lfsTrack: (id: string, pattern: string) => invoke<void>("lfs_track", { id, pattern }),
+  lfsPull: (id: string) => invoke<void>("lfs_pull", { id }),
+  lfsLocks: (id: string) => invoke<LfsLock[]>("lfs_locks", { id }),
+  lfsLock: (id: string, path: string) => invoke<void>("lfs_lock", { id, path }),
+  lfsUnlock: (id: string, path: string, force = false) => invoke<void>("lfs_unlock", { id, path, force }),
 
   signingStatus: (id?: string) => invoke<SigningStatus>("signing_status", { id }),
   signingKeys: (format: SigningFormat) => invoke<SigningKey[]>("signing_keys", { format }),

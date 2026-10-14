@@ -13,6 +13,8 @@ import {
   commitDraft,
   confirmUndoCommit,
   currentBranch,
+  lfsLockFor,
+  lockFile,
   notify,
   openSubmodule,
   refreshRepo,
@@ -22,13 +24,14 @@ import {
   setStore,
   store,
   storeDiff,
+  unlockFile,
   updateDraft,
   updateSubmodules,
 } from "../store";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { Checkbox } from "./Controls";
 import { DiffLayoutToggle, DiffView } from "./DiffView";
-import { ChevronDown, ChevronRight, StashIcon, StatusIcon, WhitespaceIcon } from "./Icons";
+import { ChevronDown, ChevronRight, LockIcon, StashIcon, StatusIcon, WhitespaceIcon } from "./Icons";
 import { ImageDiff, isImagePath } from "./ImageDiff";
 import { Loading } from "./Loading";
 import { VirtualList } from "./VirtualList";
@@ -185,8 +188,19 @@ export function ChangesList() {
         { label: "Ignore file (add to .gitignore)", run: () => ignore(f.path), disabled: f.kind !== "untracked" },
         ...(ext ? [{ label: `Ignore all ${ext} files`, run: () => ignore(`*${ext}`) }] : []),
         "separator",
+        { label: "Track with LFS…", run: () => setStore("dialog", { type: "lfsTrack", path: f.path }), disabled: !store.lfs?.version },
+        ...lockItems(f.path),
+        "separator",
       ]),
     );
+  };
+
+  const lockItems = (path: string): MenuItem[] => {
+    if (!store.lfs?.locks) return [];
+    const lock = lfsLockFor(path);
+    if (!lock) return [{ label: "Lock file", run: () => lockFile(path) }];
+    const mine = !lock.owner || lock.owner === store.account?.login;
+    return [mine ? { label: "Unlock file", run: () => unlockFile(path) } : { label: `Force unlock (locked by ${lock.owner})…`, run: () => unlockFile(path, true) }];
   };
 
   const onKeyDown = (e: KeyboardEvent) => {
@@ -294,6 +308,13 @@ export function ChangesList() {
                 <span class="path">
                   <bdi>{f.oldPath ? `${f.oldPath} -> ${f.path}` : f.path}</bdi>
                 </span>
+                <Show when={lfsLockFor(f.path)}>
+                  {(lock) => (
+                    <span class="lfs-lock" data-tooltip={lock().owner ? `Locked by ${lock().owner}` : "Locked"}>
+                      <LockIcon />
+                    </span>
+                  )}
+                </Show>
                 <StatusIcon kind={f.kind} />
               </div>
             )}

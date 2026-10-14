@@ -9,6 +9,8 @@ import {
   type CommitWarnings,
   type ReleaseNote,
   type FileDiff,
+  type LfsLock,
+  type LfsStatus,
   type Progress,
   type RepoRecord,
   type RepoView,
@@ -22,6 +24,7 @@ import { accentTokens, monoStack } from "./lib/appearance";
 import { EMPTY_DRAFT, persistDraft, savedDrafts, type CommitDraft } from "./lib/drafts";
 import { ask } from "./components/Prompt";
 import { applySidebarWidth, lastSidebarWidth, repoLayout } from "./lib/layout";
+import { claimMissingLfsWarning, LFS_INSTALL_URL } from "./lib/lfs";
 import { resolveBindings } from "./lib/keymap";
 import { reconcile, type FileSel } from "./lib/selection";
 import { closeTab, cycleTab, placeTab } from "./lib/tabs";
@@ -58,6 +61,7 @@ export type Dialog =
   | { type: "blame"; path: string }
   | { type: "fileHistory"; path: string }
   | { type: "mergeEditor"; path: string }
+  | { type: "lfsTrack"; path: string }
   | { type: "checks" }
   | { type: "checkLog"; jobId: number; name: string }
   | { type: "previewPullRequest" }
@@ -95,6 +99,7 @@ interface AppStore {
   opening: string | null;
   checks: ChecksSummary | null;
   submodules: Submodule[];
+  lfs: (LfsStatus & { locks: LfsLock[] | null }) | null;
   commitWarnings: CommitWarnings | null;
   historySearch: { kind: SearchKind; query: string } | null;
   compareWith: string | null;
@@ -122,6 +127,7 @@ export const [store, setStore] = createStore<AppStore>({
   opening: null,
   checks: null,
   submodules: [],
+  lfs: null,
   commitWarnings: null,
   historySearch: null,
   compareWith: null,
@@ -353,6 +359,7 @@ function showRepo(view: RepoView) {
       selectedPath: selected && view.files.some((f) => f.path === selected) ? selected : (view.files[0]?.path ?? null),
       checks: null,
       submodules: [],
+      lfs: null,
       historySearch: null,
       compareWith: null,
     });
@@ -550,6 +557,81 @@ export async function openSubmodule(path: string) {
     await openRepo(record.path, true);
   } catch (e) {
     reportError(e, `Could not open ${path}`);
+  }
+}
+
+function warnMissingLfs(id: string) {
+  let storage: Storage;
+  try {
+    storage = localStorage;
+  } catch {
+    return;
+  }
+  if (!claimMissingLfsWarning(id, storage)) return;
+  notify("info", "This repository stores files with Git LFS, but Git LFS isn't installed. Those files show up as small pointer files until you install it.", {
+    sticky: true,
+    action: { label: "Install Git LFS", run: () => api.openExternal(LFS_INSTALL_URL).catch(reportError) },
+  });
+}
+
+export async function refreshLfs() {
+  const repo = store.repo;
+  if (!repo) return setStore("lfs", null);
+  const status = await api.lfsStatus(repo.id).catch(() => null);
+  if (store.repo?.id !== repo.id) return;
+  setStore("lfs", status ? { ...status, locks: null } : null);
+  if (!status?.usesLfs) return;
+  if (!status.version) warnMissingLfs(repo.id);
+  else if (repo.hasRemote) await refreshLfsLocks();
+}
+
+export async function refreshLfsLocks() {
+  const repo = store.repo;
+  if (!repo || !store.lfs?.version) return;
+  const locks = await api.lfsLocks(repo.id).catch(() => null);
+  if (store.repo?.id === repo.id && store.lfs) setStore("lfs", "locks", locks);
+}
+
+export function lfsLockFor(path: string): LfsLock | undefined {
+  return store.lfs?.locks?.find((l) => l.path === path);
+}
+
+export async function lockFile(path: string) {
+  const repo = store.repo;
+  if (!repo) return;
+  const done = await run("Lock file", () => api.lfsLock(repo.id, path).then(() => true));
+  if (done) notify("success", `Locked ${path}`);
+  await refreshLfsLocks();
+}
+
+export async function unlockFile(path: string, force = false) {
+  const repo = store.repo;
+  if (!repo) return;
+  if (force) {
+    const owner = lfsLockFor(path)?.owner ?? "someone else";
+    const ok = await ask(`${path} is locked by ${owner}. Force the unlock? They may lose work if they're still editing it.`, {
+      title: "Force unlock",
+      kind: "warning",
+      okLabel: "Force unlock",
+    });
+    if (!ok) return;
+  }
+  const done = await run("Unlock file", () => api.lfsUnlock(repo.id, path, force).then(() => true));
+  if (done) notify("success", `Unlocked ${path}`);
+  await refreshLfsLocks();
+}
+
+export async function pullLfs() {
+  const repo = store.repo;
+  if (!repo || store.sync) return;
+  setStore("sync", { action: "fetch", progress: null, label: "Pulling LFS files" });
+  try {
+    await api.lfsPull(repo.id);
+    notify("success", "Git LFS files are up to date");
+  } catch (e) {
+    reportError(e, "Could not pull LFS files");
+  } finally {
+    setStore("sync", null);
   }
 }
 

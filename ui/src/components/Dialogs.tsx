@@ -33,6 +33,7 @@ import {
 } from "./dialogs/ToolDialogs";
 import { SettingsDialog } from "./Settings";
 import { ReviewDialog } from "./dialogs/ReviewDialog";
+import { LfsTrackDialog } from "./dialogs/LfsDialogs";
 
 function of<T extends Dialog["type"]>(type: T): Extract<Dialog, { type: T }> | false {
   const d = store.dialog;
@@ -106,6 +107,7 @@ export function Dialogs() {
           <PullRequestPreviewDialog />
         </Match>
         <Match when={of("mergeEditor")}>{(d) => <MergeEditorDialog path={d().path} />}</Match>
+        <Match when={of("lfsTrack")}>{(d) => <LfsTrackDialog path={d().path} />}</Match>
         <Match when={of("settings")}>{(d) => <SettingsDialog tab={d().tab} />}</Match>
         <Match when={of("whatsNew")}>{(d) => <WhatsNewDialog notes={d().notes} />}</Match>
       </Switch>

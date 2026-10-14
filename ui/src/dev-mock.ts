@@ -277,6 +277,12 @@ export function installDevMock() {
             800,
           ),
         );
+      case "lfs_status":
+        return { version: "git-lfs/3.7.1 (GitHub; windows amd64; go 1.25.1)", usesLfs: true };
+      case "lfs_locks":
+        return [{ id: "1", path: "ui/src/App.tsx", owner: "hubot", lockedAt: new Date().toISOString() }];
+      case "lfs_pull":
+        return new Promise((resolve) => setTimeout(() => resolve(null), 1500));
       case "submodules":
         return [
           { name: "vendor/libgit2", path: "vendor/libgit2", url: "https://github.com/libgit2/libgit2.git", initialized: true },

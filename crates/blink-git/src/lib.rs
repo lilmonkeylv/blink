@@ -4,6 +4,7 @@ mod error;
 mod graph;
 mod ignore;
 mod inspect;
+mod lfs;
 mod log;
 mod maintenance;
 mod redact;
@@ -21,6 +22,7 @@ pub use cli::{GitCli, Progress, PushTarget, SyncAction, find_git, is_lock_error,
 pub use error::{Error, Result};
 pub use graph::{Edge, GraphRow, GraphState, layout as graph_layout};
 pub use inspect::{Blame, BlameCommit, BlameLine, ReflogEntry, SearchKind};
+pub use lfs::{LfsLock, parse_lfs_locks, uses_lfs, validate_lfs_pattern};
 pub use log::{CommitDetail, CommitFile, CommitSummary};
 pub use redact::redact;
 pub use refs::{AheadBehind, Branch, BranchKind, HeadState};
