@@ -13,6 +13,7 @@ mod rewrite;
 mod runtime;
 mod signing;
 mod status;
+mod submodule;
 mod validate;
 
 pub use blob::BlobSource;
@@ -32,4 +33,5 @@ pub use signing::{
     validate_gpg_key_id, validate_key_file_name,
 };
 pub use status::{ChangeKind, FileChange, RepoStatus};
+pub use submodule::{Submodule, parse_gitmodules};
 pub use validate::{safe_rel_path, validate_sha};

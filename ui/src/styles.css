@@ -1866,6 +1866,10 @@ select.input {
   font-size: 12px;
 }
 
+.operation-bar.notice {
+  background: var(--hunk-bg);
+}
+
 .operation-bar.stacked {
   flex-wrap: wrap;
 }

@@ -13,6 +13,7 @@ import {
   type RepoRecord,
   type RepoView,
   type SearchKind,
+  type Submodule,
   type Settings,
   type SyncAction,
   type UpdateInfo,
@@ -89,10 +90,11 @@ interface AppStore {
   popover: Popover;
   dialog: Dialog | null;
   banners: Banner[];
-  sync: { action: SyncAction; progress: Progress | null } | null;
+  sync: { action: SyncAction; progress: Progress | null; label?: string } | null;
   busy: string | null;
   opening: string | null;
   checks: ChecksSummary | null;
+  submodules: Submodule[];
   commitWarnings: CommitWarnings | null;
   historySearch: { kind: SearchKind; query: string } | null;
   compareWith: string | null;
@@ -119,6 +121,7 @@ export const [store, setStore] = createStore<AppStore>({
   busy: null,
   opening: null,
   checks: null,
+  submodules: [],
   commitWarnings: null,
   historySearch: null,
   compareWith: null,
@@ -349,6 +352,7 @@ function showRepo(view: RepoView) {
       checkedPaths: {},
       selectedPath: selected && view.files.some((f) => f.path === selected) ? selected : (view.files[0]?.path ?? null),
       checks: null,
+      submodules: [],
       historySearch: null,
       compareWith: null,
     });
@@ -497,6 +501,55 @@ export async function refreshChecks() {
     if (store.repo?.id === repo.id) setStore("checks", checks);
   } catch {
     setStore("checks", null);
+  }
+}
+
+export async function refreshSubmodules() {
+  const repo = store.repo;
+  if (!repo) return setStore("submodules", []);
+  const list = await api.submodules(repo.id).catch(() => []);
+  if (store.repo?.id === repo.id) setStore("submodules", list);
+}
+
+export async function updateSubmodules(paths?: string[]) {
+  const repo = store.repo;
+  if (!repo || store.sync) return;
+  setStore("sync", { action: "fetch", progress: null, label: "Updating submodules" });
+  try {
+    await api.submoduleUpdate(repo.id, paths);
+    notify("success", paths?.length === 1 ? `Updated ${paths[0]}` : "Submodules are up to date");
+  } catch (e) {
+    reportError(e, "Could not update submodules");
+  } finally {
+    setStore("sync", null);
+    await refreshSubmodules();
+  }
+}
+
+export async function initSubmodules() {
+  const repo = store.repo;
+  if (!repo) return;
+  const done = await run("Initialize submodules", () => api.submoduleInit(repo.id).then(() => true));
+  if (done) notify("success", "Submodules initialized. Update them to check out their files.", { action: { label: "Update", run: () => void updateSubmodules() } });
+  await refreshSubmodules();
+}
+
+export async function syncSubmodules() {
+  const repo = store.repo;
+  if (!repo) return;
+  const done = await run("Sync submodules", () => api.submoduleSync(repo.id).then(() => true));
+  if (done) notify("success", "Submodule URLs synced from .gitmodules");
+}
+
+export async function openSubmodule(path: string) {
+  const repo = store.repo;
+  if (!repo) return;
+  try {
+    const record = await api.openSubmodule(repo.id, path);
+    await reloadRepositories();
+    await openRepo(record.path, true);
+  } catch (e) {
+    reportError(e, `Could not open ${path}`);
   }
 }
 

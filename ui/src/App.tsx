@@ -30,6 +30,7 @@ import {
   pickNewTab,
   refreshChecks,
   refreshCommitWarnings,
+  refreshSubmodules,
   refreshRepo,
   reloadSharedState,
   reportError,
@@ -327,6 +328,7 @@ export function App() {
       () => {
         refreshChecks();
         refreshCommitWarnings();
+        refreshSubmodules();
       },
     ),
   );

@@ -17,6 +17,7 @@ const repo: RepoView = {
     { path: "ui/src/App.tsx", oldPath: null, staged: null, unstaged: "modified", kind: "modified" },
     { path: "docs/notes.md", oldPath: null, staged: null, unstaged: "untracked", kind: "untracked" },
     { path: "old.txt", oldPath: null, staged: null, unstaged: "deleted", kind: "deleted" },
+    { path: "vendor/libgit2", oldPath: null, staged: null, unstaged: "modified", kind: "modified" },
   ],
 };
 
@@ -276,6 +277,15 @@ export function installDevMock() {
             800,
           ),
         );
+      case "submodules":
+        return [
+          { name: "vendor/libgit2", path: "vendor/libgit2", url: "https://github.com/libgit2/libgit2.git", initialized: true },
+          { name: "docs/theme", path: "docs/theme", url: "https://github.com/acme/theme.git", initialized: false },
+        ];
+      case "submodule_update":
+        return new Promise((resolve) => setTimeout(() => resolve(null), 1500));
+      case "open_submodule":
+        return { path: `${a.id}/${a.path}`, name: String(a.path).split("/").pop(), owner: null, remoteUrl: null, lastOpened: now };
       case "signing_status":
         return { format: "ssh", key: "C:/Users/dev/.ssh/id_ed25519.pub", scope: "global", enabled: true, gpgFound: false, sshKeygenFound: true };
       case "signing_keys":

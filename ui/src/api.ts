@@ -517,6 +517,13 @@ export interface Tool {
   name: string;
 }
 
+export interface Submodule {
+  name: string;
+  path: string;
+  url: string | null;
+  initialized: boolean;
+}
+
 export type SigningFormat = "ssh" | "gpg";
 export type ConfigScope = "global" | "local";
 
@@ -779,6 +786,12 @@ export const api = {
   enterpriseAccounts: () => invoke<EnterpriseAccount[]>("enterprise_accounts"),
   enterpriseSignIn: (host: string, token: string) => invokeShared<EnterpriseAccount>("enterprise_sign_in", { host, token }),
   enterpriseSignOut: (host: string) => invokeShared<void>("enterprise_sign_out", { host }),
+
+  submodules: (id: string) => invoke<Submodule[]>("submodules", { id }),
+  submoduleInit: (id: string) => invoke<void>("submodule_init", { id }),
+  submoduleUpdate: (id: string, paths?: string[]) => invoke<void>("submodule_update", { id, paths }),
+  submoduleSync: (id: string) => invoke<void>("submodule_sync", { id }),
+  openSubmodule: (id: string, path: string) => invokeShared<RepoRecord>("open_submodule", { id, path }),
 
   signingStatus: (id?: string) => invoke<SigningStatus>("signing_status", { id }),
   signingKeys: (format: SigningFormat) => invoke<SigningKey[]>("signing_keys", { format }),

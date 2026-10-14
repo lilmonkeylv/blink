@@ -12,6 +12,7 @@ pub mod review;
 pub mod rewrite;
 pub mod settings;
 pub mod signing;
+pub mod submodules;
 pub mod sync;
 pub mod updater;
 pub mod window;
