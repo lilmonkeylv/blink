@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, on, Show } from "solid-js";
+import { createEffect, createMemo, createResource, createSignal, on, Show } from "solid-js";
 import { api, type FileChange, type FileDiff, type FileSelection } from "../api";
 import { recentMessages, rememberMessage } from "../lib/messages";
 import { fuzzyScore } from "../lib/fuzzy";
@@ -23,7 +23,7 @@ import {
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { Checkbox } from "./Controls";
 import { DiffLayoutToggle, DiffView } from "./DiffView";
-import { ChevronDown, StatusIcon, WhitespaceIcon } from "./Icons";
+import { ChevronDown, ChevronRight, StashIcon, StatusIcon, WhitespaceIcon } from "./Icons";
 import { ImageDiff, isImagePath } from "./ImageDiff";
 import { Loading } from "./Loading";
 import { VirtualList } from "./VirtualList";
@@ -267,8 +267,26 @@ export function ChangesList() {
           />
         </Show>
       </Show>
+      <StashedChangesRow />
       <CommitBox />
     </>
+  );
+}
+
+function StashedChangesRow() {
+  const [stashes] = createResource(
+    () => (store.repo ? { id: store.repo.id, generation: store.repo.generation } : null),
+    ({ id }) => api.stashList(id).catch(() => []),
+  );
+  const count = () => stashes.latest?.length ?? 0;
+  return (
+    <Show when={count()}>
+      <button type="button" class="stashed-changes" onClick={() => setStore("dialog", { type: "stashes" })}>
+        <StashIcon />
+        <span class="grow">Stashed changes ({count()})</span>
+        <ChevronRight />
+      </button>
+    </Show>
   );
 }
 

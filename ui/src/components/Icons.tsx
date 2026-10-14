@@ -1,6 +1,7 @@
 import type { Component, JSX } from "solid-js";
 import { Dynamic } from "solid-js/web";
 import type { LucideProps } from "lucide-solid";
+import Archive from "lucide-solid/icons/archive";
 import ArrowDown from "lucide-solid/icons/arrow-down";
 import ArrowUp from "lucide-solid/icons/arrow-up";
 import Check from "lucide-solid/icons/check";
@@ -52,6 +53,7 @@ export const UnifiedIcon = icon(Rows2);
 export const SplitIcon = icon(Columns2);
 export const MoreIcon = icon(Ellipsis);
 export const FilterIcon = icon(ListFilter);
+export const StashIcon = icon(Archive);
 
 const statusGlyphs: Record<ChangeKind, Component<LucideProps>> = {
   added: SquarePlus,
