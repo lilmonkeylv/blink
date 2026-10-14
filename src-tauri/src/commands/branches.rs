@@ -16,6 +16,23 @@ pub async fn unpushed_commits(state: State<'_, AppState>, id: String, name: Stri
     Ok(state.engine.read(&id, move |repo| unpushed(&repo.cli(), &name)).await?)
 }
 
+const UNPUSHED_LIMIT: &str = "--max-count=1000";
+
+#[tauri::command]
+pub async fn unpushed_shas(state: State<'_, AppState>, id: String) -> CmdResult<Vec<String>> {
+    Ok(state
+        .engine
+        .read(&id, |repo| {
+            if !repo.has_remotes() {
+                return Ok(Vec::new());
+            }
+            let out =
+                repo.cli().run(&["rev-list", UNPUSHED_LIMIT, "HEAD", "--not", "--remotes", "--"]).unwrap_or_default();
+            Ok(out.lines().map(str::to_string).collect())
+        })
+        .await?)
+}
+
 fn unpushed(cli: &blink_git::GitCli, branch: &str) -> blink_git::Result<usize> {
     let tip = format!("refs/heads/{branch}");
     let count = cli.run(&["rev-list", "--count", &tip, "--not", "--remotes", "--"])?;

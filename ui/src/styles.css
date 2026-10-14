@@ -1685,6 +1685,22 @@ select.input {
   text-overflow: ellipsis;
 }
 
+.unpushed-mark {
+  display: inline-flex;
+  vertical-align: -2px;
+  margin-right: 4px;
+  color: var(--accent);
+}
+
+.unpushed-mark .icon {
+  width: 12px;
+  height: 12px;
+}
+
+.list:focus .row.selected .unpushed-mark {
+  color: var(--fg-selected-focus);
+}
+
 .list:focus .row.selected .meta {
   color: var(--fg-selected-focus);
 }

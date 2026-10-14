@@ -17,7 +17,7 @@ import { currentBranch, notify, reportError, run, setStore, store, undoHeadCommi
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { Checkbox, Select, Segmented } from "./Controls";
 import { DiffLayoutToggle, DiffView } from "./DiffView";
-import { CloseIcon, FilterIcon, StatusIcon } from "./Icons";
+import { CloseIcon, FilterIcon, StatusIcon, UpIcon } from "./Icons";
 import { ImageDiff, isImagePath } from "./ImageDiff";
 import { Loading } from "./Loading";
 import { VirtualList } from "./VirtualList";
@@ -45,6 +45,7 @@ const [compareSide, setCompareSide] = createSignal<"behind" | "ahead">("behind")
 const [compareResult, setCompareResult] = createSignal<{ ahead: CommitSummary[]; behind: CommitSummary[] } | null>(null);
 const [showGraph, setShowGraph] = createSignal(readGraphPref());
 const [tagsBySha, setTagsBySha] = createSignal<Map<string, string[]>>(new Map());
+const [unpushed, setUnpushed] = createSignal<Set<string>>(new Set());
 let loading = false;
 let exhausted = false;
 let loadedFor = "";
@@ -107,6 +108,13 @@ export async function reloadTags() {
   } catch (e) {
     reportError(e, "Could not load tags");
   }
+}
+
+async function reloadUnpushed() {
+  const repo = store.repo;
+  if (!repo) return;
+  const shas = await api.unpushedShas(repo.id).catch(() => [] as string[]);
+  if (store.repo?.id === repo.id) setUnpushed(new Set(shas));
 }
 
 async function deleteTag(name: string) {
@@ -321,6 +329,7 @@ export function HistoryList() {
       },
     ),
   );
+  createEffect(on(() => [store.repo?.id, headId(), store.repo?.aheadBehind?.ahead, store.repo?.aheadBehind?.behind] as const, reloadUnpushed));
 
   const [searchResults] = createResource(
     () => (store.repo && store.historySearch ? { id: store.repo.id, ...store.historySearch } : null),
@@ -479,6 +488,11 @@ export function HistoryList() {
                   {c.summary || "(no message)"}
                 </span>
                 <span class="meta">
+                  <Show when={unpushed().has(c.id)}>
+                    <span class="unpushed-mark" data-tooltip="Not pushed yet" aria-label="Not pushed yet">
+                      <UpIcon />
+                    </span>
+                  </Show>
                   <Show when={bisectRole(store.bisect, c.id)}>{(role) => <span class={`bisect-tag ${role()}`}>{BISECT_TAGS[role()]}</span>}</Show>
                   {c.authorName} · {dateFormat() === "relative" ? relativeTime(c.time) : absoluteTime(c.time)} · {c.shortId}
                 </span>
