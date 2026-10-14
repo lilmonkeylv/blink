@@ -150,7 +150,16 @@ mod tests {
     }
 
     fn line(kind: LineKind, old_no: Option<u32>, new_no: Option<u32>, text: &str, tokens: Vec<Span>) -> DiffLine {
-        DiffLine { kind, old_no, new_no, text: text.into(), no_newline: false, tokens }
+        DiffLine {
+            kind,
+            old_no,
+            new_no,
+            text: text.into(),
+            no_newline: false,
+            tokens,
+            old_raw: Vec::new(),
+            new_raw: Vec::new(),
+        }
     }
 
     fn sample_diff() -> FileDiff {

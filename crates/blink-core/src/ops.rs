@@ -122,9 +122,11 @@ pub fn commit_selection(
     }
     let cli = repo.cli().with_signing(sign);
     let status = repo.status(None)?;
-    cli.unstage_all()?;
-    stage_selection(repo, &cli, &status.files, files)?;
-    cli.commit(&message.render(), amend)
+    restoring_index_on_error(&cli, || {
+        cli.unstage_all()?;
+        stage_selection(repo, &cli, &status.files, files)?;
+        cli.commit(&message.render(), amend)
+    })
 }
 
 pub fn stash_selection(repo: &Repository, files: &[FileSelection], message: &str) -> Result<()> {
@@ -133,9 +135,30 @@ pub fn stash_selection(repo: &Repository, files: &[FileSelection], message: &str
     }
     let cli = repo.cli();
     let status = repo.status(None)?;
-    cli.unstage_all()?;
-    stage_selection(repo, &cli, &status.files, files)?;
-    cli.stash_staged(message)
+    restoring_index_on_error(&cli, || {
+        cli.unstage_all()?;
+        stage_selection(repo, &cli, &status.files, files)?;
+        cli.stash_staged(message)
+    })
+}
+
+fn restoring_index_on_error<T>(cli: &GitCli, run: impl FnOnce() -> Result<T>) -> Result<T> {
+    // write-tree fails while conflicts are unmerged; carry on without a snapshot in that case.
+    let snapshot = cli.write_tree().ok();
+    let result = run();
+    if result.is_err()
+        && let Some(tree) = snapshot
+        && let Err(e) = cli.read_tree(&tree)
+    {
+        tracing::warn!(error = %e, "could not restore the index after a failed commit");
+    }
+    result
+}
+
+fn line_diff(repo: &Repository, change: &FileChange) -> Result<FileDiff> {
+    let old = read_or_empty(repo, &BlobSource::Head, change.old_path.as_deref().unwrap_or(&change.path))?;
+    let new = repo.read_cleaned_worktree(&change.path)?.unwrap_or_default();
+    Ok(diff_file(&change.path, &old, &new, DiffOptions { max_lines: None, highlight: false, ..Default::default() }))
 }
 
 fn stage_selection(repo: &Repository, cli: &GitCli, changes: &[FileChange], files: &[FileSelection]) -> Result<()> {
@@ -150,7 +173,7 @@ fn stage_selection(repo: &Repository, cli: &GitCli, changes: &[FileChange], file
                 }
             }
             Some(lines) => {
-                let diff = working_diff(repo, change, DiffOptions { max_lines: None, ..Default::default() })?;
+                let diff = line_diff(repo, change)?;
                 let new_file = matches!(change.kind(), ChangeKind::Untracked | ChangeKind::Added);
                 if let Some(patch) =
                     build_partial_patch(&change.path, &diff, &selection_from(lines), PatchDirection::Stage, new_file)
@@ -195,7 +218,7 @@ pub fn discard_files(repo: &Repository, changes: &[FileChange]) -> Result<()> {
 }
 
 pub fn discard_lines(repo: &Repository, change: &FileChange, lines: &[(usize, usize)]) -> Result<()> {
-    let diff = working_diff(repo, change, DiffOptions { max_lines: None, ..Default::default() })?;
+    let diff = line_diff(repo, change)?;
     match build_partial_patch(&change.path, &diff, &selection_from(lines), PatchDirection::Discard, false) {
         Some(patch) => repo.cli().reverse_apply_to_worktree(&patch),
         None => Ok(()),
@@ -359,6 +382,93 @@ mod tests {
         )
         .unwrap();
         assert_eq!(repo.read_blob(&BlobSource::Head, "new.txt").unwrap().unwrap(), b"keep\n");
+    }
+
+    fn changed_lines(diff: &FileDiff, hunk: usize, text: &str) -> Vec<(usize, usize)> {
+        diff.hunks[hunk]
+            .lines
+            .iter()
+            .enumerate()
+            .filter(|(_, l)| l.kind != blink_diff::LineKind::Context && l.text.contains(text))
+            .map(|(i, _)| (hunk, i))
+            .collect()
+    }
+
+    fn commit_lines(repo: &Repository, path: &str, text: &str) -> Vec<u8> {
+        let diff = working_diff(repo, &change(repo, path), DiffOptions::default()).unwrap();
+        let lines = changed_lines(&diff, 0, text);
+        assert!(!lines.is_empty());
+        commit_selection(repo, &[FileSelection { path: path.into(), lines: Some(lines) }], &msg("part"), false, false)
+            .unwrap();
+        repo.read_blob(&BlobSource::Head, path).unwrap().unwrap()
+    }
+
+    fn commit_file(dir: &std::path::Path, path: &str, contents: &[u8]) -> Repository {
+        fs::write(dir.join(path), contents).unwrap();
+        let cli = GitCli::new(dir);
+        cli.stage(&[path]).unwrap();
+        cli.commit("add", false).unwrap();
+        Repository::open(dir).unwrap()
+    }
+
+    #[test]
+    fn stages_lines_of_a_crlf_file_byte_for_byte() {
+        let (dir, _) = fixture();
+        let repo = commit_file(dir.path(), "crlf.txt", b"1\r\n2\r\n3\r\n");
+        fs::write(dir.path().join("crlf.txt"), b"1\r\nNEW\r\n2\r\n3\r\nEND\r\n").unwrap();
+        assert_eq!(commit_lines(&repo, "crlf.txt", "NEW"), b"1\r\nNEW\r\n2\r\n3\r\n");
+
+        let diff = working_diff(&repo, &change(&repo, "crlf.txt"), DiffOptions::default()).unwrap();
+        discard_lines(&repo, &change(&repo, "crlf.txt"), &changed_lines(&diff, 0, "END")).unwrap();
+        assert_eq!(fs::read(dir.path().join("crlf.txt")).unwrap(), b"1\r\nNEW\r\n2\r\n3\r\n");
+    }
+
+    #[test]
+    fn stages_lines_of_a_latin1_file_byte_for_byte() {
+        let (dir, _) = fixture();
+        let repo = commit_file(dir.path(), "latin1.txt", b"caf\xe9\nna\xefve\n");
+        fs::write(dir.path().join("latin1.txt"), b"caf\xe9\n\xe0 la carte\nna\xefve\nd\xe9j\xe0\n").unwrap();
+        assert_eq!(commit_lines(&repo, "latin1.txt", "la carte"), b"caf\xe9\n\xe0 la carte\nna\xefve\n");
+    }
+
+    #[test]
+    fn stages_lines_with_autocrlf_in_repository_line_endings() {
+        let (dir, _) = fixture();
+        let cli = GitCli::new(dir.path());
+        cli.run(&["config", "core.autocrlf", "true"]).unwrap();
+        let repo = commit_file(dir.path(), "auto.txt", b"1\r\n2\r\n3\r\n");
+        assert_eq!(repo.read_blob(&BlobSource::Head, "auto.txt").unwrap().unwrap(), b"1\n2\n3\n");
+        fs::write(dir.path().join("auto.txt"), b"1\r\nNEW\r\n2\r\n3\r\nEND\r\n").unwrap();
+        assert_eq!(commit_lines(&repo, "auto.txt", "NEW"), b"1\nNEW\n2\n3\n");
+
+        let diff = working_diff(&repo, &change(&repo, "auto.txt"), DiffOptions::default()).unwrap();
+        discard_lines(&repo, &change(&repo, "auto.txt"), &changed_lines(&diff, 0, "END")).unwrap();
+        assert_eq!(fs::read(dir.path().join("auto.txt")).unwrap(), b"1\r\nNEW\r\n2\r\n3\r\n");
+    }
+
+    #[test]
+    fn failed_commit_leaves_the_index_untouched() {
+        let (dir, repo) = fixture();
+        let hooks = dir.path().join(".hooks");
+        fs::create_dir_all(&hooks).unwrap();
+        repo.cli().run(&["config", "core.hooksPath", ".hooks"]).unwrap();
+        let hook = hooks.join("pre-commit");
+        fs::write(&hook, "#!/bin/sh\nexit 1\n").unwrap();
+        #[cfg(unix)]
+        {
+            use std::os::unix::fs::PermissionsExt;
+            fs::set_permissions(&hook, fs::Permissions::from_mode(0o755)).unwrap();
+        }
+        fs::write(dir.path().join("a.txt"), "staged by hand\n").unwrap();
+        fs::write(dir.path().join("b.txt"), "changed\n").unwrap();
+        let cli = repo.cli();
+        cli.stage(&["a.txt"]).unwrap();
+        let index_before = cli.run(&["ls-files", "--stage"]).unwrap();
+
+        let files = [FileSelection { path: "b.txt".into(), lines: None }];
+        assert!(commit_selection(&repo, &files, &msg("blocked"), false, false).is_err());
+        assert_eq!(cli.run(&["ls-files", "--stage"]).unwrap(), index_before);
+        assert_eq!(cli.run(&["diff", "--cached", "--name-only"]).unwrap(), "a.txt\n");
     }
 
     #[test]

@@ -1,5 +1,4 @@
 use std::collections::HashSet;
-use std::fmt::Write;
 
 use crate::{FileDiff, LineKind};
 
@@ -50,31 +49,35 @@ pub fn build_partial_patch(
     selection: &LineSelection,
     direction: PatchDirection,
     new_file: bool,
-) -> Option<String> {
-    let mut body = String::new();
+) -> Option<Vec<u8>> {
+    let mut body = Vec::new();
     let mut offset: i64 = 0;
 
     for (hi, hunk) in diff.hunks.iter().enumerate() {
-        let mut lines = String::new();
+        let mut lines = Vec::new();
         let (mut old_len, mut new_len, mut changes) = (0u32, 0u32, 0u32);
 
         for (li, line) in hunk.lines.iter().enumerate() {
             let selected = selection.contains(hi, li);
             let prefix = match (line.kind, selected, direction) {
-                (LineKind::Context, ..) => ' ',
-                (LineKind::Added, true, _) => '+',
-                (LineKind::Removed, true, _) => '-',
+                (LineKind::Context, ..) => b' ',
+                (LineKind::Added, true, _) => b'+',
+                (LineKind::Removed, true, _) => b'-',
                 (LineKind::Added, false, PatchDirection::Stage) => continue,
-                (LineKind::Added, false, PatchDirection::Discard) => ' ',
-                (LineKind::Removed, false, PatchDirection::Stage) => ' ',
+                (LineKind::Added, false, PatchDirection::Discard) => b' ',
+                (LineKind::Removed, false, PatchDirection::Stage) => b' ',
                 (LineKind::Removed, false, PatchDirection::Discard) => continue,
             };
+            let raw = match (prefix, direction) {
+                (b'+', _) | (b' ', PatchDirection::Discard) => &line.new_raw,
+                _ => &line.old_raw,
+            };
             match prefix {
-                ' ' => {
+                b' ' => {
                     old_len += 1;
                     new_len += 1;
                 }
-                '+' => {
+                b'+' => {
                     new_len += 1;
                     changes += 1;
                 }
@@ -84,10 +87,9 @@ pub fn build_partial_patch(
                 }
             }
             lines.push(prefix);
-            lines.push_str(&line.text);
-            lines.push('\n');
-            if line.no_newline {
-                lines.push_str("\\ No newline at end of file\n");
+            lines.extend_from_slice(raw);
+            if !raw.ends_with(b"\n") {
+                lines.extend_from_slice(b"\n\\ No newline at end of file\n");
             }
         }
 
@@ -106,8 +108,8 @@ pub fn build_partial_patch(
         };
         offset += new_len as i64 - old_len as i64;
 
-        let _ = writeln!(body, "@@ -{old_start},{old_len} +{new_start},{new_len} @@");
-        body.push_str(&lines);
+        body.extend_from_slice(format!("@@ -{old_start},{old_len} +{new_start},{new_len} @@\n").as_bytes());
+        body.append(&mut lines);
     }
 
     if body.is_empty() {
@@ -118,7 +120,9 @@ pub fn build_partial_patch(
     } else {
         format!("diff --git a/{path} b/{path}\n--- a/{path}\n+++ b/{path}\n")
     };
-    Some(header + &body)
+    let mut patch = header.into_bytes();
+    patch.append(&mut body);
+    Some(patch)
 }
 
 fn counterpart_start(anchor: u32, anchor_len: u32, other_len: u32, offset: i64) -> u32 {
@@ -136,13 +140,17 @@ mod tests {
     use super::*;
     use crate::{DiffOptions, diff_bytes};
 
+    fn patch_text(patch: Vec<u8>) -> String {
+        String::from_utf8(patch).unwrap()
+    }
+
     #[test]
     fn stage_single_added_line() {
         let diff = diff_bytes(b"a\nb\n", b"a\nx\ny\nb\n", DiffOptions::default());
         let added = diff.hunks[0].lines.iter().position(|l| l.text == "x").unwrap();
         let mut sel = LineSelection::new();
         sel.select(0, added);
-        let patch = build_partial_patch("f.txt", &diff, &sel, PatchDirection::Stage, false).unwrap();
+        let patch = patch_text(build_partial_patch("f.txt", &diff, &sel, PatchDirection::Stage, false).unwrap());
         assert!(patch.contains("@@ -1,2 +1,3 @@"), "{patch}");
         assert!(patch.contains("+x\n"));
         assert!(!patch.contains("y"));
@@ -162,8 +170,28 @@ mod tests {
         let y = diff.hunks[0].lines.iter().position(|l| l.text == "y").unwrap();
         let mut sel = LineSelection::new();
         sel.select(0, y);
-        let patch = build_partial_patch("f", &diff, &sel, PatchDirection::Discard, false).unwrap();
+        let patch = patch_text(build_partial_patch("f", &diff, &sel, PatchDirection::Discard, false).unwrap());
         assert!(patch.contains(" x\n+y\n"), "{patch}");
         assert!(patch.contains("@@ -1,2 +1,3 @@"), "{patch}");
+    }
+
+    #[test]
+    fn keeps_original_line_endings_and_bytes() {
+        let diff = diff_bytes(b"a\r\nb\r\n", b"a\r\n\xe9t\xe9\r\nb\r\n", DiffOptions::default());
+        let added = diff.hunks[0].lines.iter().position(|l| l.kind == LineKind::Added).unwrap();
+        let mut sel = LineSelection::new();
+        sel.select(0, added);
+        let patch = build_partial_patch("f", &diff, &sel, PatchDirection::Stage, false).unwrap();
+        let body = &patch[patch.windows(2).position(|w| w == b"@@").unwrap()..];
+        assert_eq!(body, b"@@ -1,2 +1,3 @@\n a\r\n+\xe9t\xe9\r\n b\r\n");
+    }
+
+    #[test]
+    fn marks_missing_final_newline_from_the_raw_line() {
+        let diff = diff_bytes(b"a\nb", b"a\nc", DiffOptions::default());
+        let mut sel = LineSelection::new();
+        sel.select_hunk(&diff, 0);
+        let patch = patch_text(build_partial_patch("f", &diff, &sel, PatchDirection::Stage, false).unwrap());
+        assert!(patch.ends_with("-b\n\\ No newline at end of file\n+c\n\\ No newline at end of file\n"), "{patch}");
     }
 }

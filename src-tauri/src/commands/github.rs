@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use parking_lot::Mutex;
 
-use blink_git::{GitCli, HeadState, Repository, SyncAction};
+use blink_git::{GitCli, HeadState, PushTarget, Repository, SyncAction};
 use blink_github::{CheckState, ChecksSummary, Client, Job, Org, PullRequest, Repo, parse_remote};
 use blink_store::RepoRecord;
 use serde::Serialize;
@@ -234,7 +234,7 @@ pub async fn publish_repository(
                 None => cli.add_remote("origin", &url)?,
             }
             if let HeadState::Branch { name, .. } = repo.head()? {
-                cli.push("origin", &name, true, false, |_| {})?;
+                cli.push(&PushTarget::new_branch("origin", &name), false, |_| {})?;
             }
             Ok(())
         })

@@ -10,6 +10,7 @@ fn fixture() -> (tempfile::TempDir, Repository) {
     cli.run(&["config", "user.name", "Test"]).unwrap();
     cli.run(&["config", "user.email", "test@example.com"]).unwrap();
     cli.run(&["config", "commit.gpgsign", "false"]).unwrap();
+    cli.run(&["config", "core.autocrlf", "false"]).unwrap();
     write(dir.path(), "a.txt", "one\ntwo\n");
     write(dir.path(), "b.txt", "bee\n");
     cli.stage_all().unwrap();
@@ -128,4 +129,78 @@ fn undo_last_commit_keeps_changes() {
     assert_eq!(repo.log(None, 0, 10).unwrap().len(), 1);
     let status = repo.status(None).unwrap();
     assert_eq!(status.files[0].staged, Some(ChangeKind::Modified));
+}
+
+#[test]
+fn commit_keeps_lines_that_look_like_comments() {
+    let (dir, repo) = fixture();
+    write(dir.path(), "a.txt", "changed\n");
+    repo.cli().stage_all().unwrap();
+    let message = "#123 fix crash\n\n# Notes\nbody";
+    let id = repo.cli().commit(message, false).unwrap();
+    assert_eq!(repo.cli().run(&["log", "-1", "--format=%B", &id]).unwrap().trim_end(), message);
+}
+
+#[test]
+fn paths_are_not_treated_as_patterns() {
+    let (dir, repo) = fixture();
+    write(dir.path(), "[ab].txt", "literal\n");
+    repo.cli().stage_all().unwrap();
+    repo.cli().commit("add literal", false).unwrap();
+    for path in ["a.txt", "b.txt", "[ab].txt"] {
+        write(dir.path(), path, "dirty\n");
+    }
+
+    repo.cli().stage(&["[ab].txt"]).unwrap();
+    let staged: Vec<_> =
+        repo.status(None).unwrap().files.into_iter().filter(|f| f.staged.is_some()).map(|f| f.path).collect();
+    assert_eq!(staged, ["[ab].txt"]);
+
+    repo.cli().unstage(&["[ab].txt"]).unwrap();
+    repo.cli().discard_tracked(&["[ab].txt"]).unwrap();
+    assert_eq!(fs::read_to_string(dir.path().join("[ab].txt")).unwrap(), "literal\n");
+    assert_eq!(kind_of(&repo, "a.txt"), Some(ChangeKind::Modified));
+    assert_eq!(kind_of(&repo, "b.txt"), Some(ChangeKind::Modified));
+}
+
+#[test]
+fn stages_more_paths_than_fit_on_a_command_line() {
+    let (dir, repo) = fixture();
+    let paths: Vec<String> =
+        (0..1000).map(|i| format!("a/fairly/deeply/nested/directory/with-a-long-name-{i:04}.txt")).collect();
+    for path in &paths {
+        write(dir.path(), path, "x\n");
+    }
+    let refs: Vec<&str> = paths.iter().map(String::as_str).collect();
+    repo.cli().stage(&refs).unwrap();
+    let status = repo.status(None).unwrap();
+    assert_eq!(status.files.iter().filter(|f| f.staged == Some(ChangeKind::Added)).count(), 1000);
+}
+
+#[test]
+fn push_follows_the_configured_upstream() {
+    let (dir, repo) = fixture();
+    let remote = tempfile::tempdir().unwrap();
+    GitCli::new(remote.path()).run(&["init", "--bare", "-b", "main"]).unwrap();
+    let cli = repo.cli();
+    cli.add_remote("origin", &remote.path().to_string_lossy()).unwrap();
+    cli.run(&["push", "origin", "main:main", "main:feature-x"]).unwrap();
+    cli.run(&["fetch", "origin"]).unwrap();
+    cli.checkout_remote_branch("origin/feature-x", "fx").unwrap();
+    write(dir.path(), "a.txt", "feature\n");
+    cli.stage_all().unwrap();
+    let id = cli.commit("feature work", false).unwrap();
+
+    let target = cli.push_target("fx").unwrap();
+    assert_eq!(target.remote, "origin");
+    assert!(!target.set_upstream);
+    cli.push(&target, false, |_| {}).unwrap();
+
+    let bare = GitCli::new(remote.path());
+    assert_eq!(bare.rev_parse("refs/heads/feature-x").unwrap(), id);
+    assert!(bare.rev_parse("refs/heads/fx").is_err());
+
+    cli.create_branch("untracked", None, true).unwrap();
+    let target = cli.push_target("untracked").unwrap();
+    assert_eq!(target, blink_git::PushTarget::new_branch("origin", "untracked"));
 }

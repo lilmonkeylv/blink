@@ -62,6 +62,8 @@ pub fn parse_unified(patch: &str) -> FileDiff {
             text: text.to_string(),
             no_newline: false,
             tokens: Vec::new(),
+            old_raw: Vec::new(),
+            new_raw: Vec::new(),
         });
     }
     diff

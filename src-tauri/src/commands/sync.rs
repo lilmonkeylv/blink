@@ -67,16 +67,10 @@ pub async fn sync(
                 let HeadState::Branch { name, .. } = repo.head()? else {
                     return Err(blink_git::Error::Git("Cannot push a detached HEAD".into()));
                 };
-                let upstream = repo.branches()?.into_iter().find(|b| b.name == name).and_then(|b| b.upstream);
-                let remote = upstream
-                    .as_deref()
-                    .and_then(|u| u.split_once('/'))
-                    .map(|(r, _)| r.to_string())
-                    .or_else(|| cli.remotes().ok()?.first().map(|(n, _)| n.clone()))
-                    .ok_or_else(|| blink_git::Error::Git("This repository has no remote to push to".into()))?;
-                cli.push(&remote, &name, upstream.is_none(), force, &mut emit)?;
+                let target = cli.push_target(&name)?;
+                cli.push(&target, force, &mut emit)?;
                 if push_tags {
-                    cli.push_tags(&remote, &mut emit)?;
+                    cli.push_tags(&target.remote, &mut emit)?;
                 }
                 Ok(())
             }
