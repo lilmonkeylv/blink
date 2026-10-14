@@ -70,7 +70,16 @@ export function ImageDiff(p: { path: string; oldPath: string | null; sha?: strin
                 ]}
               />
               <Show when={mode() === "swipe" || mode() === "onion"}>
-                <input type="range" min="0" max="100" value={amount()} onInput={(e) => setAmount(Number(e.currentTarget.value))} />
+                <input
+                  type="range"
+                  min="0"
+                  max="100"
+                  value={amount()}
+                  aria-label={mode() === "swipe" ? "Swipe position" : "After image opacity"}
+                  aria-valuetext={`${amount()}%`}
+                  style={{ "--fill": `${amount()}%` }}
+                  onInput={(e) => setAmount(Number(e.currentTarget.value))}
+                />
               </Show>
             </div>
           </Show>

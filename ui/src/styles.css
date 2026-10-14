@@ -2010,8 +2010,49 @@ label.check {
 }
 
 input[type="range"] {
-  accent-color: var(--accent);
+  --fill: 50%;
+  width: 180px;
+  height: 18px;
+  margin: 0;
+  background: transparent;
   cursor: pointer;
+  appearance: none;
+}
+
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: linear-gradient(var(--accent), var(--accent)) 0 / var(--fill) 100% no-repeat, var(--border);
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  width: 14px;
+  height: 14px;
+  margin-top: -5px;
+  border: 2px solid var(--accent);
+  border-radius: 50%;
+  background: var(--bg);
+  appearance: none;
+  transition:
+    transform var(--ease),
+    box-shadow var(--ease);
+}
+
+input[type="range"]:hover::-webkit-slider-thumb {
+  transform: scale(1.1);
+}
+
+input[type="range"]:focus-visible {
+  outline: none;
+}
+
+input[type="range"]:focus-visible::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 35%, transparent);
+}
+
+input::-ms-reveal,
+input::-ms-clear {
+  display: none;
 }
 
 .history-tools {
@@ -2495,11 +2536,53 @@ input[type="range"] {
   user-select: text;
 }
 
-.markdown code {
+code {
   padding: 1px 4px;
   border-radius: 4px;
   background: var(--bg-subtle);
   font: 12px var(--font-mono);
+}
+
+pre code {
+  padding: 0;
+  background: none;
+}
+
+.tooltip {
+  position: fixed;
+  top: 0;
+  left: 0;
+  z-index: 70;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 280px;
+  padding: 4px 8px;
+  border: 1px solid var(--toolbar-border);
+  border-radius: 5px;
+  background: var(--toolbar-bg);
+  color: var(--toolbar-fg);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  font-size: 12px;
+  line-height: 1.35;
+  pointer-events: none;
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 120ms ease-out,
+    visibility 0s linear 120ms;
+}
+
+.tooltip.open {
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 120ms ease-out;
+}
+
+.tooltip-shortcut {
+  flex: none;
+  color: var(--toolbar-muted);
+  font: 11px var(--font-mono);
 }
 
 .split-row {

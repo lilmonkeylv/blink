@@ -39,6 +39,16 @@ function Text(p: { label: string; value: string; onChange: (v: string) => void; 
   );
 }
 
+const THREAD_COUNTS = [1, 2, 4, 8, 16];
+
+function Threads(p: { label: string; value: number | null; onChange: (v: number | null) => void; hint?: string }) {
+  const options = () => {
+    const counts = p.value && !THREAD_COUNTS.includes(p.value) ? [...THREAD_COUNTS, p.value].sort((a, b) => a - b) : THREAD_COUNTS;
+    return [{ value: "", label: "Automatic" }, ...counts.map((n) => ({ value: String(n), label: String(n) }))];
+  };
+  return <Choice label={p.label} value={p.value ? String(p.value) : ""} options={options()} onChange={(v) => p.onChange(v ? Number(v) : null)} hint={p.hint} />;
+}
+
 function Pane(p: { children: JSX.Element }) {
   return <div class="pane">{p.children}</div>;
 }
@@ -418,19 +428,15 @@ export function SettingsDialog(p: { tab?: string }) {
                 onChange={(v) => set((x) => (x.advanced.updateChannel = v))}
                 hint="Beta gets prerelease builds before they ship to everyone. Prerelease builds of Blink always follow beta."
               />
-              <Text
+              <Threads
                 label="Foreground threads"
-                type="number"
-                placeholder="Automatic"
-                value={s.advanced.foregroundThreads?.toString() ?? ""}
-                onChange={(v) => set((x) => (x.advanced.foregroundThreads = v ? Number(v) : null))}
+                value={s.advanced.foregroundThreads}
+                onChange={(v) => set((x) => (x.advanced.foregroundThreads = v))}
               />
-              <Text
+              <Threads
                 label="Background threads"
-                type="number"
-                placeholder="Automatic"
-                value={s.advanced.backgroundThreads?.toString() ?? ""}
-                onChange={(v) => set((x) => (x.advanced.backgroundThreads = v ? Number(v) : null))}
+                value={s.advanced.backgroundThreads}
+                onChange={(v) => set((x) => (x.advanced.backgroundThreads = v))}
                 hint="Thread changes apply after restart."
               />
               <div class="summary-row">

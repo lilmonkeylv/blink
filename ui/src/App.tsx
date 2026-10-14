@@ -9,6 +9,7 @@ import { Dialogs } from "./components/Dialogs";
 import { CommitView, HistoryList } from "./components/HistoryPane";
 import { TabStrip } from "./components/TabStrip";
 import { Toasts } from "./components/Toasts";
+import { TooltipHost } from "./components/Tooltip";
 import { applySidebarWidth, clampSidebar, reclampSidebar, saveRepoLayout } from "./lib/layout";
 import { appMenu, doSync, pickAndAddRepository, Toolbar } from "./components/Toolbar";
 import { fuzzyFilter } from "./lib/fuzzy";
@@ -376,6 +377,7 @@ export function App() {
       <PromptHost />
       <ContextMenuHost />
       <Toasts />
+      <TooltipHost />
     </div>
   );
 }

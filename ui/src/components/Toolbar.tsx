@@ -518,11 +518,13 @@ export function Toolbar() {
     return progress && progress.percent !== null ? `${progress.phase} ${progress.percent}%` : previous;
   }, "");
   const state = () => syncState();
+  const syncTooltip = () => (state().action === "push" ? "Push your commits" : state().action === "pull" ? "Pull new commits" : "Check for new commits");
+  const syncShortcut = () => keymap().keys[`sync.${state().action}`];
 
   return (
     <>
       <div class="toolbar" data-tauri-drag-region={customTitleBar || undefined}>
-        <button class="toolbar-button repo" classList={{ open: store.popover === "repos" }} onClick={() => toggle("repos")} title="Ctrl+T">
+        <button class="toolbar-button repo" classList={{ open: store.popover === "repos" }} onClick={() => toggle("repos")} data-tooltip="Switch repository" data-shortcut={keymap().keys["repo.list"]}>
           <RepoIcon />
           <span class="labels">
             <span class="title">{store.opening ? "Opening repository" : "Current repository"}</span>
@@ -547,7 +549,8 @@ export function Toolbar() {
           }}
           onDragLeave={() => setDropping(false)}
           onDrop={() => setDropping(false)}
-          title="Ctrl+B"
+          data-tooltip="Switch branch"
+          data-shortcut={keymap().keys["branch.list"]}
         >
           <BranchIcon />
           <span class="labels">
@@ -557,7 +560,7 @@ export function Toolbar() {
           <Show when={store.checks && store.checks.state !== "none"}>
             <span
               class={`dot ${store.checks!.state}`}
-              title={`${store.checks!.failed} failed, ${store.checks!.pending} pending of ${store.checks!.total} checks`}
+              data-tooltip={`${store.checks!.failed} failed, ${store.checks!.pending} pending of ${store.checks!.total} checks`}
               onClick={(e) => {
                 e.stopPropagation();
                 setStore("dialog", { type: "checks" });
@@ -571,6 +574,8 @@ export function Toolbar() {
           style={{ position: "relative" }}
           disabled={!store.repo || !!store.sync}
           onClick={() => doSync()}
+          data-tooltip={state().kind === "publish" ? undefined : syncTooltip()}
+          data-shortcut={syncShortcut()}
           onContextMenu={(e) =>
             store.repo &&
             openContextMenu(e, [
@@ -625,7 +630,7 @@ export function Toolbar() {
         <Show
           when={customTitleBar}
           fallback={
-            <button class="toolbar-button app-menu" aria-label="Menu" title="Menu" onMouseDown={(e) => e.preventDefault()} onClick={(e) => openContextMenu(e, appMenu())}>
+            <button class="toolbar-button app-menu" aria-label="Menu" data-tooltip="Menu" onMouseDown={(e) => e.preventDefault()} onClick={(e) => openContextMenu(e, appMenu())}>
               <MenuIcon />
             </button>
           }

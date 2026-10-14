@@ -1,5 +1,5 @@
 import { For, Show } from "solid-js";
-import { closeRepoTab, openInNewWindow, openRepo, pickNewTab, store } from "../store";
+import { closeRepoTab, keymap, openInNewWindow, openRepo, pickNewTab, store } from "../store";
 import { openContextMenu } from "./ContextMenu";
 import { CloseIcon, PlusIcon } from "./Icons";
 
@@ -14,7 +14,7 @@ export function TabStrip() {
             <div
               class="repo-tab"
               classList={{ active: store.repo?.id === path || (!store.repo && store.opening === path) }}
-              title={path}
+              data-tooltip={path}
               onClick={() => store.repo?.id !== path && openRepo(path)}
               onAuxClick={(e) => e.button === 1 && closeRepoTab(path)}
               onContextMenu={(e) =>
@@ -35,7 +35,9 @@ export function TabStrip() {
               <span class="grow">{tabName(path)}</span>
               <button
                 class="tab-close"
-                title="Close tab (Ctrl+W)"
+                aria-label="Close tab"
+                data-tooltip="Close tab"
+                data-shortcut={keymap().keys["tab.close"]}
                 onClick={(e) => {
                   e.stopPropagation();
                   closeRepoTab(path);
@@ -46,7 +48,13 @@ export function TabStrip() {
             </div>
           )}
         </For>
-        <button class="tab-new" title="Open a repository in a new tab (Ctrl+Alt+T)" onClick={pickNewTab}>
+        <button
+          class="tab-new"
+          aria-label="New tab"
+          data-tooltip="Open a repository in a new tab"
+          data-shortcut={keymap().keys["tab.new"]}
+          onClick={pickNewTab}
+        >
           <PlusIcon />
         </button>
       </Show>
