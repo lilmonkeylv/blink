@@ -5,6 +5,7 @@ import { absoluteTime, relativeTime } from "../../lib/time";
 import { currentBranch, notify, run, store } from "../../store";
 import { Field, Select } from "../Controls";
 import { Dialog } from "../Dialog";
+import { Loading } from "../Loading";
 import { DiffView, Tokens } from "../DiffView";
 import { focusCommit } from "../HistoryPane";
 import { DownIcon, UpIcon } from "../Icons";
@@ -299,7 +300,7 @@ export function UndoHistoryDialog() {
       </Show>
       <Show when={tab() === "reflog"}>
         <div class="pick-list" style={{ "max-height": "400px" }}>
-          <For each={reflog()} fallback={<div class="empty muted">Loading…</div>}>
+          <For each={reflog()} fallback={<Loading />}>
             {(r) => (
               <div class="static-row" title={r.sha}>
                 <span class="muted small" style={{ width: "70px", "font-family": "var(--font-mono)" }}>
@@ -351,7 +352,7 @@ export function FileHistoryDialog(p: { path: string }) {
           )}
         />
         <div class="content">
-          <Show when={diff()} fallback={<div class="empty muted">{list.loading ? "Loading…" : "Select a commit"}</div>}>
+          <Show when={diff()} fallback={list.loading ? <Loading /> : <div class="empty muted">Select a commit</div>}>
             {(d) => <DiffView diff={d()} />}
           </Show>
         </div>
@@ -366,7 +367,7 @@ export function BlameDialog(p: { path: string }) {
   const lines = () => blame()?.lines ?? [];
   return (
     <Dialog title={`Blame ${p.path}`} onClose={closeDialog} class="fill">
-      <Show when={blame()} fallback={<div class="empty muted">Loading…</div>}>
+      <Show when={blame()} fallback={<Loading />}>
         {(b) => (
           <VirtualList
             items={lines()}

@@ -8,6 +8,7 @@ import { addRepository, keymap, notify, refreshChecks, reportError, run, setStor
 import { Checkbox, Field, Segmented } from "../Controls";
 import { Dialog } from "../Dialog";
 import { CheckIcon } from "../Icons";
+import { Loading } from "../Loading";
 import { Markdown } from "../Markdown";
 import { VirtualList } from "../VirtualList";
 import { closeDialog, sanitizeBranchName } from "./common";
@@ -195,7 +196,7 @@ export function WorktreesDialog() {
   };
   return (
     <Dialog title="Worktrees" onClose={closeDialog} wide>
-      <For each={list()} fallback={<div class="empty muted">Loading…</div>}>
+      <For each={list()} fallback={<Loading />}>
         {(w, i) => (
           <div class="static-row">
             <span class="grow" title={w.path}>
@@ -387,7 +388,7 @@ export function CheckLogDialog(p: { jobId: number; name: string }) {
           </For>
         </div>
       </Show>
-      <Switch fallback={<div class="empty muted">Loading…</div>}>
+      <Switch fallback={<Loading />}>
         <Match when={log.error}>
           <div class="empty muted">{String((log.error as { message?: string })?.message ?? "Could not load the log")}</div>
         </Match>

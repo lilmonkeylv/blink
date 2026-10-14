@@ -18,6 +18,7 @@ import { Checkbox, Select, Segmented } from "./Controls";
 import { DiffLayoutToggle, DiffView } from "./DiffView";
 import { CloseIcon, FilterIcon, StatusIcon } from "./Icons";
 import { ImageDiff, isImagePath } from "./ImageDiff";
+import { Loading } from "./Loading";
 import { VirtualList } from "./VirtualList";
 import { ask } from "./Prompt";
 
@@ -563,7 +564,7 @@ export function CommitView() {
               when={!isImagePath(f().path)}
               fallback={<ImageDiff path={f().path} oldPath={f().oldPath} sha={range() ? undefined : selected()[0]} />}
             >
-              <Show when={diff()} fallback={<div class="empty muted">Loading…</div>}>
+              <Show when={diff()} fallback={<Loading />}>
                 {(d) => <DiffView diff={d()} />}
               </Show>
             </Show>
@@ -581,7 +582,7 @@ export function CommitView() {
           when={!loadError() && currentDetail()}
           fallback={
             <div class="empty">
-              <Show when={loadError()} fallback={selected()[0] ? "Loading…" : "Select a commit"}>
+              <Show when={loadError()} fallback={selected()[0] ? <Loading /> : "Select a commit"}>
                 <div>
                   <h2>Could not load this commit</h2>
                   <p class="muted" style={{ "user-select": "text" }}>

@@ -6,6 +6,7 @@ import { ContextMenuHost, menuActions } from "./components/ContextMenu";
 import { PromptHost } from "./components/Prompt";
 import { Dialog, dialogOpen } from "./components/Dialog";
 import { Dialogs } from "./components/Dialogs";
+import { Loading } from "./components/Loading";
 import { CommitView, HistoryList } from "./components/HistoryPane";
 import { TabStrip } from "./components/TabStrip";
 import { Toasts } from "./components/Toasts";
@@ -73,17 +74,6 @@ function Welcome() {
         <span class="muted" style={{ "font-size": "12px" }}>
           Tip: drag a folder onto this window to add it, or run <span class="kbd">blink .</span> in a terminal.
         </span>
-      </div>
-    </div>
-  );
-}
-
-function Loading(p: { label: string }) {
-  return (
-    <div class="empty">
-      <div class="loading">
-        <span class="spinner large" />
-        <span class="muted">{p.label}…</span>
       </div>
     </div>
   );

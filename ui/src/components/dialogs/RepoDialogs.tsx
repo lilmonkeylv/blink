@@ -17,6 +17,7 @@ import { fuzzyFilter } from "../../lib/fuzzy";
 import { applyTheme, currentBranch, notify, openRepo, reloadRepositories, reportError, run, setStore, store } from "../../store";
 import { Checkbox, Field, Select } from "../Controls";
 import { Dialog } from "../Dialog";
+import { Loading } from "../Loading";
 import { RepoIcon } from "../Icons";
 import { closeDialog, Tabs } from "./common";
 
@@ -398,7 +399,7 @@ export function RepoSettingsDialog() {
           ...(fork()?.isFork ? ([["fork", "Fork behavior"]] as ["fork", string][]) : []),
         ]}
       />
-      <Show when={settings()} fallback={<div class="empty muted">Loading…</div>}>
+      <Show when={settings()} fallback={<Loading />}>
         {(s) => (
           <Switch>
             <Match when={tab() === "remote"}>

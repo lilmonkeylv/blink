@@ -3,6 +3,7 @@ import { api, type DiffLine, type DraftComment, type ReviewEvent, type ReviewFil
 import { relativeTime } from "../../lib/time";
 import { notify, reportError, store } from "../../store";
 import { Dialog } from "../Dialog";
+import { Loading } from "../Loading";
 import { DiffView } from "../DiffView";
 import { Markdown } from "../Markdown";
 import { closeDialog } from "./common";
@@ -125,7 +126,7 @@ export function ReviewDialog(p: { number: number; title: string }) {
         </>
       }
     >
-      <Show when={data()} fallback={<div class="empty muted">{data.error ? "Could not load this pull request" : "Loading pull request…"}</div>}>
+      <Show when={data()} fallback={data.error ? <div class="empty muted">Could not load this pull request</div> : <Loading label="Loading pull request" />}>
         {(d) => (
           <div class="commit-split" style={{ flex: "1", "min-height": "0", "grid-template-columns": "280px 1fr" }}>
             <div class="list">

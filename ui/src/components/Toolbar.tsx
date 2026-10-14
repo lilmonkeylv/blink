@@ -25,6 +25,7 @@ import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { customTitleBar, WindowControls } from "./WindowControls";
 import { DRAG_TYPE } from "./HistoryPane";
 import { BranchIcon, CheckIcon, ChevronDown, DownIcon, MenuIcon, PlusIcon, PullRequestIcon, RepoIcon, SyncIcon, UpIcon } from "./Icons";
+import { Loading } from "./Loading";
 import { ask, choose, message } from "./Prompt";
 import { transferPercent } from "../lib/progress";
 
@@ -170,7 +171,7 @@ function PullRequestList(p: { query: string }) {
       }
     >
       <Show when={!prs.error} fallback={<div class="empty muted">{String((prs.error as { message?: string })?.message ?? "Could not load pull requests")}</div>}>
-        <For each={list()} fallback={<div class="empty muted">{prs.loading ? "Loading…" : "No open pull requests"}</div>}>
+        <For each={list()} fallback={prs.loading ? <Loading /> : <div class="empty muted">No open pull requests</div>}>
           {(pr) => (
             <div
               class="static-row pr-row"

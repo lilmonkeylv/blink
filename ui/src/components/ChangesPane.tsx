@@ -24,6 +24,7 @@ import { Checkbox } from "./Controls";
 import { DiffLayoutToggle, DiffView } from "./DiffView";
 import { ChevronDown, StatusIcon, WhitespaceIcon } from "./Icons";
 import { ImageDiff, isImagePath } from "./ImageDiff";
+import { Loading } from "./Loading";
 import { VirtualList } from "./VirtualList";
 import { ask } from "./Prompt";
 
@@ -614,7 +615,7 @@ export function ChangesDiff() {
             <ConflictActions path={f().path} />
           </Show>
           <Show when={!isImagePath(f().path)} fallback={<ImageDiff path={f().path} oldPath={f().oldPath} />}>
-            <Show when={diff()} fallback={<div class="empty muted">Loading…</div>}>
+            <Show when={diff()} fallback={<Loading />}>
               {(d) => (
                 <DiffView
                   diff={d()}
