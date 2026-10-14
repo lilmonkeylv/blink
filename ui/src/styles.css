@@ -2277,6 +2277,47 @@ input::-ms-clear {
   background: var(--hunk-bg);
 }
 
+.conflict-side.base {
+  background: var(--bg-subtle);
+}
+
+.conflict-base {
+  border-top: 1px solid var(--border);
+}
+
+.conflict-base-toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+  padding: 4px 10px;
+  border: 0;
+  background: transparent;
+  color: var(--fg-muted);
+  font: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.conflict-base-toggle:hover {
+  color: var(--fg);
+}
+
+.conflict-base-toggle .icon {
+  width: 14px;
+  height: 14px;
+  transition: transform var(--ease);
+}
+
+.conflict-base.open .conflict-base-toggle .icon {
+  transform: rotate(90deg);
+}
+
+.conflict-base-note {
+  padding: 0 10px 6px 28px;
+}
+
 .code-area {
   width: 100%;
   min-height: 260px;

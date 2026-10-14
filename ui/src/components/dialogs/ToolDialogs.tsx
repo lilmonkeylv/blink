@@ -1,13 +1,13 @@
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { createMemo, createResource, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
 import { api, isCommandError, type DeviceCode, type JobStep, type ReleaseNote } from "../../api";
-import { conflictCount, parseConflicts, render, type Resolution, type Segment } from "../../lib/conflicts";
+import { baseSections, conflictCount, parseConflicts, render, type Resolution, type Segment } from "../../lib/conflicts";
 import { parseJobLog } from "../../lib/joblog";
 import { COMMIT_KEYS, DEFAULT_BINDINGS } from "../../lib/keymap";
 import { addRepository, keymap, notify, refreshChecks, reportError, run, setStore, store } from "../../store";
 import { Checkbox, Field, Segmented } from "../Controls";
 import { Dialog } from "../Dialog";
-import { CheckIcon } from "../Icons";
+import { CheckIcon, ChevronRight } from "../Icons";
 import { Loading } from "../Loading";
 import { Markdown } from "../Markdown";
 import { VirtualList } from "../VirtualList";
@@ -416,6 +416,7 @@ export function MergeEditorDialog(p: { path: string }) {
   const [status, setStatus] = createSignal<"loading" | "ready" | "error">("loading");
   const [loadError, setLoadError] = createSignal("");
   const repoId = store.repo!.id;
+  const [ancestor] = createResource(() => api.conflictVersions(repoId, p.path).then(([base]) => base, () => null));
 
   const load = async () => {
     setStatus("loading");
@@ -434,6 +435,16 @@ export function MergeEditorDialog(p: { path: string }) {
 
   const output = createMemo(() => render(segments(), resolutions()));
   const conflicts = createMemo(() => segments().filter((s) => s.type === "conflict"));
+  const bases = createMemo(() => {
+    const text = ancestor();
+    return text == null ? conflicts().map((c) => (c.type === "conflict" ? c.base : null)) : baseSections(segments(), text);
+  });
+  const baseNote = (i: number) => {
+    if (bases()[i]) return null;
+    if (ancestor.loading) return "Loading the common ancestor…";
+    if (ancestor() == null) return "There is no common ancestor. Both sides added this file.";
+    return "Could not find this part of the file in the common ancestor.";
+  };
   const result = () => manual() ?? output().text;
   const unresolved = () => (manual() != null ? (manual()!.includes("<<<<<<<") ? 1 : 0) : output().unresolved);
 
@@ -533,6 +544,7 @@ export function MergeEditorDialog(p: { path: string }) {
                         Theirs ({c.theirsLabel || "incoming"})
                       </div>
                       <pre class="conflict-side theirs">{c.theirs.join("\n") || " "}</pre>
+                      <BaseSection lines={bases()[i()]} note={baseNote(i())} />
                     </div>
                   )
                 }
@@ -542,6 +554,27 @@ export function MergeEditorDialog(p: { path: string }) {
         </Match>
       </Switch>
     </Dialog>
+  );
+}
+
+function BaseSection(p: { lines: string[] | null; note: string | null }) {
+  const [open, setOpen] = createSignal(false);
+  return (
+    <div class="conflict-base" classList={{ open: open() }}>
+      <button type="button" class="conflict-base-toggle" aria-expanded={open()} onClick={() => setOpen(!open())}>
+        <ChevronRight />
+        Base (common ancestor)
+      </button>
+      <Show when={open()}>
+        <Show when={p.lines} fallback={<div class="muted small conflict-base-note">{p.note}</div>}>
+          {(lines) => (
+            <Show when={lines().length} fallback={<div class="muted small conflict-base-note">Empty in the common ancestor.</div>}>
+              <pre class="conflict-side base">{lines().join("\n")}</pre>
+            </Show>
+          )}
+        </Show>
+      </Show>
+    </div>
   );
 }
 
