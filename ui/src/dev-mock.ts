@@ -233,6 +233,10 @@ export function installDevMock() {
           { path: repo.id, name: "blink", fetched: true, error: null, ahead: 2, behind: 0, changes: 4 },
           { path: "C:/dev/desktop", name: "desktop", fetched: false, error: "fatal: could not read Username for 'https://github.com'", ahead: 0, behind: 0, changes: 0 },
         ];
+      case "unpushed_commits":
+        return 1;
+      case "check_git_executable":
+        return "2.47.1.windows.1";
       case "keymap":
         return {};
       case "pull_request_review":

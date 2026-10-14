@@ -1,10 +1,12 @@
-import { createMemo, createResource, createSignal, For, type JSX, Match, Show, Switch } from "solid-js";
+import { createEffect, createMemo, createResource, createSignal, For, type JSX, Match, onCleanup, Show, Switch } from "solid-js";
 import { createStore, unwrap } from "solid-js/store";
-import { api, type Settings } from "../api";
-import { notify, reportError, saveSettings, setStore, store } from "../store";
+import { api, isCommandError, type Settings } from "../api";
+import { ACCENT_PRESETS, normalizeHex, readableOn } from "../lib/appearance";
+import { applyTheme, notify, reportError, saveSettings, setStore, store } from "../store";
 import { Checkbox, Field, Select, type SelectOption } from "./Controls";
 import { Dialog } from "./Dialog";
 import { Avatar } from "./Avatar";
+import { CheckIcon } from "./Icons";
 
 const TABS = ["Accounts", "Integrations", "Git", "Appearance", "Notifications", "Prompts", "Advanced", "Accessibility"] as const;
 type TabName = (typeof TABS)[number];
@@ -51,6 +53,103 @@ function Threads(p: { label: string; value: number | null; onChange: (v: number 
 
 function Pane(p: { children: JSX.Element }) {
   return <div class="pane">{p.children}</div>;
+}
+
+const HOURS = Array.from({ length: 24 }, (_, h) => ({ value: String(h), label: `${String(h).padStart(2, "0")}:00` }));
+
+function Swatch(p: { color: string; label: string; checked: boolean; onSelect: () => void }) {
+  return (
+    <button
+      type="button"
+      role="radio"
+      class="swatch"
+      aria-checked={p.checked}
+      aria-label={p.label}
+      title={p.label}
+      style={{ "--swatch": p.color, color: readableOn(p.color) }}
+      onClick={p.onSelect}
+    >
+      <Show when={p.checked}>
+        <CheckIcon />
+      </Show>
+    </button>
+  );
+}
+
+function AccentPicker(p: { value: string | null; onChange: (v: string | null) => void }) {
+  const current = () => normalizeHex(p.value);
+  const isPreset = (hex: string | null) => !hex || ACCENT_PRESETS.some((c) => c.value === hex);
+  const [custom, setCustom] = createSignal(isPreset(current()) ? "" : (current() ?? ""));
+  const customHex = () => normalizeHex(custom());
+  return (
+    <Field label="Accent color" hint="Used for selection, focus rings and primary buttons.">
+      <div class="swatches" role="radiogroup" aria-label="Accent color">
+        <For each={ACCENT_PRESETS}>
+          {(c, i) => (
+            <Swatch
+              color={c.value}
+              label={i() === 0 ? `${c.label} (default)` : c.label}
+              checked={i() === 0 ? !current() || current() === c.value : current() === c.value}
+              onSelect={() => p.onChange(i() === 0 ? null : c.value)}
+            />
+          )}
+        </For>
+        <Swatch
+          color={customHex() ?? "#8c959f"}
+          label="Custom"
+          checked={!isPreset(current())}
+          onSelect={() => customHex() && p.onChange(customHex())}
+        />
+        <input
+          class="input swatch-hex"
+          placeholder="#rrggbb"
+          aria-label="Custom accent color"
+          spellcheck={false}
+          value={custom()}
+          classList={{ invalid: !!custom().trim() && !customHex() }}
+          onInput={(e) => {
+            setCustom(e.currentTarget.value);
+            const hex = normalizeHex(e.currentTarget.value);
+            if (hex) p.onChange(hex);
+          }}
+        />
+      </div>
+    </Field>
+  );
+}
+
+function GitExecutableField(p: { value: string; onChange: (v: string) => void }) {
+  const [status, setStatus] = createSignal<{ ok: boolean; text: string } | null>(null);
+  const check = async () => {
+    const path = p.value.trim();
+    if (!path) return setStatus(null);
+    try {
+      setStatus({ ok: true, text: `Found Git ${await api.checkGitExecutable(path)}` });
+    } catch (e) {
+      setStatus({ ok: false, text: isCommandError(e) ? (e.detail ?? e.message) : String(e) });
+    }
+  };
+  return (
+    <Field label="Git executable" hint="Leave blank to use the Git found on PATH. Applies to the next Git command.">
+      <div class="summary-row">
+        <input
+          class="input"
+          placeholder="Found on PATH"
+          spellcheck={false}
+          value={p.value}
+          onInput={(e) => {
+            setStatus(null);
+            p.onChange(e.currentTarget.value);
+          }}
+          onBlur={check}
+        />
+        <button class="btn" disabled={!p.value.trim()} onClick={check}>
+          Test
+        </button>
+      </div>
+      <Show when={status()}>{(st) => <span class={`hint ${st().ok ? "ok" : "error"}`}>{st().text}</span>}</Show>
+    </Field>
+  );
 }
 
 function EnterpriseAccounts() {
@@ -244,8 +343,16 @@ function GitTab(p: { s: Settings; set: Update }) {
         label="Sign commits"
         checked={p.s.git.signCommits}
         onChange={(v) => p.set((s) => (s.git.signCommits = v))}
-        hint="Uses your Git signing configuration (user.signingkey, gpg.format)."
+        hint="Uses your Git signing configuration, such as gpg.format."
       />
+      <Text
+        label="Signing key"
+        placeholder="Use user.signingkey from your Git config"
+        value={p.s.git.signingKey ?? ""}
+        onChange={(v) => p.set((s) => (s.git.signingKey = v.trim() ? v : null))}
+        hint="A GPG key ID, or the path to an SSH key when gpg.format is ssh."
+      />
+      <GitExecutableField value={p.s.git.executablePath ?? ""} onChange={(v) => p.set((s) => (s.git.executablePath = v.trim() ? v : null))} />
     </Pane>
   );
 }
@@ -259,6 +366,8 @@ export function SettingsDialog(p: { tab?: string }) {
       fn(next);
       return next;
     });
+  createEffect(() => applyTheme(s));
+  onCleanup(() => applyTheme());
   const close = () => setStore("dialog", null);
   const save = async () => {
     try {
@@ -317,6 +426,7 @@ export function SettingsDialog(p: { tab?: string }) {
                 ]}
                 onChange={(v) => set((x) => (x.appearance.theme = v))}
               />
+              <AccentPicker value={s.appearance.accentColor} onChange={(v) => set((x) => (x.appearance.accentColor = v))} />
               <Choice
                 label="Density"
                 value={s.appearance.density}
@@ -331,6 +441,13 @@ export function SettingsDialog(p: { tab?: string }) {
                 value={String(s.appearance.tabSize)}
                 options={["1", "2", "3", "4", "5", "6", "8"].map((v) => ({ value: v, label: v }))}
                 onChange={(v) => set((x) => (x.appearance.tabSize = Number(v)))}
+              />
+              <Text
+                label="Diff font"
+                placeholder="Cascadia Code"
+                value={s.appearance.diffFont ?? ""}
+                onChange={(v) => set((x) => (x.appearance.diffFont = v.trim() ? v : null))}
+                hint="Any installed monospace font. Separate fallbacks with commas."
               />
               <Choice
                 label="Diff font size"
@@ -355,12 +472,37 @@ export function SettingsDialog(p: { tab?: string }) {
                 label="Enable notifications"
                 checked={s.notifications.enabled}
                 onChange={(v) => set((x) => (x.notifications.enabled = v))}
-                hint="Shown for check failures and pull request reviews in repositories you have open."
+                hint="Shown for the events below in repositories you have open."
               />
               <Check label="Checks failed" checked={s.notifications.checksFailed} onChange={(v) => set((x) => (x.notifications.checksFailed = v))} />
               <Check label="Review requested" checked={s.notifications.reviewRequested} onChange={(v) => set((x) => (x.notifications.reviewRequested = v))} />
               <Check label="Pull request merged" checked={s.notifications.prMerged} onChange={(v) => set((x) => (x.notifications.prMerged = v))} />
               <Check label="Push rejected" checked={s.notifications.pushRejected} onChange={(v) => set((x) => (x.notifications.pushRejected = v))} />
+              <Check
+                label="Quiet hours"
+                checked={!!s.notifications.quietHours}
+                onChange={(v) => set((x) => (x.notifications.quietHours = v ? [22, 8] : null))}
+                hint="No notifications are shown between these hours."
+              />
+              <Show when={s.notifications.quietHours}>
+                {(quiet) => (
+                  <div class="summary-row quiet-hours">
+                    <Select
+                      value={String(quiet()[0])}
+                      options={HOURS}
+                      ariaLabel="Quiet hours start"
+                      onChange={(v) => set((x) => (x.notifications.quietHours = [Number(v), quiet()[1]]))}
+                    />
+                    <span class="muted">to</span>
+                    <Select
+                      value={String(quiet()[1])}
+                      options={HOURS}
+                      ariaLabel="Quiet hours end"
+                      onChange={(v) => set((x) => (x.notifications.quietHours = [quiet()[0], Number(v)]))}
+                    />
+                  </div>
+                )}
+              </Show>
             </Pane>
           </Match>
           <Match when={tab() === "Prompts"}>
@@ -368,6 +510,12 @@ export function SettingsDialog(p: { tab?: string }) {
               <span class="muted">Show a confirmation dialog before:</span>
               <Check label="Removing repositories" checked={s.prompts.removeRepository} onChange={(v) => set((x) => (x.prompts.removeRepository = v))} />
               <Check label="Discarding changes" checked={s.prompts.discardChanges} onChange={(v) => set((x) => (x.prompts.discardChanges = v))} />
+              <Check
+                label="Discarding selected lines permanently"
+                checked={s.prompts.discardChangesPermanently}
+                onChange={(v) => set((x) => (x.prompts.discardChangesPermanently = v))}
+                hint="Discarded lines skip the trash and cannot be recovered."
+              />
               <Check label="Force pushing" checked={s.prompts.forcePush} onChange={(v) => set((x) => (x.prompts.forcePush = v))} />
               <Check label="Undoing commits" checked={s.prompts.undoCommit} onChange={(v) => set((x) => (x.prompts.undoCommit = v))} />
               <Check label="Hard reset" checked={s.prompts.hardReset} onChange={(v) => set((x) => (x.prompts.hardReset = v))} />
@@ -416,8 +564,33 @@ export function SettingsDialog(p: { tab?: string }) {
                   { value: "polling", label: "Polling (network drives)" },
                 ]}
                 onChange={(v) => set((x) => (x.advanced.watcher = v))}
+                hint="Git fsmonitor needs Windows or macOS and falls back to native events elsewhere."
               />
-              <Check label="Use system OpenSSH" checked={s.advanced.useSystemOpenssh} onChange={(v) => set((x) => (x.advanced.useSystemOpenssh = v))} />
+              <Check
+                label="Use system OpenSSH"
+                checked={s.advanced.useSystemOpenssh}
+                onChange={(v) => set((x) => (x.advanced.useSystemOpenssh = v))}
+                hint="Windows only. Uses the OpenSSH client that ships with Windows instead of the one bundled with Git."
+              />
+              <Choice
+                label="Cache size limit"
+                value={String(s.advanced.cacheLimitMb)}
+                options={[...new Set([128, 256, 512, 1024, 2048, s.advanced.cacheLimitMb])].sort((a, b) => a - b).map((mb) => ({ value: String(mb), label: mb >= 1024 ? `${mb / 1024} GB` : `${mb} MB` }))}
+                onChange={(v) => set((x) => (x.advanced.cacheLimitMb = Number(v)))}
+                hint="Cached repository views and avatars past this size are removed, oldest first."
+              />
+              <Choice
+                label="Log level"
+                value={s.advanced.logLevel}
+                options={[
+                  { value: "error", label: "Errors only" },
+                  { value: "warn", label: "Warnings" },
+                  { value: "info", label: "Info" },
+                  { value: "debug", label: "Debug" },
+                  { value: "trace", label: "Trace (very verbose)" },
+                ]}
+                onChange={(v) => set((x) => (x.advanced.logLevel = v))}
+              />
               <Choice
                 label="Update channel"
                 value={s.advanced.updateChannel}
@@ -456,6 +629,12 @@ export function SettingsDialog(p: { tab?: string }) {
               <Check label="Reduce motion" checked={s.accessibility.reducedMotion} onChange={(v) => set((x) => (x.accessibility.reducedMotion = v))} />
               <Check label="High contrast" checked={s.accessibility.highContrast} onChange={(v) => set((x) => (x.accessibility.highContrast = v))} />
               <Check label="Larger hit targets" checked={s.accessibility.largeHitTargets} onChange={(v) => set((x) => (x.accessibility.largeHitTargets = v))} />
+              <Check
+                label="Keyboard navigation"
+                checked={s.accessibility.keyboardNavigation}
+                onChange={(v) => set((x) => (x.accessibility.keyboardNavigation = v))}
+                hint="Always show the focus ring, and press F6 or Shift+F6 to move between the toolbar, file list, commit message and diff."
+              />
             </Pane>
           </Match>
         </Switch>

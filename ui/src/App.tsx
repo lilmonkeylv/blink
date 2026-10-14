@@ -15,6 +15,7 @@ import { applySidebarWidth, clampSidebar, reclampSidebar, saveRepoLayout } from 
 import { appMenu, doSync, pickAndAddRepository, Toolbar } from "./components/Toolbar";
 import { fuzzyFilter } from "./lib/fuzzy";
 import { comboFromEvent } from "./lib/keymap";
+import { cycleTab } from "./lib/tabs";
 import {
   applyRepoView,
   applyTheme,
@@ -213,6 +214,19 @@ function focusSearch() {
   setTimeout(() => document.getElementById("history-search")?.focus(), 30);
 }
 
+const REGIONS = [".toolbar", ".sidebar .list", ".commit-box", ".content"];
+const FOCUSABLE = "[tabindex='0'], button:not(:disabled), input:not(:disabled), textarea:not(:disabled)";
+
+function focusRegion(step: number) {
+  const present = REGIONS.filter((s) => document.querySelector(s));
+  const current = present.find((s) => document.activeElement?.closest(s)) ?? null;
+  const next = cycleTab(present, current, step);
+  const region = next ? document.querySelector<HTMLElement>(next) : null;
+  if (!region) return;
+  const target = region.matches(FOCUSABLE) ? region : (region.querySelector<HTMLElement>(".list") ?? region.querySelector<HTMLElement>(FOCUSABLE));
+  target?.focus();
+}
+
 function inTextField(e: KeyboardEvent) {
   const el = e.target as HTMLElement;
   return el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable;
@@ -226,6 +240,11 @@ export function App() {
     if (e.key === "F12" && import.meta.env.DEV) {
       e.preventDefault();
       api.openDevtools().catch(() => {});
+      return;
+    }
+    if (e.key === "F6" && store.settings?.accessibility.keyboardNavigation && !store.dialog) {
+      e.preventDefault();
+      focusRegion(e.shiftKey ? -1 : 1);
       return;
     }
     const action = keymap().byCombo.get(comboFromEvent(e));
@@ -317,7 +336,7 @@ export function App() {
     window.addEventListener("focus", loadKeymap);
     window.addEventListener("resize", reclampSidebar);
     loadKeymap();
-    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", applyTheme);
+    window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", () => applyTheme());
     try {
       await bootstrap();
       if (windowRepo) return;

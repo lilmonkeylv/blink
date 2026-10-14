@@ -260,11 +260,21 @@ function BranchPopover() {
 
   const del = async (b: Branch) => {
     const repo = store.repo!;
+    if (store.settings?.prompts.deleteBranchWithUnpushed !== false) {
+      const unpushed = await api.unpushedCommits(repo.id, b.name).catch(() => 0);
+      const commits = unpushed === 1 ? "1 commit that is" : `${unpushed} commits that are`;
+      const ok =
+        unpushed === 0 ||
+        (await ask(`${b.name} has ${commits} not on any remote. Delete it anyway? You can ${undoPhrase(shortcut("undo"))}.`, {
+          title: "Delete branch",
+          kind: "warning",
+          okLabel: "Delete",
+        }));
+      if (!ok) return;
+    }
     const includeRemote = b.upstream
       ? await ask(`Also delete ${b.upstream} on the remote?`, { title: `Delete ${b.name}`, okLabel: "Delete remote too", cancelLabel: "Local only" })
       : false;
-    const ok = await ask(`Delete branch ${b.name}? You can ${undoPhrase(shortcut("undo"))}.`, { title: "Delete branch", kind: "warning", okLabel: "Delete" });
-    if (!ok) return;
     try {
       await api.deleteBranch(repo.id, b.name, false, includeRemote);
       notify("success", `Deleted ${b.name}`, { action: { label: "Undo", run: undoLastOperation } });

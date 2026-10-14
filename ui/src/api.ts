@@ -633,6 +633,7 @@ export const api = {
   renameBranch: (id: string, old: string, newName: string) => invoke<void>("rename_branch", { id, old, new: newName }),
   deleteBranch: (id: string, name: string, force: boolean, includeRemote: boolean) =>
     invoke<void>("delete_branch", { id, name, force, includeRemote }),
+  unpushedCommits: (id: string, name: string) => invoke<number>("unpushed_commits", { id, name }),
   deleteRemoteBranch: (id: string, name: string) => invoke<void>("delete_remote_branch", { id, name }),
   setUpstream: (id: string, branch: string, upstream: string | null) => invoke<void>("set_upstream", { id, branch, upstream }),
   pruneRemotes: (id: string) => invoke<string[]>("prune_remotes", { id }),
@@ -725,6 +726,8 @@ export const api = {
   detectIntegrations: () => invoke<{ editors: Tool[]; shells: Tool[] }>("detect_integrations"),
   openInEditor: (id: string, path?: string) => invoke<void>("open_in_editor", { id, path }),
   openInShell: (id: string, path?: string) => invoke<void>("open_in_shell", { id, path }),
+  openInDiffTool: (id: string, path: string) => invoke<void>("open_in_diff_tool", { id, path }),
+  checkGitExecutable: (path: string) => invoke<string>("check_git_executable", { path }),
   openLogsFolder: () => invoke<void>("open_logs_folder"),
   takeCrashReport: () => invoke<string | null>("take_crash_report"),
   openDevtools: () => invoke<void>("open_devtools"),
