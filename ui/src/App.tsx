@@ -1,8 +1,9 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { createEffect, createMemo, createSignal, For, Match, on, onCleanup, onMount, Show, Switch } from "solid-js";
-import { api, onChecksChanged, onLaunch, onRepoChanged, onSharedChanged, onSyncProgress, onUpdateAvailable } from "./api";
+import { api, onChecksChanged, onHookOutput, onLaunch, onRepoChanged, onSharedChanged, onSyncProgress, onUpdateAvailable } from "./api";
 import { ChangesDiff, ChangesList } from "./components/ChangesPane";
 import { ContextMenuHost, menuActions } from "./components/ContextMenu";
+import { HookPanel } from "./components/HookPanel";
 import { PromptHost } from "./components/Prompt";
 import { Dialog, dialogOpen } from "./components/Dialog";
 import { Dialogs } from "./components/Dialogs";
@@ -14,6 +15,7 @@ import { TooltipHost } from "./components/Tooltip";
 import { applySidebarWidth, clampSidebar, reclampSidebar, saveRepoLayout } from "./lib/layout";
 import { appMenu, doSync, pickAndAddRepository, Toolbar } from "./components/Toolbar";
 import { fuzzyFilter } from "./lib/fuzzy";
+import { applyHookEvent } from "./lib/hooks";
 import { comboFromEvent } from "./lib/keymap";
 import { cycleTab } from "./lib/tabs";
 import {
@@ -131,6 +133,7 @@ function Sidebar() {
           <HistoryList />
         </Match>
       </Switch>
+      <HookPanel />
       <Show when={!store.account}>
         <div class="list-header" style={{ "border-top": "1px solid var(--border)", "border-bottom": 0 }}>
           <a onClick={() => setStore("dialog", { type: "signIn" })}>Sign in to GitHub.com</a>
@@ -301,6 +304,11 @@ export function App() {
     onSharedChanged(() => reloadSharedState().catch(reportError)),
     onSyncProgress((e) => {
       if (store.sync && store.repo?.id === e.repo) setStore("sync", "progress", e.progress);
+    }),
+    onHookOutput((e) => {
+      if (store.repo?.id !== e.repo) return;
+      if (e.event.type === "started") setStore("hookRetry", null);
+      setStore("hookRun", applyHookEvent(store.hookRun, e.repo, e.action, e.event));
     }),
     onChecksChanged((e) => {
       if (store.repo?.id === e.repo) setStore("checks", e.summary);

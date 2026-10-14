@@ -356,6 +356,18 @@ export interface Progress {
 
 export type SyncAction = "fetch" | "pull" | "push";
 
+export type HookAction = "commit" | "push";
+
+export interface HookResult {
+  name: string;
+  code: number | null;
+}
+
+export type HookEvent =
+  | { type: "started"; hooks: string[] }
+  | { type: "output"; line: string }
+  | { type: "finished"; results: HookResult[] };
+
 export interface FileSelection {
   path: string;
   lines?: [number, number][];
@@ -653,8 +665,8 @@ export const api = {
 
   fileDiff: (id: string, path: string, ignoreWhitespace = false, full = false, highlight = true) =>
     invoke("file_diff", { id, path, ignoreWhitespace, full, highlight }).then(wire(decodeDiff)),
-  commit: (id: string, files: FileSelection[], message: CommitMessage, amend = false) =>
-    invoke<string>("commit", { id, files, message, amend }),
+  commit: (id: string, files: FileSelection[], message: CommitMessage, amend = false, noVerify = false) =>
+    invoke<string>("commit", { id, files, message, amend, noVerify }),
   discardFiles: (id: string, paths: string[]) => invoke<void>("discard_files", { id, paths }),
   discardLines: (id: string, path: string, lines: [number, number][]) =>
     invoke<void>("discard_lines", { id, path, lines }),
@@ -692,8 +704,8 @@ export const api = {
   stashPop: (id: string, reference: string) => invoke<void>("stash_pop", { id, reference }),
   stashDrop: (id: string, reference: string) => invoke<void>("stash_drop", { id, reference }),
 
-  sync: (id: string, action: SyncAction, forceWithLease = false, tags = false) =>
-    invoke<void>("sync", { id, action, forceWithLease, tags }),
+  sync: (id: string, action: SyncAction, forceWithLease = false, tags = false, noVerify = false) =>
+    invoke<void>("sync", { id, action, forceWithLease, tags, noVerify }),
 
   revert: (id: string, sha: string) => invoke<void>("revert_commit", { id, sha }),
   cherryPick: (id: string, shas: string[], target?: string) => invoke<void>("cherry_pick", { id, shas, target }),
@@ -831,6 +843,10 @@ export const api = {
 
 export function onRepoChanged(handler: (view: RepoView) => void): Promise<UnlistenFn> {
   return listen<RepoView>("repo-changed", (e) => handler(e.payload));
+}
+
+export function onHookOutput(handler: (e: { repo: string; action: HookAction; event: HookEvent }) => void): Promise<UnlistenFn> {
+  return listen<{ repo: string; action: HookAction; event: HookEvent }>("hook-output", (e) => handler(e.payload));
 }
 
 export function onSyncProgress(

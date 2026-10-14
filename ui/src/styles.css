@@ -1900,6 +1900,85 @@ select.input {
   margin-left: auto;
 }
 
+.hook-panel {
+  --tone: var(--accent);
+  display: flex;
+  flex-direction: column;
+  border-top: 1px solid var(--border);
+  box-shadow: inset 3px 0 0 var(--tone);
+  background: var(--bg-subtle);
+  font-size: 12px;
+}
+
+.hook-panel.passed {
+  --tone: var(--add-fg);
+}
+
+.hook-panel.failed {
+  --tone: var(--del-fg);
+  background: var(--del-bg);
+}
+
+.hook-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px 2px 4px;
+}
+
+.hook-toggle {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px;
+  border: 0;
+  border-radius: var(--radius);
+  background: transparent;
+  text-align: left;
+}
+
+.hook-toggle:hover {
+  background: var(--bg-hover);
+}
+
+.hook-toggle > .icon:first-child,
+.hook-toggle > .spinner {
+  color: var(--tone);
+}
+
+.hook-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 500;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hook-output {
+  margin: 0 10px 8px;
+  padding: 6px 8px;
+  max-height: 180px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  white-space: pre-wrap;
+  word-break: break-word;
+  user-select: text;
+}
+
+.hook-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  padding: 0 10px 8px;
+}
+
 .palette {
   align-self: start;
   margin-top: 12vh;

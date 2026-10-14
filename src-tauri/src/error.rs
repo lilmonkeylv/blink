@@ -50,6 +50,9 @@ impl From<blink_git::Error> for CommandError {
             blink_git::Error::Tool { tool, stderr } => {
                 Self { kind: "tool", message: format!("{tool} failed"), detail: Some(blink_git::redact(&stderr)) }
             }
+            blink_git::Error::HookFailed { hook, output, .. } => {
+                Self { kind: "hookFailed", message: format!("The {hook} hook failed"), detail: Some(output) }
+            }
             blink_git::Error::NotARepository(path) => Self::new("notARepository", path),
             blink_git::Error::GitNotFound => Self::new("gitNotFound", "Git is not installed or not on PATH"),
             blink_git::Error::InvalidArgument(message) => Self::new("invalidArgument", message),
@@ -128,6 +131,19 @@ mod tests {
     #[test]
     fn other_git_failures_stay_git() {
         assert_eq!(push_failure("fatal: Authentication failed").kind, "git");
+    }
+
+    #[test]
+    fn hook_failures_keep_the_hook_output() {
+        let e = CommandError::from(blink_git::Error::HookFailed {
+            hook: "pre-commit".into(),
+            code: Some(1),
+            output: "lint failed".into(),
+        });
+        assert_eq!(
+            (e.kind, e.message.as_str(), e.detail.as_deref()),
+            ("hookFailed", "The pre-commit hook failed", Some("lint failed"))
+        );
     }
 
     #[test]

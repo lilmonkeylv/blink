@@ -115,6 +115,10 @@ impl GitCli {
         &self.workdir
     }
 
+    pub(crate) fn signs_commits(&self) -> bool {
+        self.sign_commits
+    }
+
     fn user_ssh_command(&self) -> bool {
         ["GIT_SSH_COMMAND", "GIT_SSH"]
             .iter()
@@ -162,7 +166,7 @@ impl GitCli {
         cmd
     }
 
-    fn finish(args: &[&str], output: std::process::Output) -> Result<String> {
+    pub(crate) fn finish(args: &[&str], output: std::process::Output) -> Result<String> {
         if output.status.success() {
             Ok(String::from_utf8_lossy(&output.stdout).into_owned())
         } else {
@@ -177,7 +181,7 @@ impl GitCli {
         }
     }
 
-    fn spawn_error(e: std::io::Error) -> Error {
+    pub(crate) fn spawn_error(e: std::io::Error) -> Error {
         if e.kind() == std::io::ErrorKind::NotFound { Error::GitNotFound } else { e.into() }
     }
 
@@ -494,7 +498,7 @@ impl GitCli {
     }
 }
 
-fn parse_progress(line: &str) -> Progress {
+pub(crate) fn parse_progress(line: &str) -> Progress {
     let line = line.trim().trim_start_matches("remote:").trim();
     let (phase, rest) = line.split_once(':').unwrap_or((line, ""));
     let percent = rest.split_whitespace().find_map(|w| w.strip_suffix('%')).and_then(|p| p.parse::<u8>().ok());
@@ -517,7 +521,7 @@ pub fn locked_file(stderr: &str) -> Option<&str> {
     Some(&stderr[start..end]).filter(|p| p.ends_with(".lock"))
 }
 
-fn retry_when_locked<T>(mut attempt: impl FnMut() -> Result<T>) -> Result<T> {
+pub(crate) fn retry_when_locked<T>(mut attempt: impl FnMut() -> Result<T>) -> Result<T> {
     for delay in LOCK_RETRY_DELAYS_MS {
         match attempt() {
             Err(Error::Cli { stderr, .. }) if is_lock_error(&stderr) => {

@@ -1,7 +1,7 @@
 use std::io::Write;
 
 use blink_diff::{DiffOptions, FileDiff, LineSelection, PatchDirection, SubmoduleDiff, build_partial_patch, diff_file};
-use blink_git::{BlobSource, ChangeKind, Error, FileChange, GitCli, Repository, Result};
+use blink_git::{BlobSource, ChangeKind, Error, FileChange, GitCli, HookEvent, Repository, Result};
 use serde::Deserialize;
 
 #[derive(Debug, Clone, Deserialize)]
@@ -110,6 +110,13 @@ fn find_change<'a>(changes: &'a [FileChange], path: &str) -> Result<&'a FileChan
     changes.iter().find(|c| c.path == path).ok_or_else(|| Error::Git(format!("no change for {path}")))
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct CommitOptions {
+    pub amend: bool,
+    pub sign: bool,
+    pub verify: bool,
+}
+
 pub fn commit_selection(
     repo: &Repository,
     files: &[FileSelection],
@@ -117,15 +124,25 @@ pub fn commit_selection(
     amend: bool,
     sign: bool,
 ) -> Result<String> {
+    commit_selection_with_hooks(repo, files, message, CommitOptions { amend, sign, verify: true }, |_| {})
+}
+
+pub fn commit_selection_with_hooks(
+    repo: &Repository,
+    files: &[FileSelection],
+    message: &CommitMessage,
+    options: CommitOptions,
+    on_hook: impl FnMut(HookEvent),
+) -> Result<String> {
     if message.summary.trim().is_empty() {
         return Err(Error::Git("commit summary is required".into()));
     }
-    let cli = repo.cli().with_signing(sign);
+    let cli = repo.cli().with_signing(options.sign);
     let status = repo.status(None)?;
     restoring_index_on_error(&cli, || {
         cli.unstage_all()?;
         stage_selection(repo, &cli, &status.files, files)?;
-        cli.commit(&message.render(), amend)
+        cli.commit_with_hooks(&message.render(), options.amend, options.verify, on_hook)
     })
 }
 

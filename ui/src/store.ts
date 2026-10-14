@@ -22,6 +22,7 @@ import {
 } from "./api";
 import { accentTokens, monoStack } from "./lib/appearance";
 import { EMPTY_DRAFT, persistDraft, savedDrafts, type CommitDraft } from "./lib/drafts";
+import type { HookRun } from "./lib/hooks";
 import { ask } from "./components/Prompt";
 import { applySidebarWidth, lastSidebarWidth, repoLayout } from "./lib/layout";
 import { claimMissingLfsWarning, LFS_INSTALL_URL } from "./lib/lfs";
@@ -95,6 +96,8 @@ interface AppStore {
   dialog: Dialog | null;
   banners: Banner[];
   sync: { action: SyncAction; progress: Progress | null; label?: string } | null;
+  hookRun: HookRun | null;
+  hookRetry: { label: string; run: () => void } | null;
   busy: string | null;
   opening: string | null;
   checks: ChecksSummary | null;
@@ -123,6 +126,8 @@ export const [store, setStore] = createStore<AppStore>({
   dialog: null,
   banners: [],
   sync: null,
+  hookRun: null,
+  hookRetry: null,
   busy: null,
   opening: null,
   checks: null,
@@ -135,6 +140,11 @@ export const [store, setStore] = createStore<AppStore>({
   pickingNewTab: false,
   drafts: savedDrafts(),
 });
+
+export function clearFailedHooks(action: HookRun["action"]) {
+  if (store.hookRun?.action === action && store.hookRun.status === "failed") setStore("hookRun", null);
+  setStore("hookRetry", null);
+}
 
 export function commitDraft(repo: string): CommitDraft {
   return store.drafts[repo] ?? EMPTY_DRAFT;
@@ -362,6 +372,8 @@ function showRepo(view: RepoView) {
       lfs: null,
       historySearch: null,
       compareWith: null,
+      hookRun: null,
+      hookRetry: null,
     });
   });
   setDiffVersion((v) => v + 1);

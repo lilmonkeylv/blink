@@ -12,6 +12,8 @@ pub enum Error {
     Cli { command: String, stderr: String, code: Option<i32> },
     #[error("{tool} failed: {stderr}")]
     Tool { tool: String, stderr: String },
+    #[error("the {hook} hook failed")]
+    HookFailed { hook: String, code: Option<i32>, output: String },
     #[error("git executable not found")]
     GitNotFound,
     #[error("invalid argument: {0}")]

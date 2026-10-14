@@ -1,13 +1,14 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use blink_git::{GitCli, HeadState, Progress, Repository, SyncAction};
+use blink_git::{GitCli, HeadState, HookEvent, Progress, Repository, SyncAction};
 use blink_store::PullStrategy;
 use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::sync::Semaphore;
 
 use crate::alerts::{self, Alert};
+use crate::commands::hooks::{HookAction, hook_emitter};
 use crate::error::{CmdResult, CommandError};
 use crate::state::AppState;
 use crate::view::RepoView;
@@ -45,6 +46,7 @@ pub async fn sync(
     action: SyncAction,
     force_with_lease: Option<bool>,
     tags: Option<bool>,
+    no_verify: Option<bool>,
 ) -> CmdResult<()> {
     let handle = state.engine.get(&id)?;
     let cli = state.git_cli(handle.repo());
@@ -54,7 +56,9 @@ pub async fn sync(
     };
     let force = force_with_lease.unwrap_or(false);
     let push_tags = tags.unwrap_or(false);
+    let verify = !no_verify.unwrap_or(false);
     let mut emit = progress_emitter(&app, &id, action);
+    let mut hooks = hook_emitter(&app, &id, HookAction::Push);
 
     let engine = &state.engine;
     let result = match action {
@@ -68,7 +72,8 @@ pub async fn sync(
                 .await
         }
         SyncAction::Push => {
-            engine.network_write(&id, move |repo| push_current_branch(repo, &cli, force, push_tags, &mut emit)).await
+            let options = PushOptions { force, push_tags, verify };
+            engine.network_write(&id, move |repo| push_current_branch(repo, &cli, options, &mut emit, &mut hooks)).await
         }
     }
     .map_err(CommandError::from);
@@ -76,6 +81,7 @@ pub async fn sync(
         maintain_commit_graph(&state, id);
     } else if let Err(e) = &result
         && action == SyncAction::Push
+        && e.kind != "hookFailed"
         && alerts::is_push_rejection(e.detail.as_deref().unwrap_or(&e.message))
         && !alerts::window_focused(&app)
     {
@@ -85,20 +91,26 @@ pub async fn sync(
     result
 }
 
+struct PushOptions {
+    force: bool,
+    push_tags: bool,
+    verify: bool,
+}
+
 fn push_current_branch(
     repo: &Repository,
     cli: &GitCli,
-    force: bool,
-    push_tags: bool,
+    options: PushOptions,
     emit: &mut impl FnMut(Progress),
+    hooks: &mut impl FnMut(HookEvent),
 ) -> blink_git::Result<()> {
     let HeadState::Branch { name, .. } = repo.head()? else {
         return Err(blink_git::Error::Git("Cannot push a detached HEAD".into()));
     };
     let target = cli.push_target(&name)?;
-    cli.push(&target, force, &mut *emit)?;
-    if push_tags {
-        cli.push_tags(&target.remote, &mut *emit)?;
+    cli.push_with_hooks(&target, options.force, options.verify, &mut *emit, &mut *hooks)?;
+    if options.push_tags {
+        cli.push_tags_with_hooks(&target.remote, options.verify, &mut *emit, &mut *hooks)?;
     }
     Ok(())
 }

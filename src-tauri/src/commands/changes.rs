@@ -1,10 +1,11 @@
-use blink_core::ops::{self, CommitMessage, FileSelection};
+use blink_core::ops::{self, CommitMessage, CommitOptions, FileSelection};
 use blink_diff::DiffOptions;
 use blink_git::FileChange;
 use serde::{Deserialize, Serialize};
-use tauri::State;
 use tauri::ipc::Response;
+use tauri::{AppHandle, State};
 
+use crate::commands::hooks::{HookAction, hook_emitter};
 use crate::error::{CmdResult, CommandError};
 use crate::state::AppState;
 
@@ -43,19 +44,26 @@ pub async fn file_diff(
 
 #[tauri::command]
 pub async fn commit(
+    app: AppHandle,
     state: State<'_, AppState>,
     id: String,
     files: Vec<FileSelection>,
     message: CommitMessage,
     amend: Option<bool>,
+    no_verify: Option<bool>,
 ) -> CmdResult<String> {
     if files.is_empty() && !amend.unwrap_or(false) {
         return Err(CommandError::new("nothingSelected", "Select at least one file to commit"));
     }
     let amend = amend.unwrap_or(false);
     let sign = state.settings.read().git.sign_commits;
+    let options = CommitOptions { amend, sign, verify: !no_verify.unwrap_or(false) };
     let label = if amend { "Amend commit" } else { "Commit" };
-    Ok(state.engine.rewrite(&id, label, move |repo| ops::commit_selection(repo, &files, &message, amend, sign)).await?)
+    let emit = hook_emitter(&app, &id, HookAction::Commit);
+    Ok(state
+        .engine
+        .rewrite(&id, label, move |repo| ops::commit_selection_with_hooks(repo, &files, &message, options, emit))
+        .await?)
 }
 
 #[tauri::command]
