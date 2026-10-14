@@ -2,6 +2,12 @@
 
 All notable changes to Blink are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.1.0-alpha.10] - 2026-10-14
+
+### Fixes
+
+- **changes:** Clear the commit message as soon as the commit lands ([f9a5322](https://github.com/lilmonkeylv/blink/commit/f9a5322e04a0b50da48896953d00a6ad66069d0a))
+
 ## [0.1.0-alpha.9] - 2026-10-14
 
 ### Fixes
