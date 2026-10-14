@@ -8,6 +8,7 @@ import {
   checkForUpdates,
   closeRepoTab,
   currentBranch,
+  keymap,
   notify,
   openInNewTab,
   openInNewWindow,
@@ -39,9 +40,9 @@ function usePopoverDismiss(close: () => void) {
 }
 
 const addMenu = (): MenuItem[] => [
-  { label: "Add existing repository…", run: () => pickAndAddRepository() },
-  { label: "Clone repository…", run: () => setStore("dialog", { type: "clone" }) },
-  { label: "Create new repository…", run: () => setStore("dialog", { type: "createRepo" }) },
+  { label: "Add existing repository…", hint: keymap().keys["repo.add"], run: () => pickAndAddRepository() },
+  { label: "Clone repository…", hint: keymap().keys["repo.clone"], run: () => setStore("dialog", { type: "clone" }) },
+  { label: "Create new repository…", hint: keymap().keys["repo.create"], run: () => setStore("dialog", { type: "createRepo" }) },
   "separator",
   { label: "Import repositories from a folder…", run: () => setStore("dialog", { type: "import" }) },
 ];
@@ -457,9 +458,9 @@ export function appMenu(): MenuItem[] {
     {
       label: "Repository",
       items: [
-        { label: "Push", run: () => doSync("push"), disabled: !repo },
-        { label: "Pull", run: () => doSync("pull"), disabled: !repo },
-        { label: "Fetch", run: () => doSync("fetch"), disabled: !repo },
+        { label: "Push", hint: keymap().keys["sync.push"], run: () => doSync("push"), disabled: !repo },
+        { label: "Pull", hint: keymap().keys["sync.pull"], run: () => doSync("pull"), disabled: !repo },
+        { label: "Fetch", hint: keymap().keys["sync.fetch"], run: () => doSync("fetch"), disabled: !repo },
         { label: "Force push (with lease)…", run: () => doSync("push", true), disabled: !repo },
         "separator",
         { label: "Fetch all repositories…", run: () => setStore("dialog", { type: "fetchAll" }) },
@@ -477,9 +478,9 @@ export function appMenu(): MenuItem[] {
       disabled: !repo,
       items: [
         { label: "Preview pull request…", run: () => setStore("dialog", { type: "previewPullRequest" }) },
-        { label: "Create pull request", run: r((i) => api.createPullRequest(i)) },
+        { label: "Create pull request", hint: keymap().keys["pr.create"], run: r((i) => api.createPullRequest(i)) },
         { label: "Checks for this branch…", run: () => setStore("dialog", { type: "checks" }) },
-        { label: "View on GitHub", run: r(api.openOnGithub) },
+        { label: "View on GitHub", hint: keymap().keys["open.github"], run: r(api.openOnGithub) },
       ],
     },
     {
@@ -487,13 +488,13 @@ export function appMenu(): MenuItem[] {
       disabled: !repo,
       items: [
         { label: "Open in new window", run: () => id && openInNewWindow(id) },
-        { label: "Open in external editor", run: r((i) => api.openInEditor(i)) },
-        { label: "Open in shell", run: r((i) => api.openInShell(i)) },
-        { label: "Show in file manager", run: r((i) => api.reveal(i)) },
+        { label: "Open in external editor", hint: keymap().keys["open.editor"], run: r((i) => api.openInEditor(i)) },
+        { label: "Open in shell", hint: keymap().keys["open.shell"], run: r((i) => api.openInShell(i)) },
+        { label: "Show in file manager", hint: keymap().keys["open.files"], run: r((i) => api.reveal(i)) },
       ],
     },
     "separator",
-    { label: "Settings", run: () => setStore("dialog", { type: "settings" }) },
+    { label: "Settings", hint: keymap().keys["settings"], run: () => setStore("dialog", { type: "settings" }) },
     { label: "Keyboard shortcuts", run: () => setStore("dialog", { type: "shortcuts" }) },
     "separator",
     { label: "What's new", run: () => showWhatsNew(true) },

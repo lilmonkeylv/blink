@@ -168,7 +168,7 @@ function Palette(p: { onClose: () => void }) {
         ]
       : [];
     const repos: PaletteItem[] = store.repositories.map((r) => ({ label: `Open ${r.name}`, hint: r.owner ?? undefined, run: () => openRepo(r.path) }));
-    return fuzzyFilter([...extra, ...actions.map((a) => ({ label: a.label, run: a.run })), ...repos], query(), (i) => i.label);
+    return fuzzyFilter([...extra, ...actions.map((a) => ({ label: a.label, hint: a.hint, run: a.run })), ...repos], query(), (i) => i.label);
   });
 
   const choose = (item?: PaletteItem) => {
