@@ -50,11 +50,14 @@ pub struct GitCli {
 
 const NETWORK_COMMANDS: &[&str] = &["fetch", "pull", "push", "clone", "ls-remote"];
 const STALL_GUARD: [&str; 4] = ["-c", "http.lowSpeedLimit=1000", "-c", "http.lowSpeedTime=60"];
-const SSH_KEEPALIVE: &str = "ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=4";
+const SSH_KEEPALIVE: &str = "-o ServerAliveInterval=15 -o ServerAliveCountMax=4";
 
 static SYSTEM_GIT: OnceLock<Option<PathBuf>> = OnceLock::new();
 
 pub fn find_git() -> Option<PathBuf> {
+    if let Some(git) = crate::runtime::runtime().executable {
+        return Some(git);
+    }
     SYSTEM_GIT
         .get_or_init(|| {
             let exe = if cfg!(windows) { "git.exe" } else { "git" };
@@ -119,26 +122,33 @@ impl GitCli {
             || self.config_get("core.sshCommand").is_some()
     }
 
-    fn ssh_command(&self) -> String {
-        if self.ssh_batch_mode { format!("{SSH_KEEPALIVE} -o BatchMode=yes") } else { SSH_KEEPALIVE.to_string() }
+    fn ssh_command(&self, program: Option<&Path>) -> String {
+        // GIT_SSH_COMMAND outranks GIT_SSH, so a chosen ssh binary has to be named here to keep the keepalive options.
+        let program =
+            program.map_or_else(|| "ssh".to_string(), |p| format!("'{}'", p.to_string_lossy().replace('\\', "/")));
+        let batch = if self.ssh_batch_mode { " -o BatchMode=yes" } else { "" };
+        format!("{program} {SSH_KEEPALIVE}{batch}")
     }
 
     pub(crate) fn command(&self, args: &[&str]) -> Command {
         let network = args.first().is_some_and(|sub| NETWORK_COMMANDS.contains(sub));
+        let runtime = crate::runtime::runtime();
         let mut cmd = Command::new(&self.git);
         cmd.current_dir(&self.workdir)
             .args(["-c", "core.quotepath=false", "-c", "color.ui=false"])
+            .args(runtime.config_args())
             .args(self.config.iter().flat_map(|c| ["-c", c.as_str()]));
         if network {
             cmd.args(STALL_GUARD);
             if !self.user_ssh_command() {
-                cmd.env("GIT_SSH_COMMAND", self.ssh_command());
+                cmd.env("GIT_SSH_COMMAND", self.ssh_command(runtime.ssh.as_deref()));
             }
         }
         cmd.args(args)
             .env("GIT_TERMINAL_PROMPT", "0")
             .env("GIT_OPTIONAL_LOCKS", "0")
             .env("LC_ALL", "C")
+            .envs(runtime.env())
             .envs(self.env.iter().map(|(k, v)| (k, v)))
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
@@ -586,6 +596,17 @@ mod tests {
         assert_eq!(env_of(&cli.command(&["fetch"]), "GIT_SSH_COMMAND"), None);
         let custom = GitCli::new(dir.path()).with_env("GIT_SSH_COMMAND", "plink");
         assert_eq!(env_of(&custom.command(&["fetch"]), "GIT_SSH_COMMAND").as_deref(), Some("plink"));
+    }
+
+    #[test]
+    fn chosen_ssh_binary_keeps_the_keepalive_options() {
+        let cli = GitCli::new(".");
+        assert_eq!(cli.ssh_command(None), "ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=4");
+        let system = Path::new(r"C:\Windows\System32\OpenSSH\ssh.exe");
+        assert_eq!(
+            cli.clone().with_ssh_batch_mode().ssh_command(Some(system)),
+            "'C:/Windows/System32/OpenSSH/ssh.exe' -o ServerAliveInterval=15 -o ServerAliveCountMax=4 -o BatchMode=yes"
+        );
     }
 
     #[test]

@@ -1,3 +1,4 @@
+mod apply;
 mod commands;
 mod crash;
 mod error;
@@ -14,7 +15,12 @@ use crate::state::AppState;
 
 pub fn run() {
     let paths = blink_store::AppPaths::system().ok();
-    logging::init(paths.as_ref().map(|p| p.log_dir.as_path()));
+    let level = paths
+        .as_ref()
+        .and_then(|p| blink_store::Settings::load(&p.settings_file()).ok())
+        .map(|s| s.advanced.log_level)
+        .unwrap_or_default();
+    logging::init(paths.as_ref().map(|p| p.log_dir.as_path()), &level);
     if let Some(paths) = &paths {
         crash::install(&paths.log_dir);
     }
@@ -36,15 +42,18 @@ pub fn run() {
         .setup(|app| {
             let state = AppState::initialize().map_err(|e| Box::new(e) as Box<dyn std::error::Error>)?;
             state.engine.pools().background().spawn(blink_diff::warm_up);
+            let settings = state.settings.read().clone();
             app.manage(state);
+            let handle = app.handle().clone();
+            apply::apply_settings(&handle, None, &settings);
             if let Some(main) = app.get_webview_window("main") {
                 commands::window::fit_to_screen(&main);
             }
-            let handle = app.handle().clone();
             launch::handle_args(&handle, &std::env::args().collect::<Vec<_>>(), None);
             launch::register_deep_links(&handle);
             commands::sync::spawn_background_fetch(handle.clone());
             commands::github::spawn_checks_poller(handle.clone());
+            apply::spawn_cache_pruning(handle.clone());
             commands::updater::spawn_update_checks(handle);
             Ok(())
         })
@@ -89,6 +98,7 @@ pub fn run() {
             commands::branches::create_branch,
             commands::branches::rename_branch,
             commands::branches::delete_branch,
+            commands::branches::unpushed_commits,
             commands::branches::delete_remote_branch,
             commands::branches::set_upstream,
             commands::branches::prune_remotes,
@@ -159,6 +169,7 @@ pub fn run() {
             commands::integrations::detect_integrations,
             commands::integrations::open_in_editor,
             commands::integrations::open_in_shell,
+            commands::integrations::open_in_diff_tool,
             commands::auth::sign_in,
             commands::auth::device_start,
             commands::auth::device_complete,
@@ -169,6 +180,7 @@ pub fn run() {
             commands::auth::enterprise_sign_out,
             commands::settings::get_settings,
             commands::settings::save_settings,
+            commands::settings::check_git_executable,
             commands::settings::open_logs_folder,
             commands::settings::take_crash_report,
             commands::settings::keymap,

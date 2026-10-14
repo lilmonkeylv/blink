@@ -20,6 +20,10 @@ fn allowed(url: &url::Url, enterprise_hosts: &[String]) -> bool {
             || enterprise_hosts.iter().any(|h| host == h || host.ends_with(&format!(".{h}"))))
 }
 
+pub fn avatar_dir(paths: &blink_store::AppPaths) -> PathBuf {
+    paths.data_dir.join("avatars")
+}
+
 fn cache_path(dir: &std::path::Path, url: &str) -> PathBuf {
     let digest: String = Sha256::digest(url.as_bytes()).iter().take(16).map(|b| format!("{b:02x}")).collect();
     dir.join(digest)
@@ -44,7 +48,7 @@ pub async fn avatar(state: State<'_, AppState>, url: String) -> CmdResult<Option
     if !allowed(&parsed, &hosts) {
         return Ok(None);
     }
-    let dir = state.paths.data_dir.join("avatars");
+    let dir = avatar_dir(&state.paths);
     let base = cache_path(&dir, &url);
     if let Some(hit) = read_cached(&base) {
         return Ok(Some(hit));

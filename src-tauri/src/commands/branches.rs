@@ -11,6 +11,17 @@ pub async fn branches(state: State<'_, AppState>, id: String) -> CmdResult<Vec<B
     Ok(state.engine.read(&id, |repo| repo.branches()).await?)
 }
 
+#[tauri::command]
+pub async fn unpushed_commits(state: State<'_, AppState>, id: String, name: String) -> CmdResult<usize> {
+    Ok(state.engine.read(&id, move |repo| unpushed(&repo.cli(), &name)).await?)
+}
+
+fn unpushed(cli: &blink_git::GitCli, branch: &str) -> blink_git::Result<usize> {
+    let tip = format!("refs/heads/{branch}");
+    let count = cli.run(&["rev-list", "--count", &tip, "--not", "--remotes", "--"])?;
+    Ok(count.trim().parse().unwrap_or(0))
+}
+
 #[derive(Debug, Clone, Copy, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum UncommittedChanges {
@@ -229,4 +240,34 @@ pub async fn stash_pop(state: State<'_, AppState>, id: String, reference: String
 #[tauri::command]
 pub async fn stash_drop(state: State<'_, AppState>, id: String, reference: String) -> CmdResult<()> {
     Ok(state.engine.write(&id, move |repo| repo.cli().stash_drop(&reference)).await?)
+}
+
+#[cfg(test)]
+mod tests {
+    use blink_git::GitCli;
+
+    use super::*;
+
+    #[test]
+    fn counts_commits_missing_from_every_remote() {
+        let dir = tempfile::tempdir().unwrap();
+        let work = dir.path().join("work");
+        GitCli::init(&work, "main").unwrap();
+        let cli = GitCli::new(&work);
+        for (k, v) in [("user.name", "T"), ("user.email", "t@example.com"), ("commit.gpgsign", "false")] {
+            cli.run(&["config", k, v]).unwrap();
+        }
+        let commit = |msg: &str| cli.run(&["commit", "--allow-empty", "-q", "-m", msg]).unwrap();
+        commit("one");
+        cli.run(&["checkout", "-q", "-b", "feature"]).unwrap();
+        commit("two");
+        assert_eq!(unpushed(&cli, "feature").unwrap(), 2);
+
+        let remote = dir.path().join("remote.git");
+        GitCli::new(dir.path()).run(&["init", "-q", "--bare", remote.to_str().unwrap()]).unwrap();
+        cli.run(&["remote", "add", "origin", remote.to_str().unwrap()]).unwrap();
+        cli.run(&["push", "-q", "origin", "main"]).unwrap();
+        assert_eq!(unpushed(&cli, "main").unwrap(), 0);
+        assert_eq!(unpushed(&cli, "feature").unwrap(), 1);
+    }
 }
