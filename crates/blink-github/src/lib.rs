@@ -1,3 +1,4 @@
+mod activity;
 mod api;
 mod device;
 mod error;
@@ -7,6 +8,7 @@ mod oauth;
 mod pkce;
 mod review;
 
+pub use activity::{PullActivity, PullBrief};
 pub use api::{
     Account, CheckApp, CheckRun, CheckState, ChecksSummary, Client, CommitStatus, Email, Job, JobStep, Org,
     PullRequest, Repo, Verification, parse_remote, summarize_checks,

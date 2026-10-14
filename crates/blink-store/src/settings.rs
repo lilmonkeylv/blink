@@ -181,6 +181,21 @@ impl Default for Notifications {
     }
 }
 
+impl Notifications {
+    pub fn quiet_at(&self, hour: u8) -> bool {
+        match self.quiet_hours {
+            Some((start, end)) if start == end => false,
+            Some((start, end)) if start < end => (start..end).contains(&hour),
+            Some((start, end)) => hour >= start || hour < end,
+            None => false,
+        }
+    }
+
+    pub fn allows(&self, hour: u8) -> bool {
+        self.enabled && !self.quiet_at(hour)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Prompts {
@@ -322,6 +337,25 @@ mod tests {
     fn removed_keys_are_ignored() {
         let s: Settings = toml::from_str("[advanced]\nusageStats = true\nbackgroundFetch = false\n").unwrap();
         assert!(!s.advanced.background_fetch);
+    }
+
+    #[test]
+    fn quiet_hours_wrap_past_midnight() {
+        let mut n = Notifications::default();
+        assert!(!n.quiet_at(3));
+        n.quiet_hours = Some((22, 7));
+        assert!(n.quiet_at(22) && n.quiet_at(23) && n.quiet_at(0) && n.quiet_at(6));
+        assert!(!n.quiet_at(7) && !n.quiet_at(12) && !n.quiet_at(21));
+        n.quiet_hours = Some((9, 17));
+        assert!(n.quiet_at(9) && n.quiet_at(16));
+        assert!(!n.quiet_at(8) && !n.quiet_at(17));
+        n.quiet_hours = Some((5, 5));
+        assert!(!n.quiet_at(5));
+        assert!(n.allows(5));
+        n.enabled = false;
+        assert!(!n.allows(5));
+        let s: Settings = toml::from_str("[notifications]\nquietHours = [22, 7]\n").unwrap();
+        assert_eq!(s.notifications.quiet_hours, Some((22, 7)));
     }
 
     #[test]

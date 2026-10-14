@@ -1,3 +1,4 @@
+mod alerts;
 mod apply;
 mod commands;
 mod crash;

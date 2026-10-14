@@ -7,6 +7,7 @@ use serde::Serialize;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tokio::sync::Semaphore;
 
+use crate::alerts::{self, Alert};
 use crate::error::{CmdResult, CommandError};
 use crate::state::AppState;
 use crate::view::RepoView;
@@ -73,6 +74,13 @@ pub async fn sync(
     .map_err(CommandError::from);
     if result.is_ok() && action != SyncAction::Push {
         maintain_commit_graph(&state, id);
+    } else if let Err(e) = &result
+        && action == SyncAction::Push
+        && alerts::is_push_rejection(e.detail.as_deref().unwrap_or(&e.message))
+        && !alerts::window_focused(&app)
+    {
+        let body = format!("Pull the latest changes into {} and push again.", handle.repo().name());
+        alerts::notify(&app, Alert::PushRejected, "Push rejected", body);
     }
     result
 }
