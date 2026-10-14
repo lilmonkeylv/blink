@@ -1900,6 +1900,52 @@ select.input {
   margin-left: auto;
 }
 
+.merge-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 20px;
+}
+
+.merge-preview-status {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+}
+
+.merge-preview-status.ok .icon {
+  color: var(--add-fg);
+}
+
+.merge-preview-status.warn {
+  color: var(--conflict);
+}
+
+.merge-preview-status.info .icon {
+  color: var(--fg-muted);
+}
+
+.merge-preview-files {
+  margin: 0;
+  padding: 6px 8px;
+  max-height: 120px;
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  user-select: text;
+}
+
+.merge-preview-files li {
+  list-style: none;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .hook-panel {
   --tone: var(--accent);
   display: flex;

@@ -104,6 +104,7 @@ pub fn run() {
             commands::branches::set_upstream,
             commands::branches::prune_remotes,
             commands::branches::merge_branch,
+            commands::branches::predict_merge,
             commands::branches::abort_merge,
             commands::branches::resolve_conflict,
             commands::branches::stash_changes,

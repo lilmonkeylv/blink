@@ -379,6 +379,13 @@ export interface CommitMessage {
   coAuthors: string[];
 }
 
+export type MergePrediction =
+  | { type: "upToDate" }
+  | { type: "fastForward" }
+  | { type: "clean" }
+  | { type: "conflicts"; files: string[] }
+  | { type: "unknown" };
+
 export type ResetMode = "soft" | "mixed" | "hard";
 export type RebaseAction = "pick" | "reword" | "squash" | "fixup" | "drop";
 
@@ -696,6 +703,7 @@ export const api = {
   pruneRemotes: (id: string) => invoke<string[]>("prune_remotes", { id }),
   merge: (id: string, branch: string, squash = false) =>
     invoke<{ conflicted: boolean; output: string }>("merge_branch", { id, branch, squash }),
+  predictMerge: (id: string, branch: string) => invoke<MergePrediction>("predict_merge", { id, branch }),
   abortMerge: (id: string) => invoke<void>("abort_merge", { id }),
   resolveConflict: (id: string, path: string, ours: boolean) => invoke<void>("resolve_conflict", { id, path, ours }),
   stash: (id: string, message?: string, paths?: string[]) => invoke<void>("stash_changes", { id, message, paths }),

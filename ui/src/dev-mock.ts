@@ -262,6 +262,12 @@ export function installDevMock() {
           reviewComments: [{ id: 2, path: "crates/blink-core/src/engine.rs", line: 12, original_line: 12, side: "RIGHT", body: "Why 256?", user: { login: "hubot" }, created_at: new Date().toISOString(), in_reply_to_id: null }],
           reviews: [],
         };
+      case "predict_merge":
+        return sleep(250).then(() => {
+          if (a.branch === "feature/watcher") return { type: "conflicts", files: ["crates/blink-watch/src/lib.rs", "ui/src/App.tsx"] };
+          if (a.branch === "origin/release") return { type: "upToDate" };
+          return { type: "clean" };
+        });
       case "commit": {
         if (a.noVerify) return history[0].id;
         const failing = String((a.message as { summary?: string })?.summary ?? "").includes("fail-hook") ? "pre-commit" : null;
