@@ -17,4 +17,6 @@ test("sidebar width stays usable", () => {
   expect(clampSidebar(100, 1400)).toBe(220);
   expect(clampSidebar(900, 1400)).toBe(640);
   expect(clampSidebar(500, 800)).toBe(440);
+  expect(clampSidebar(640, 860)).toBe(500);
+  expect(clampSidebar(400, 500)).toBe(220);
 });

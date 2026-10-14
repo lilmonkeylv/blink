@@ -1,6 +1,6 @@
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { createMemo, createResource, createSignal, For, Match, Show, Switch } from "solid-js";
-import { api, type DeviceCode, type JobStep, type ReleaseNote } from "../../api";
+import { api, isCommandError, type DeviceCode, type JobStep, type ReleaseNote } from "../../api";
 import { conflictCount, parseConflicts, render, type Resolution, type Segment } from "../../lib/conflicts";
 import { parseJobLog } from "../../lib/joblog";
 import { DEFAULT_BINDINGS } from "../../lib/keymap";
@@ -356,15 +356,24 @@ export function MergeEditorDialog(p: { path: string }) {
   const [resolutions, setResolutions] = createSignal<Resolution[]>([]);
   const [manual, setManual] = createSignal<string | null>(null);
   const [view, setView] = createSignal<"guided" | "result">("guided");
+  const [status, setStatus] = createSignal<"loading" | "ready" | "error">("loading");
+  const [loadError, setLoadError] = createSignal("");
+  const repoId = store.repo!.id;
 
-  api
-    .readWorktreeFile(store.repo!.id, p.path)
-    .then((text) => {
-      const parsed = parseConflicts(text);
+  const load = async () => {
+    setStatus("loading");
+    try {
+      const parsed = parseConflicts(await api.readWorktreeFile(repoId, p.path));
+      setManual(null);
       setSegments(parsed);
       setResolutions(Array(conflictCount(parsed)).fill(null));
-    })
-    .catch(reportError);
+      setStatus("ready");
+    } catch (e) {
+      setLoadError(isCommandError(e) ? e.message : String(e));
+      setStatus("error");
+    }
+  };
+  void load();
 
   const output = createMemo(() => render(segments(), resolutions()));
   const conflicts = createMemo(() => segments().filter((s) => s.type === "conflict"));
@@ -377,7 +386,8 @@ export function MergeEditorDialog(p: { path: string }) {
   };
 
   const save = async () => {
-    const ok = await run("Resolve conflict", () => api.writeResolvedFile(store.repo!.id, p.path, result()).then(() => true));
+    if (status() !== "ready" || unresolved() > 0) return;
+    const ok = await run("Resolve conflict", () => api.writeResolvedFile(repoId, p.path, result()).then(() => true));
     if (ok) {
       closeDialog();
       notify("success", `Resolved ${p.path}`);
@@ -392,63 +402,88 @@ export function MergeEditorDialog(p: { path: string }) {
       footer={
         <>
           <span class="muted small" style={{ "margin-right": "auto" }}>
-            {unresolved() ? `${unresolved()} conflict${unresolved() === 1 ? "" : "s"} left` : "All conflicts resolved"}
+            <Show when={status() === "ready"}>
+              {unresolved() ? `${unresolved()} conflict${unresolved() === 1 ? "" : "s"} left` : "All conflicts resolved"}
+            </Show>
           </span>
           <button class="btn" onClick={closeDialog}>
             Cancel
           </button>
-          <button class="btn primary" disabled={unresolved() > 0} onClick={save}>
+          <button class="btn primary" disabled={status() !== "ready" || unresolved() > 0} onClick={save}>
             Mark as resolved
           </button>
         </>
       }
     >
-      <div class="history-tools" style={{ "justify-content": "space-between" }}>
-        <Segmented
-          value={view()}
-          onChange={setView}
-          options={[
-            { value: "guided", label: `Conflicts (${conflicts().length})` },
-            { value: "result", label: "Result" },
-          ]}
-        />
-      </div>
-      <div style={{ padding: "16px", overflow: "auto", display: "flex", "flex-direction": "column", gap: "12px", flex: 1 }}>
-        <Show
-          when={view() === "guided"}
-          fallback={<textarea class="textarea code-area" style={{ flex: 1 }} spellcheck={false} value={result()} onInput={(e) => setManual(e.currentTarget.value)} />}
-        >
-          <For each={conflicts()} fallback={<div class="empty muted">No conflict markers found in this file.</div>}>
-            {(c, i) =>
-              c.type === "conflict" && (
-                <div class="conflict-card">
-                  <header>
-                    <span class="grow">Conflict {i() + 1}</span>
-                    <Segmented
-                      value={resolutions()[i()] ?? ""}
-                      onChange={(v) => choose(i(), (v || null) as Resolution)}
-                      options={[
-                        { value: "ours", label: "Ours" },
-                        { value: "theirs", label: "Theirs" },
-                        { value: "both", label: "Both" },
-                        { value: "theirs-first", label: "Theirs, then ours" },
-                      ]}
-                    />
-                  </header>
-                  <div class="muted small" style={{ padding: "4px 10px" }}>
-                    Ours ({c.oursLabel || "current"})
-                  </div>
-                  <pre class="conflict-side ours">{c.ours.join("\n") || " "}</pre>
-                  <div class="muted small" style={{ padding: "4px 10px" }}>
-                    Theirs ({c.theirsLabel || "incoming"})
-                  </div>
-                  <pre class="conflict-side theirs">{c.theirs.join("\n") || " "}</pre>
-                </div>
-              )
-            }
-          </For>
-        </Show>
-      </div>
+      <Switch>
+        <Match when={status() === "loading"}>
+          <div class="empty">
+            <div class="loading">
+              <span class="spinner large" />
+              <span class="muted">Reading {p.path}…</span>
+            </div>
+          </div>
+        </Match>
+        <Match when={status() === "error"}>
+          <div class="empty">
+            <div>
+              <p>Could not read {p.path}.</p>
+              <p class="muted small">{loadError()}</p>
+              <button class="btn" onClick={load}>
+                Retry
+              </button>
+            </div>
+          </div>
+        </Match>
+        <Match when={status() === "ready"}>
+          <div class="history-tools" style={{ "justify-content": "space-between" }}>
+            <Segmented
+              value={view()}
+              onChange={setView}
+              options={[
+                { value: "guided", label: `Conflicts (${conflicts().length})` },
+                { value: "result", label: "Result" },
+              ]}
+            />
+          </div>
+          <div style={{ padding: "16px", overflow: "auto", display: "flex", "flex-direction": "column", gap: "12px", flex: 1 }}>
+            <Show
+              when={view() === "guided"}
+              fallback={<textarea class="textarea code-area" style={{ flex: 1 }} spellcheck={false} value={result()} onInput={(e) => setManual(e.currentTarget.value)} />}
+            >
+              <For each={conflicts()} fallback={<div class="empty muted">No conflict markers found in this file.</div>}>
+                {(c, i) =>
+                  c.type === "conflict" && (
+                    <div class="conflict-card">
+                      <header>
+                        <span class="grow">Conflict {i() + 1}</span>
+                        <Segmented
+                          value={resolutions()[i()] ?? ""}
+                          onChange={(v) => choose(i(), (v || null) as Resolution)}
+                          options={[
+                            { value: "ours", label: "Ours" },
+                            { value: "theirs", label: "Theirs" },
+                            { value: "both", label: "Both" },
+                            { value: "theirs-first", label: "Theirs, then ours" },
+                          ]}
+                        />
+                      </header>
+                      <div class="muted small" style={{ padding: "4px 10px" }}>
+                        Ours ({c.oursLabel || "current"})
+                      </div>
+                      <pre class="conflict-side ours">{c.ours.join("\n") || " "}</pre>
+                      <div class="muted small" style={{ padding: "4px 10px" }}>
+                        Theirs ({c.theirsLabel || "incoming"})
+                      </div>
+                      <pre class="conflict-side theirs">{c.theirs.join("\n") || " "}</pre>
+                    </div>
+                  )
+                }
+              </For>
+            </Show>
+          </div>
+        </Match>
+      </Switch>
     </Dialog>
   );
 }

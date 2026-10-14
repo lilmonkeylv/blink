@@ -478,7 +478,7 @@ a {
 
 .main {
   display: grid;
-  grid-template-columns: var(--sidebar) 1fr;
+  grid-template-columns: min(var(--sidebar), calc(100vw - 360px)) 1fr;
   min-height: 0;
   position: relative;
 }
@@ -487,7 +487,7 @@ a {
   position: absolute;
   top: 0;
   bottom: 0;
-  left: calc(var(--sidebar) - 3px);
+  left: calc(min(var(--sidebar), calc(100vw - 360px)) - 3px);
   z-index: 5;
   width: 6px;
   cursor: col-resize;

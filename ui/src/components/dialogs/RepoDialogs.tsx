@@ -12,6 +12,7 @@ import {
   type Settings,
 } from "../../api";
 import { unwrap } from "solid-js/store";
+import { cloneUrl, isShorthand, repoNameFromUrl } from "../../lib/clone";
 import { fuzzyFilter } from "../../lib/fuzzy";
 import { applyTheme, currentBranch, notify, openRepo, reloadRepositories, reportError, run, setStore, store } from "../../store";
 import { Checkbox, Field, Select } from "../Controls";
@@ -130,11 +131,6 @@ export function CreateRepoDialog() {
   );
 }
 
-function repoNameFromUrl(url: string): string {
-  const trimmed = url.trim().replace(/\/+$/, "").replace(/\.git$/, "");
-  return trimmed.split(/[/:]/).pop() ?? "";
-}
-
 export function CloneDialog(p: { url?: string }) {
   const [tab, setTab] = createSignal<"github" | "url">(p.url || !store.account ? "url" : "github");
   const [url, setUrl] = createSignal(p.url ?? "");
@@ -151,7 +147,7 @@ export function CloneDialog(p: { url?: string }) {
     (load) => (load ? api.githubRepositories() : Promise.resolve([] as GithubRepo[])),
   );
   const filtered = createMemo(() => fuzzyFilter(repos() ?? [], query(), (r) => r.full_name));
-  const source = () => (tab() === "github" ? picked()?.clone_url ?? "" : url().trim());
+  const source = () => (tab() === "github" ? picked()?.clone_url ?? "" : cloneUrl(url()));
 
   const unlisten = onSyncProgress((e) => {
     if (e.repo === "clone") setProgress(e.progress.percent != null ? `${e.progress.phase} ${e.progress.percent}%` : e.progress.phase);
@@ -238,16 +234,15 @@ export function CloneDialog(p: { url?: string }) {
           </div>
         </Match>
         <Match when={tab() === "url"}>
-          <Field label="Repository URL or GitHub owner/name">
+          <Field label="Repository URL or GitHub owner/name" hint={isShorthand(url()) ? `Will clone ${cloneUrl(url())}` : undefined}>
             <input
               class="input"
               autofocus
               placeholder="https://github.com/owner/repo.git"
               value={url()}
               onInput={(e) => {
-                const v = e.currentTarget.value;
-                setUrl(/^[\w.-]+\/[\w.-]+$/.test(v.trim()) ? `https://github.com/${v.trim()}.git` : v);
-                setName(repoNameFromUrl(v));
+                setUrl(e.currentTarget.value);
+                setName(repoNameFromUrl(e.currentTarget.value));
               }}
             />
           </Field>
