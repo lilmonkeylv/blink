@@ -1064,6 +1064,20 @@ select.input {
   display: grid;
   place-items: center;
   background: rgba(0, 0, 0, 0.35);
+  animation: backdrop-in 120ms ease-out;
+}
+
+@keyframes backdrop-in {
+  from {
+    background: transparent;
+  }
+}
+
+@keyframes dialog-in {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
 }
 
 .dialog {
@@ -1075,6 +1089,18 @@ select.input {
   border: 1px solid var(--border);
   border-radius: 10px;
   box-shadow: var(--shadow);
+  animation: dialog-in 120ms ease-out;
+}
+
+.dialog:focus {
+  outline: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .backdrop,
+  .dialog {
+    animation: none;
+  }
 }
 
 .dialog.wide {

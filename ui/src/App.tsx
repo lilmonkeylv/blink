@@ -4,7 +4,7 @@ import { api, onChecksChanged, onLaunch, onRepoChanged, onSharedChanged, onSyncP
 import { ChangesDiff, ChangesList } from "./components/ChangesPane";
 import { ContextMenuHost, menuActions } from "./components/ContextMenu";
 import { PromptHost } from "./components/Prompt";
-import { Dialog } from "./components/Dialog";
+import { Dialog, dialogOpen } from "./components/Dialog";
 import { Dialogs } from "./components/Dialogs";
 import { CommitView, HistoryList } from "./components/HistoryPane";
 import { TabStrip } from "./components/TabStrip";
@@ -238,6 +238,12 @@ export function App() {
     }
     const action = keymap().byCombo.get(comboFromEvent(e));
     if (!action) return;
+    if (action === "palette") {
+      e.preventDefault();
+      setPalette(!palette());
+      return;
+    }
+    if (dialogOpen()) return;
     const id = repo?.id;
     const call = (fn: (id: string) => Promise<unknown>) => () => id && fn(id).catch(reportError);
     const manyTabs = store.tabs.length > 1;
@@ -259,7 +265,7 @@ export function App() {
       "sync.push": { when: !!repo, run: () => doSync("push") },
       "sync.pull": { when: !!repo, run: () => doSync("pull") },
       "sync.fetch": { run: () => doSync("fetch") },
-      undo: { when: !!repo && !inTextField(e) && !store.dialog, run: undoLastOperation },
+      undo: { when: !!repo && !inTextField(e), run: undoLastOperation },
       "history.search": { when: !!repo, run: focusSearch },
       "pr.create": { when: !!repo, run: call(api.createPullRequest) },
       "open.editor": { when: !!repo, run: call((i) => api.openInEditor(i)) },
@@ -268,7 +274,6 @@ export function App() {
       "open.github": { when: !!repo, run: call(api.openOnGithub) },
       "file.blame": { when: !!repo && !!store.selectedPath, run: () => setStore("dialog", { type: "blame", path: store.selectedPath! }) },
       "stash.all": { when: !!repo, run: () => run("Stash", () => api.stash(repo!.id)) },
-      palette: { run: () => setPalette(true) },
       settings: { run: () => setStore("dialog", { type: "settings" }) },
       refresh: { run: refreshRepo },
     };
