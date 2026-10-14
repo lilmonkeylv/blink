@@ -319,20 +319,22 @@ export function StashesDialog() {
         </button>
       </div>
       <Show when={stashes()?.length} fallback={<div class="empty muted">No stashed changes</div>}>
-        <For each={stashes()}>
-          {(s) => (
-            <div class="static-row">
-              <span class="grow">{label(s.message)}</span>
-              <span class="muted small">{s.reference}</span>
-              <button class="btn" onClick={async () => { await run("Restore stash", () => api.stashPop(id(), s.reference)); refetch(); }}>
-                Restore
-              </button>
-              <button class="btn danger" onClick={() => discard(s.reference)}>
-                Discard
-              </button>
-            </div>
-          )}
-        </For>
+        <div class="action-list">
+          <For each={stashes()}>
+            {(s) => (
+              <div class="action-row">
+                <span class="grow">{label(s.message)}</span>
+                <span class="muted small">{s.reference}</span>
+                <button class="btn" onClick={async () => { await run("Restore stash", () => api.stashPop(id(), s.reference)); refetch(); }}>
+                  Restore
+                </button>
+                <button class="btn danger" onClick={() => discard(s.reference)}>
+                  Discard
+                </button>
+              </div>
+            )}
+          </For>
+        </div>
       </Show>
     </Dialog>
   );
