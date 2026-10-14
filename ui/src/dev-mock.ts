@@ -335,7 +335,10 @@ export function installDevMock() {
         const failing = String((a.message as { summary?: string })?.summary ?? "").includes("fail-hook") ? "pre-commit" : null;
         const lines = ["> lint-staged", "Running tasks for staged files...", "eslint --fix ui/src/App.tsx"];
         if (failing) lines.push("ui/src/App.tsx:12:7  error  'unused' is assigned a value but never used", "1 problem (1 error, 0 warnings)");
-        return mockHooks(String(a.id), "commit", ["pre-commit", "commit-msg"], lines, failing).then(() => history[0].id);
+        return mockHooks(String(a.id), "commit", ["pre-commit", "commit-msg"], lines, failing)
+          .then(() => emit("repo-changed", { ...repo, head: { ...repo.head, id: "f".repeat(40) }, files: [], generation: repo.generation + 1 }))
+          .then(() => sleep(1500))
+          .then(() => history[0].id);
       }
       case "sync":
         if (a.action === "push" && !a.noVerify) {

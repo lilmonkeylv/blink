@@ -507,11 +507,32 @@ function CommitBox() {
     if (ok) await commit(true);
   };
 
+  const headId = () => {
+    const head = store.repo?.head;
+    return head && "id" in head ? head.id : undefined;
+  };
+  let inFlight: { repo: string; head: string | undefined; landed: boolean } | null = null;
+  const clearCommittedDraft = (repoId: string) => {
+    updateDraft(repoId, { summary: "", description: store.repo?.id === repoId ? template() : "", amend: false });
+    setStore("checkedPaths", {});
+  };
+  createEffect(
+    on(headId, (id) => {
+      const pending = inFlight;
+      // git moves HEAD before post-commit hooks run, so the list empties well before the commit call returns
+      if (!pending || pending.landed || store.repo?.id !== pending.repo || id === pending.head) return;
+      pending.landed = true;
+      clearCommittedDraft(pending.repo);
+    }),
+  );
+
   const commit = async (noVerify = false) => {
     const repo = store.repo;
     if (!repo || !canCommit()) return;
     const { summary, description, coAuthors, amend: amended } = commitDraft(repo.id);
     setCommitting(true);
+    const pending = { repo: repo.id, head: headId(), landed: false };
+    inFlight = pending;
     try {
       const files = await gatherSelection(repo.id);
       if (!files) return;
@@ -524,8 +545,8 @@ function CommitBox() {
       const count = files.length;
       rememberMessage(repo.id, { summary, description });
       setRecall(-1);
-      updateDraft(repo.id, { summary: "", description: store.repo?.id === repo.id ? template() : "", amend: false });
-      setStore("checkedPaths", {});
+      if (!pending.landed) clearCommittedDraft(repo.id);
+      pending.landed = true;
       notify(
         "success",
         amended ? "Amended last commit" : `Committed ${count} file${count === 1 ? "" : "s"} to ${branch()}`,
@@ -544,6 +565,7 @@ function CommitBox() {
         notify("error", `${e.message}, so nothing was committed. See the hook output below the commit button.`);
       } else reportError(e, "Commit failed");
     } finally {
+      if (inFlight === pending) inFlight = null;
       setCommitting(false);
     }
   };
