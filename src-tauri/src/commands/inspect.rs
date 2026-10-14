@@ -3,7 +3,10 @@ use std::path::PathBuf;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
 use blink_diff::{DiffOptions, diff_file};
-use blink_git::{Blame, BlobSource, CommitFile, CommitSummary, ReflogEntry, SearchKind, Worktree, graph_layout};
+use blink_git::{
+    Blame, BlobSource, CommitFile, CommitSummary, ReflogEntry, SearchKind, Worktree, graph_layout, safe_rel_path,
+    validate_sha,
+};
 use serde::Serialize;
 use tauri::State;
 use tauri::ipc::Response;
@@ -68,6 +71,8 @@ pub async fn range_files(
     oldest: String,
     newest: String,
 ) -> CmdResult<Vec<CommitFile>> {
+    validate_sha(&oldest)?;
+    validate_sha(&newest)?;
     Ok(state.engine.read(&id, move |repo| repo.range_files(&oldest, &newest)).await?)
 }
 
@@ -81,6 +86,8 @@ pub async fn range_file_diff(
     old_path: Option<String>,
     highlight: Option<bool>,
 ) -> CmdResult<Response> {
+    validate_sha(&oldest)?;
+    validate_sha(&newest)?;
     let opts = DiffOptions { highlight: highlight.unwrap_or(true), ..Default::default() };
     let diff = state
         .engine
@@ -214,6 +221,7 @@ pub async fn remove_worktree(state: State<'_, AppState>, id: String, path: Strin
 
 #[tauri::command]
 pub async fn commit_patch(state: State<'_, AppState>, id: String, sha: String) -> CmdResult<String> {
+    validate_sha(&sha)?;
     Ok(state.engine.read(&id, move |repo| repo.cli().format_patch(&sha)).await?)
 }
 
@@ -267,6 +275,9 @@ pub async fn image_pair(
     sha: Option<String>,
 ) -> CmdResult<ImagePair> {
     let mime = mime(&path).ok_or_else(|| CommandError::new("notImage", "Not an image"))?;
+    if let Some(sha) = &sha {
+        validate_sha(sha)?;
+    }
     Ok(state
         .engine
         .read(&id, move |repo| {
@@ -298,7 +309,7 @@ pub async fn write_resolved_file(
     Ok(state
         .engine
         .write(&id, move |repo| {
-            std::fs::write(repo.workdir().join(&path), content)?;
+            std::fs::write(repo.workdir().join(safe_rel_path(&path)?), content)?;
             repo.cli().stage(&[&path])
         })
         .await?)

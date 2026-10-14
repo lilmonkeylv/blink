@@ -49,6 +49,7 @@ impl From<blink_git::Error> for CommandError {
             }
             blink_git::Error::NotARepository(path) => Self::new("notARepository", path),
             blink_git::Error::GitNotFound => Self::new("gitNotFound", "Git is not installed or not on PATH"),
+            blink_git::Error::InvalidArgument(message) => Self::new("invalidArgument", message),
             other => Self::new("git", blink_git::redact(&other.to_string())),
         }
     }

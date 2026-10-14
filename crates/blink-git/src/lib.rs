@@ -10,6 +10,7 @@ mod refs;
 mod repo;
 mod rewrite;
 mod status;
+mod validate;
 
 pub use blob::BlobSource;
 pub use cli::{GitCli, Progress, PushTarget, SyncAction, is_lock_error, locked_file};
@@ -22,3 +23,4 @@ pub use refs::{AheadBehind, Branch, BranchKind, HeadState};
 pub use repo::Repository;
 pub use rewrite::{Operation, RebaseAction, RebaseStep, ResetMode, Worktree};
 pub use status::{ChangeKind, FileChange, RepoStatus};
+pub use validate::{safe_rel_path, validate_sha};

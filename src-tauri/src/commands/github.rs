@@ -118,6 +118,7 @@ fn has_signature(raw_commit: &str) -> bool {
 
 #[tauri::command]
 pub async fn commit_signature(state: State<'_, AppState>, id: String, sha: String) -> CmdResult<Option<Signature>> {
+    blink_git::validate_sha(&sha)?;
     if let Some(known) = SIGNATURES.lock().get(&sha) {
         return Ok(known.clone());
     }

@@ -451,7 +451,7 @@ pub fn reveal_in_file_manager(
 ) -> CmdResult<()> {
     let handle = state.engine.get(&id)?;
     let target = match path {
-        Some(p) => handle.repo().workdir().join(p),
+        Some(p) => handle.repo().workdir().join(blink_git::safe_rel_path(&p)?),
         None => handle.repo().workdir().to_path_buf(),
     };
     app.opener().reveal_item_in_dir(target).map_err(|e| CommandError::new("opener", e.to_string()))

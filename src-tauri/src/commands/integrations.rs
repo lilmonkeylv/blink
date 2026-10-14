@@ -139,7 +139,7 @@ pub fn open_in_editor(state: State<'_, AppState>, id: String, path: Option<Strin
     let mut cmd = editor_command(&state)?;
     cmd.arg(&root);
     if let Some(p) = path {
-        cmd.arg(root.join(p));
+        cmd.arg(root.join(blink_git::safe_rel_path(&p)?));
     }
     spawn(cmd)
 }
@@ -204,7 +204,7 @@ pub fn open_in_shell(state: State<'_, AppState>, id: String, path: Option<String
     let root = handle.repo().workdir().to_path_buf();
     let at_file = state.settings.read().integrations.terminal_opens_at_file;
     let dir = match path.filter(|_| at_file) {
-        Some(p) => root.join(p).parent().map(Path::to_path_buf).unwrap_or(root),
+        Some(p) => root.join(blink_git::safe_rel_path(&p)?).parent().map(Path::to_path_buf).unwrap_or(root),
         None => root,
     };
     spawn(shell_command(&state, &dir)?)

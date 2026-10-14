@@ -2,6 +2,7 @@ use gix::bstr::ByteSlice;
 
 use crate::error::{Result, ResultExt};
 use crate::repo::Repository;
+use crate::validate::safe_rel_path;
 
 #[derive(Debug, Clone)]
 pub enum BlobSource {
@@ -15,7 +16,7 @@ impl Repository {
     pub fn read_blob(&self, source: &BlobSource, path: &str) -> Result<Option<Vec<u8>>> {
         let repo = self.local();
         match source {
-            BlobSource::Worktree => match std::fs::read(self.workdir().join(path)) {
+            BlobSource::Worktree => match std::fs::read(self.workdir().join(safe_rel_path(path)?)) {
                 Ok(data) => Ok(Some(data)),
                 Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
                 Err(e) => Err(e.into()),

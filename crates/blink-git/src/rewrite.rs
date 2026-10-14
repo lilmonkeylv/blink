@@ -1,11 +1,12 @@
 use std::fmt::Write as _;
-use std::path::{Path, PathBuf};
-use std::sync::atomic::{AtomicU64, Ordering};
+use std::io::Write as _;
+use std::path::Path;
 
 use serde::{Deserialize, Serialize};
 
 use crate::cli::{GitCli, Progress};
 use crate::error::{Error, Result};
+use crate::validate::validate_sha;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
@@ -74,26 +75,17 @@ pub struct Worktree {
     pub locked: bool,
 }
 
-static SCRATCH_SEQ: AtomicU64 = AtomicU64::new(0);
-
-struct ScratchFile(PathBuf);
+struct ScratchFile(tempfile::TempPath);
 
 impl ScratchFile {
     fn new(prefix: &str, contents: &str) -> Result<Self> {
-        let n = SCRATCH_SEQ.fetch_add(1, Ordering::Relaxed);
-        let path = std::env::temp_dir().join(format!("blink-{prefix}-{}-{n}", std::process::id()));
-        std::fs::write(&path, contents)?;
-        Ok(Self(path))
+        let mut file = tempfile::Builder::new().prefix(&format!("blink-{prefix}-")).tempfile()?;
+        file.write_all(contents.as_bytes())?;
+        Ok(Self(file.into_temp_path()))
     }
 
     fn shell_path(&self) -> String {
         format!("'{}'", self.0.to_string_lossy().replace('\\', "/").replace('\'', r"'\''"))
-    }
-}
-
-impl Drop for ScratchFile {
-    fn drop(&mut self) {
-        let _ = std::fs::remove_file(&self.0);
     }
 }
 
@@ -106,7 +98,7 @@ fn render_todo(steps: &[RebaseStep], messages: &mut Vec<ScratchFile>) -> Result<
             RebaseAction::Fixup => "fixup",
             RebaseAction::Drop => "drop",
         };
-        let _ = writeln!(todo, "{verb} {}", step.sha);
+        let _ = writeln!(todo, "{verb} {}", validate_sha(&step.sha)?);
         let custom = match step.action {
             RebaseAction::Reword | RebaseAction::Squash => step.message.as_deref().filter(|m| !m.trim().is_empty()),
             _ => None,
@@ -187,6 +179,9 @@ impl GitCli {
         }
         if steps.first().is_some_and(|s| matches!(s.action, RebaseAction::Squash | RebaseAction::Fixup)) {
             return Err(Error::Git("the first commit cannot be squashed into a previous one".into()));
+        }
+        if let Some(base) = base {
+            validate_sha(base)?;
         }
         let mut messages = Vec::new();
         let todo = ScratchFile::new("todo", &render_todo(steps, &mut messages)?)?;
@@ -363,5 +358,30 @@ impl GitCli {
 
     pub fn local_config(&self, key: &str) -> Option<String> {
         self.run(&["config", "--local", "--get", key]).ok().map(|s| s.trim().to_string()).filter(|s| !s.is_empty())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn scratch_files_get_unique_names_and_are_removed() {
+        let a = ScratchFile::new("todo", "pick abcd\n").unwrap();
+        let b = ScratchFile::new("todo", "pick abcd\n").unwrap();
+        assert_ne!(a.0.to_path_buf(), b.0.to_path_buf());
+        assert!(a.0.file_name().unwrap().to_string_lossy().starts_with("blink-todo-"));
+        assert_eq!(std::fs::read_to_string(&a.0).unwrap(), "pick abcd\n");
+        let path = a.0.to_path_buf();
+        drop(a);
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn todo_rejects_non_hex_shas() {
+        let step = |sha: &str| RebaseStep { action: RebaseAction::Pick, sha: sha.into(), message: None };
+        assert!(render_todo(&[step("abc1234")], &mut Vec::new()).is_ok());
+        assert!(render_todo(&[step("abc1234\nexec rm -rf ~")], &mut Vec::new()).is_err());
+        assert!(render_todo(&[step("HEAD")], &mut Vec::new()).is_err());
     }
 }

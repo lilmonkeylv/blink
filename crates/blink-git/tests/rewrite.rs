@@ -87,6 +87,31 @@ fn interactive_rebase_reorders_squashes_rewords_and_drops() {
 }
 
 #[test]
+fn interactive_rebase_rejects_todo_injection() {
+    let (_dir, repo, ids) = fixture(&[("a", "a\n", "base"), ("b", "b\n", "add b")]);
+    let injected =
+        RebaseStep { action: RebaseAction::Pick, sha: format!("{}\nexec touch pwned", ids[1]), message: None };
+    let err = repo.cli().rebase_interactive(Some(&ids[0]), &[injected]).unwrap_err();
+    assert!(matches!(err, blink_git::Error::InvalidArgument(_)));
+    let pick = RebaseStep { action: RebaseAction::Pick, sha: ids[1].clone(), message: None };
+    assert!(repo.cli().rebase_interactive(Some("--exec=touch pwned"), &[pick]).is_err());
+    assert_eq!(summaries(&repo), ["add b", "base"]);
+    assert_eq!(repo.is_operation_in_progress(), None);
+}
+
+#[test]
+fn worktree_blobs_stay_inside_the_repository() {
+    let (dir, repo, _) = fixture(&[("a", "a\n", "base")]);
+    let secret = dir.path().with_extension("secret");
+    fs::write(&secret, "s").unwrap();
+    let name = secret.file_name().unwrap().to_string_lossy().into_owned();
+    assert!(repo.read_blob(&BlobSource::Worktree, &format!("../{name}")).is_err());
+    assert!(repo.read_blob(&BlobSource::Worktree, &secret.to_string_lossy()).is_err());
+    assert_eq!(repo.read_blob(&BlobSource::Worktree, "a").unwrap().unwrap(), b"a\n");
+    let _ = fs::remove_file(secret);
+}
+
+#[test]
 fn conflicting_cherry_pick_can_be_aborted() {
     let (_dir, repo, ids) = fixture(&[("a", "base\n", "base"), ("a", "main\n", "main change")]);
     let cli = repo.cli();
