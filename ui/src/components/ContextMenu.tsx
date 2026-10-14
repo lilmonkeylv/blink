@@ -3,7 +3,7 @@ import { Portal } from "solid-js/web";
 import { ChevronRight } from "./Icons";
 
 export type MenuItem =
-  | { label: string; run: () => void; disabled?: boolean }
+  | { label: string; run: () => void; disabled?: boolean; hint?: string }
   | { label: string; items: MenuItem[]; disabled?: boolean }
   | "separator";
 
@@ -26,16 +26,28 @@ export function menuActions(items: MenuItem[]): MenuAction[] {
 const EDGE = 8;
 
 const [menu, setMenu] = createSignal<OpenMenu | null>(null);
+let returnFocus: HTMLElement | null = null;
 
 export function openContextMenu(e: MouseEvent, items: MenuItem[]) {
   e.preventDefault();
   e.stopPropagation();
-  setMenu({ x: e.clientX, y: e.clientY, items });
+  returnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : null;
+  const target = e.currentTarget;
+  if (e.detail === 0 && target instanceof HTMLElement) {
+    const rect = target.getBoundingClientRect();
+    setMenu({ x: rect.left, y: rect.bottom + 2, flipX: rect.right, items });
+  } else {
+    setMenu({ x: e.clientX, y: e.clientY, items });
+  }
 }
 
-function MenuPanel(p: { menu: OpenMenu; onClose: () => void }) {
+function menuButtons(el: HTMLElement) {
+  return [...el.querySelectorAll<HTMLButtonElement>(":scope > button:not(:disabled)")];
+}
+
+function MenuPanel(p: { menu: OpenMenu; onClose: () => void; onBack?: () => void; focusFirst: boolean }) {
   let el!: HTMLDivElement;
-  const [submenu, setSubmenu] = createSignal<{ index: number; menu: OpenMenu } | null>(null);
+  const [submenu, setSubmenu] = createSignal<{ index: number; menu: OpenMenu; focusFirst: boolean; trigger: HTMLElement } | null>(null);
   onMount(() => {
     const { width, height } = el.getBoundingClientRect();
     const left = p.menu.x + width > window.innerWidth - EDGE ? Math.max(EDGE, (p.menu.flipX ?? p.menu.x) - width) : p.menu.x;
@@ -43,16 +55,44 @@ function MenuPanel(p: { menu: OpenMenu; onClose: () => void }) {
     el.style.left = `${left}px`;
     el.style.top = `${top}px`;
     el.style.visibility = "visible";
+    if (p.focusFirst) (menuButtons(el)[0] ?? el).focus();
   });
-  const openSubmenu = (index: number, items: MenuItem[], target: HTMLElement) => {
-    if (submenu()?.index === index) return;
+  const openSubmenu = (index: number, items: MenuItem[], target: HTMLElement, focusFirst = false) => {
+    if (submenu()?.index === index && !focusFirst) return;
     const rect = target.getBoundingClientRect();
-    setSubmenu({ index, menu: { x: rect.right + 4, y: rect.top - 5, flipX: rect.left - 4, items } });
+    setSubmenu({ index, focusFirst, trigger: target, menu: { x: rect.right + 4, y: rect.top - 5, flipX: rect.left - 4, items } });
   };
+  const closeSubmenu = () => {
+    const open = submenu();
+    if (!open) return;
+    setSubmenu(null);
+    open.trigger.focus();
+  };
+
+  const onKeyDown = (e: KeyboardEvent) => {
+    if (e.target instanceof HTMLElement && e.target.closest(".menu") !== el) return;
+    const buttons = menuButtons(el);
+    const index = buttons.indexOf(document.activeElement as HTMLButtonElement);
+    const focusAt = (i: number) => buttons[(i + buttons.length) % buttons.length]?.focus();
+    const current = buttons[index];
+    if (e.key === "ArrowDown") focusAt(index + 1);
+    else if (e.key === "ArrowUp") focusAt(index < 0 ? -1 : index - 1);
+    else if (e.key === "Home") focusAt(0);
+    else if (e.key === "End") focusAt(-1);
+    else if (e.key === "ArrowRight" && current?.classList.contains("submenu")) current.click();
+    else if (e.key === "ArrowLeft" && p.onBack) p.onBack();
+    else if (e.key === "Tab") p.onClose();
+    else return;
+    e.preventDefault();
+    e.stopPropagation();
+  };
+
   return (
     <div
       ref={el}
       class="menu"
+      role="menu"
+      tabIndex={-1}
       style={{
         left: `${p.menu.x}px`,
         top: `${p.menu.y}px`,
@@ -60,32 +100,46 @@ function MenuPanel(p: { menu: OpenMenu; onClose: () => void }) {
         "max-height": `${window.innerHeight - 2 * EDGE}px`,
       }}
       onMouseDown={(e) => e.stopPropagation()}
+      onKeyDown={onKeyDown}
     >
       <For each={p.menu.items}>
         {(item, index) =>
           item === "separator" ? (
-            <hr />
+            <hr role="separator" />
           ) : "items" in item ? (
             <button
               class="submenu"
               classList={{ open: submenu()?.index === index() }}
+              role="menuitem"
+              aria-haspopup="menu"
+              aria-expanded={submenu()?.index === index()}
               disabled={item.disabled}
-              onMouseEnter={(e) => openSubmenu(index(), item.items, e.currentTarget)}
-              onClick={(e) => openSubmenu(index(), item.items, e.currentTarget)}
+              onMouseEnter={(e) => {
+                e.currentTarget.focus();
+                openSubmenu(index(), item.items, e.currentTarget);
+              }}
+              onClick={(e) => openSubmenu(index(), item.items, e.currentTarget, e.detail === 0)}
             >
-              <span>{item.label}</span>
+              <span class="menu-label">{item.label}</span>
               <ChevronRight />
             </button>
           ) : (
             <button
+              role="menuitem"
               disabled={item.disabled}
-              onMouseEnter={() => setSubmenu(null)}
+              onMouseEnter={(e) => {
+                e.currentTarget.focus();
+                setSubmenu(null);
+              }}
               onClick={() => {
                 p.onClose();
                 item.run();
               }}
             >
-              {item.label}
+              <span class="menu-label">{item.label}</span>
+              <Show when={item.hint}>
+                <span class="menu-hint">{item.hint}</span>
+              </Show>
             </button>
           )
         }
@@ -93,7 +147,7 @@ function MenuPanel(p: { menu: OpenMenu; onClose: () => void }) {
       <Show when={submenu()} keyed>
         {(open) => (
           <Portal>
-            <MenuPanel menu={open.menu} onClose={p.onClose} />
+            <MenuPanel menu={open.menu} onClose={p.onClose} onBack={closeSubmenu} focusFirst={open.focusFirst} />
           </Portal>
         )}
       </Show>
@@ -102,7 +156,12 @@ function MenuPanel(p: { menu: OpenMenu; onClose: () => void }) {
 }
 
 export function ContextMenuHost() {
-  const close = () => setMenu(null);
+  const close = () => {
+    if (!menu()) return;
+    setMenu(null);
+    if (returnFocus?.isConnected) returnFocus.focus();
+    returnFocus = null;
+  };
   const onKey = (e: KeyboardEvent) => e.key === "Escape" && close();
   onMount(() => {
     window.addEventListener("mousedown", close);
@@ -121,7 +180,7 @@ export function ContextMenuHost() {
     <Show when={menu()} keyed>
       {(m) => (
         <Portal>
-          <MenuPanel menu={m} onClose={close} />
+          <MenuPanel menu={m} onClose={close} focusFirst />
         </Portal>
       )}
     </Show>

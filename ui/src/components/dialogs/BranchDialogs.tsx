@@ -5,6 +5,7 @@ import { Select } from "../Controls";
 import { DiffView } from "../DiffView";
 import { StatusIcon } from "../Icons";
 import { Dialog } from "../Dialog";
+import { Loading } from "../Loading";
 import { BranchPicker, closeDialog, sanitizeBranchName } from "./common";
 import { ask, message as showMessage } from "../Prompt";
 
@@ -344,7 +345,7 @@ export function PullRequestPreviewDialog() {
       </div>
       <div class="commit-split" style={{ flex: "1", "min-height": "0", "grid-template-columns": "300px 1fr" }}>
         <div class="list">
-          <For each={preview()?.files ?? []} fallback={<div class="empty muted">{preview.loading ? "Loading…" : "No changes"}</div>}>
+          <For each={preview()?.files ?? []} fallback={preview.loading ? <Loading /> : <div class="empty muted">No changes</div>}>
             {(f) => (
               <div class="row" classList={{ selected: file()?.path === f.path }} onMouseDown={() => setPicked(f)} title={f.path}>
                 <span class="path grow">
@@ -356,7 +357,7 @@ export function PullRequestPreviewDialog() {
           </For>
         </div>
         <div class="content">
-          <Show when={diff()} fallback={<div class="empty muted">{diff.loading ? "Loading…" : ""}</div>}>
+          <Show when={diff()} fallback={diff.loading ? <Loading /> : <div class="empty" />}>
             {(d) => <DiffView diff={d()} />}
           </Show>
         </div>

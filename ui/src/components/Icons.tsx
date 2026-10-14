@@ -6,12 +6,20 @@ import ArrowUp from "lucide-solid/icons/arrow-up";
 import Check from "lucide-solid/icons/check";
 import ChevronDownGlyph from "lucide-solid/icons/chevron-down";
 import ChevronRightGlyph from "lucide-solid/icons/chevron-right";
+import CircleAlert from "lucide-solid/icons/circle-alert";
+import CircleCheck from "lucide-solid/icons/circle-check";
+import Columns2 from "lucide-solid/icons/columns-2";
+import Ellipsis from "lucide-solid/icons/ellipsis";
 import FolderGit from "lucide-solid/icons/folder-git-2";
 import GitBranch from "lucide-solid/icons/git-branch";
 import GitPullRequest from "lucide-solid/icons/git-pull-request";
+import Info from "lucide-solid/icons/info";
+import ListFilter from "lucide-solid/icons/list-filter";
 import Menu from "lucide-solid/icons/menu";
+import Pilcrow from "lucide-solid/icons/pilcrow";
 import Plus from "lucide-solid/icons/plus";
 import RefreshCw from "lucide-solid/icons/refresh-cw";
+import Rows2 from "lucide-solid/icons/rows-2";
 import SquareArrowRight from "lucide-solid/icons/square-arrow-right";
 import SquareDot from "lucide-solid/icons/square-dot";
 import SquareMinus from "lucide-solid/icons/square-minus";
@@ -36,6 +44,14 @@ export const PullRequestIcon = icon(GitPullRequest);
 export const PlusIcon = icon(Plus);
 export const CheckIcon = icon(Check);
 export const CloseIcon = icon(X);
+export const SuccessIcon = icon(CircleCheck);
+export const ErrorIcon = icon(CircleAlert);
+export const InfoIcon = icon(Info);
+export const WhitespaceIcon = icon(Pilcrow);
+export const UnifiedIcon = icon(Rows2);
+export const SplitIcon = icon(Columns2);
+export const MoreIcon = icon(Ellipsis);
+export const FilterIcon = icon(ListFilter);
 
 const statusGlyphs: Record<ChangeKind, Component<LucideProps>> = {
   added: SquarePlus,

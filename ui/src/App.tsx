@@ -4,10 +4,13 @@ import { api, onChecksChanged, onLaunch, onRepoChanged, onSharedChanged, onSyncP
 import { ChangesDiff, ChangesList } from "./components/ChangesPane";
 import { ContextMenuHost, menuActions } from "./components/ContextMenu";
 import { PromptHost } from "./components/Prompt";
-import { Dialog } from "./components/Dialog";
+import { Dialog, dialogOpen } from "./components/Dialog";
 import { Dialogs } from "./components/Dialogs";
+import { Loading } from "./components/Loading";
 import { CommitView, HistoryList } from "./components/HistoryPane";
 import { TabStrip } from "./components/TabStrip";
+import { Toasts } from "./components/Toasts";
+import { TooltipHost } from "./components/Tooltip";
 import { applySidebarWidth, clampSidebar, reclampSidebar, saveRepoLayout } from "./lib/layout";
 import { appMenu, doSync, pickAndAddRepository, Toolbar } from "./components/Toolbar";
 import { fuzzyFilter } from "./lib/fuzzy";
@@ -18,7 +21,6 @@ import {
   bootstrap,
   closeRepoTab,
   cycleRepoTab,
-  dismiss,
   handleLaunches,
   keymap,
   loadKeymap,
@@ -32,55 +34,13 @@ import {
   reportError,
   run,
   setStore,
+  shortcut,
   showWhatsNew,
   store,
   undoLastOperation,
   windowRepo,
 } from "./store";
 import { nativeWindow } from "./components/WindowControls";
-
-function Banners() {
-  return (
-    <div class="banners">
-      <For each={store.banners}>
-        {(b) => (
-          <div class={`banner ${b.tone}`} role={b.tone === "error" ? "alert" : "status"}>
-            <div class="msg">
-              {b.message}
-              <Show when={b.detail}>
-                <details>
-                  <summary class="muted">Show Git output</summary>
-                  <pre>{b.detail}</pre>
-                </details>
-              </Show>
-            </div>
-            <Show when={b.action}>
-              {(a) => (
-                <a
-                  onClick={() => {
-                    dismiss(b.id);
-                    a().run();
-                  }}
-                >
-                  {a().label}
-                </a>
-              )}
-            </Show>
-            <a
-              class="muted"
-              onClick={() => {
-                b.onDismiss?.();
-                dismiss(b.id);
-              }}
-            >
-              Dismiss
-            </a>
-          </div>
-        )}
-      </For>
-    </div>
-  );
-}
 
 function Welcome() {
   return (
@@ -120,17 +80,6 @@ function Welcome() {
   );
 }
 
-function Loading(p: { label: string }) {
-  return (
-    <div class="empty">
-      <div class="loading">
-        <span class="spinner large" />
-        <span class="muted">{p.label}…</span>
-      </div>
-    </div>
-  );
-}
-
 function SidebarResizer() {
   const start = (e: PointerEvent) => {
     if (e.button !== 0) return;
@@ -153,7 +102,7 @@ function SidebarResizer() {
     handle.addEventListener("pointermove", move);
     handle.addEventListener("pointerup", done);
   };
-  return <div class="sidebar-resizer" onPointerDown={start} title="Drag to resize" />;
+  return <div class="sidebar-resizer" onPointerDown={start} data-tooltip="Drag to resize" />;
 }
 
 function Sidebar() {
@@ -161,13 +110,13 @@ function Sidebar() {
   return (
     <div class="sidebar">
       <div class="tabs sidebar-tabs" classList={{ history: store.tab === "history" }} role="tablist">
-        <button class="tab" classList={{ active: store.tab === "changes" }} onClick={() => setStore("tab", "changes")} title="Ctrl+1">
+        <button class="tab" classList={{ active: store.tab === "changes" }} onClick={() => setStore("tab", "changes")} data-tooltip="Changes" data-shortcut={shortcut("view.changes")}>
           Changes{" "}
           <Show when={changes()}>
             <span class="badge">{changes()}</span>
           </Show>
         </button>
-        <button class="tab" classList={{ active: store.tab === "history" }} onClick={() => setStore("tab", "history")} title="Ctrl+2">
+        <button class="tab" classList={{ active: store.tab === "history" }} onClick={() => setStore("tab", "history")} data-tooltip="History" data-shortcut={shortcut("view.history")}>
           History
         </button>
       </div>
@@ -201,17 +150,17 @@ function Palette(p: { onClose: () => void }) {
     const actions = menuActions(appMenu());
     const extra: PaletteItem[] = store.repo
       ? [
-          { label: "New branch…", hint: keymap().keys["branch.new"], run: () => setStore("dialog", { type: "newBranch" }) },
+          { label: "New branch…", hint: shortcut("branch.new"), run: () => setStore("dialog", { type: "newBranch" }) },
           { label: "Merge into current branch…", run: () => setStore("dialog", { type: "merge" }) },
           { label: "Rebase current branch…", run: () => setStore("dialog", { type: "rebase" }) },
-          { label: "Stash all changes", hint: keymap().keys["stash.all"], run: () => run("Stash", () => api.stash(store.repo!.id)) },
-          { label: "Undo last Git operation", hint: keymap().keys["undo"], run: undoLastOperation },
-          { label: "Search history", hint: keymap().keys["history.search"], run: focusSearch },
-          { label: "Refresh", hint: keymap().keys["refresh"], run: refreshRepo },
+          { label: "Stash all changes", hint: shortcut("stash.all"), run: () => run("Stash", () => api.stash(store.repo!.id)) },
+          { label: "Undo last Git operation", hint: shortcut("undo"), run: undoLastOperation },
+          { label: "Search history", hint: shortcut("history.search"), run: focusSearch },
+          { label: "Refresh", hint: shortcut("refresh"), run: refreshRepo },
         ]
       : [];
     const repos: PaletteItem[] = store.repositories.map((r) => ({ label: `Open ${r.name}`, hint: r.owner ?? undefined, run: () => openRepo(r.path) }));
-    return fuzzyFilter([...extra, ...actions.map((a) => ({ label: a.label, run: a.run })), ...repos], query(), (i) => i.label);
+    return fuzzyFilter([...extra, ...actions.map((a) => ({ label: a.label, hint: a.hint, run: a.run })), ...repos], query(), (i) => i.label);
   });
 
   const choose = (item?: PaletteItem) => {
@@ -281,6 +230,12 @@ export function App() {
     }
     const action = keymap().byCombo.get(comboFromEvent(e));
     if (!action) return;
+    if (action === "palette") {
+      e.preventDefault();
+      setPalette(!palette());
+      return;
+    }
+    if (dialogOpen()) return;
     const id = repo?.id;
     const call = (fn: (id: string) => Promise<unknown>) => () => id && fn(id).catch(reportError);
     const manyTabs = store.tabs.length > 1;
@@ -302,7 +257,7 @@ export function App() {
       "sync.push": { when: !!repo, run: () => doSync("push") },
       "sync.pull": { when: !!repo, run: () => doSync("pull") },
       "sync.fetch": { run: () => doSync("fetch") },
-      undo: { when: !!repo && !inTextField(e) && !store.dialog, run: undoLastOperation },
+      undo: { when: !!repo && !inTextField(e), run: undoLastOperation },
       "history.search": { when: !!repo, run: focusSearch },
       "pr.create": { when: !!repo, run: call(api.createPullRequest) },
       "open.editor": { when: !!repo, run: call((i) => api.openInEditor(i)) },
@@ -311,7 +266,6 @@ export function App() {
       "open.github": { when: !!repo, run: call(api.openOnGithub) },
       "file.blame": { when: !!repo && !!store.selectedPath, run: () => setStore("dialog", { type: "blame", path: store.selectedPath! }) },
       "stash.all": { when: !!repo, run: () => run("Stash", () => api.stash(repo!.id)) },
-      palette: { run: () => setPalette(true) },
       settings: { run: () => setStore("dialog", { type: "settings" }) },
       refresh: { run: refreshRepo },
     };
@@ -383,7 +337,6 @@ export function App() {
     >
       <Toolbar />
       <TabStrip />
-      <Banners />
       <Show when={store.ready} fallback={<Loading label="Starting Blink" />}>
         <Show when={store.repo} fallback={store.opening ? <Loading label="Opening repository" /> : <Welcome />}>
           <div
@@ -414,6 +367,8 @@ export function App() {
       </Show>
       <PromptHost />
       <ContextMenuHost />
+      <Toasts />
+      <TooltipHost />
     </div>
   );
 }

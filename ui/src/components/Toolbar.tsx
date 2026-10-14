@@ -16,6 +16,7 @@ import {
   reportError,
   run,
   setStore,
+  shortcut,
   showWhatsNew,
   store,
   undoLastOperation,
@@ -24,7 +25,9 @@ import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { customTitleBar, WindowControls } from "./WindowControls";
 import { DRAG_TYPE } from "./HistoryPane";
 import { BranchIcon, CheckIcon, ChevronDown, DownIcon, MenuIcon, PlusIcon, PullRequestIcon, RepoIcon, SyncIcon, UpIcon } from "./Icons";
+import { Loading } from "./Loading";
 import { ask, choose, message } from "./Prompt";
+import { undoPhrase } from "../lib/keymap";
 import { transferPercent } from "../lib/progress";
 
 export async function pickAndAddRepository() {
@@ -39,9 +42,9 @@ function usePopoverDismiss(close: () => void) {
 }
 
 const addMenu = (): MenuItem[] => [
-  { label: "Add existing repository…", run: () => pickAndAddRepository() },
-  { label: "Clone repository…", run: () => setStore("dialog", { type: "clone" }) },
-  { label: "Create new repository…", run: () => setStore("dialog", { type: "createRepo" }) },
+  { label: "Add existing repository…", hint: shortcut("repo.add"), run: () => pickAndAddRepository() },
+  { label: "Clone repository…", hint: shortcut("repo.clone"), run: () => setStore("dialog", { type: "clone" }) },
+  { label: "Create new repository…", hint: shortcut("repo.create"), run: () => setStore("dialog", { type: "createRepo" }) },
   "separator",
   { label: "Import repositories from a folder…", run: () => setStore("dialog", { type: "import" }) },
 ];
@@ -169,7 +172,7 @@ function PullRequestList(p: { query: string }) {
       }
     >
       <Show when={!prs.error} fallback={<div class="empty muted">{String((prs.error as { message?: string })?.message ?? "Could not load pull requests")}</div>}>
-        <For each={list()} fallback={<div class="empty muted">{prs.loading ? "Loading…" : "No open pull requests"}</div>}>
+        <For each={list()} fallback={prs.loading ? <Loading /> : <div class="empty muted">No open pull requests</div>}>
           {(pr) => (
             <div
               class="static-row pr-row"
@@ -260,7 +263,7 @@ function BranchPopover() {
     const includeRemote = b.upstream
       ? await ask(`Also delete ${b.upstream} on the remote?`, { title: `Delete ${b.name}`, okLabel: "Delete remote too", cancelLabel: "Local only" })
       : false;
-    const ok = await ask(`Delete branch ${b.name}? You can undo this with Ctrl+Z.`, { title: "Delete branch", kind: "warning", okLabel: "Delete" });
+    const ok = await ask(`Delete branch ${b.name}? You can ${undoPhrase(shortcut("undo"))}.`, { title: "Delete branch", kind: "warning", okLabel: "Delete" });
     if (!ok) return;
     try {
       await api.deleteBranch(repo.id, b.name, false, includeRemote);
@@ -457,9 +460,9 @@ export function appMenu(): MenuItem[] {
     {
       label: "Repository",
       items: [
-        { label: "Push", run: () => doSync("push"), disabled: !repo },
-        { label: "Pull", run: () => doSync("pull"), disabled: !repo },
-        { label: "Fetch", run: () => doSync("fetch"), disabled: !repo },
+        { label: "Push", hint: shortcut("sync.push"), run: () => doSync("push"), disabled: !repo },
+        { label: "Pull", hint: shortcut("sync.pull"), run: () => doSync("pull"), disabled: !repo },
+        { label: "Fetch", hint: shortcut("sync.fetch"), run: () => doSync("fetch"), disabled: !repo },
         { label: "Force push (with lease)…", run: () => doSync("push", true), disabled: !repo },
         "separator",
         { label: "Fetch all repositories…", run: () => setStore("dialog", { type: "fetchAll" }) },
@@ -477,9 +480,9 @@ export function appMenu(): MenuItem[] {
       disabled: !repo,
       items: [
         { label: "Preview pull request…", run: () => setStore("dialog", { type: "previewPullRequest" }) },
-        { label: "Create pull request", run: r((i) => api.createPullRequest(i)) },
+        { label: "Create pull request", hint: shortcut("pr.create"), run: r((i) => api.createPullRequest(i)) },
         { label: "Checks for this branch…", run: () => setStore("dialog", { type: "checks" }) },
-        { label: "View on GitHub", run: r(api.openOnGithub) },
+        { label: "View on GitHub", hint: shortcut("open.github"), run: r(api.openOnGithub) },
       ],
     },
     {
@@ -487,13 +490,13 @@ export function appMenu(): MenuItem[] {
       disabled: !repo,
       items: [
         { label: "Open in new window", run: () => id && openInNewWindow(id) },
-        { label: "Open in external editor", run: r((i) => api.openInEditor(i)) },
-        { label: "Open in shell", run: r((i) => api.openInShell(i)) },
-        { label: "Show in file manager", run: r((i) => api.reveal(i)) },
+        { label: "Open in external editor", hint: shortcut("open.editor"), run: r((i) => api.openInEditor(i)) },
+        { label: "Open in shell", hint: shortcut("open.shell"), run: r((i) => api.openInShell(i)) },
+        { label: "Show in file manager", hint: shortcut("open.files"), run: r((i) => api.reveal(i)) },
       ],
     },
     "separator",
-    { label: "Settings", run: () => setStore("dialog", { type: "settings" }) },
+    { label: "Settings", hint: shortcut("settings"), run: () => setStore("dialog", { type: "settings" }) },
     { label: "Keyboard shortcuts", run: () => setStore("dialog", { type: "shortcuts" }) },
     "separator",
     { label: "What's new", run: () => showWhatsNew(true) },
@@ -517,11 +520,13 @@ export function Toolbar() {
     return progress && progress.percent !== null ? `${progress.phase} ${progress.percent}%` : previous;
   }, "");
   const state = () => syncState();
+  const syncTooltip = () => (state().action === "push" ? "Push your commits" : state().action === "pull" ? "Pull new commits" : "Check for new commits");
+  const syncShortcut = () => shortcut(`sync.${state().action}`);
 
   return (
     <>
       <div class="toolbar" data-tauri-drag-region={customTitleBar || undefined}>
-        <button class="toolbar-button repo" classList={{ open: store.popover === "repos" }} onClick={() => toggle("repos")} title="Ctrl+T">
+        <button class="toolbar-button repo" classList={{ open: store.popover === "repos" }} onClick={() => toggle("repos")} data-tooltip="Switch repository" data-shortcut={shortcut("repo.list")}>
           <RepoIcon />
           <span class="labels">
             <span class="title">{store.opening ? "Opening repository" : "Current repository"}</span>
@@ -546,7 +551,8 @@ export function Toolbar() {
           }}
           onDragLeave={() => setDropping(false)}
           onDrop={() => setDropping(false)}
-          title="Ctrl+B"
+          data-tooltip="Switch branch"
+          data-shortcut={shortcut("branch.list")}
         >
           <BranchIcon />
           <span class="labels">
@@ -556,7 +562,7 @@ export function Toolbar() {
           <Show when={store.checks && store.checks.state !== "none"}>
             <span
               class={`dot ${store.checks!.state}`}
-              title={`${store.checks!.failed} failed, ${store.checks!.pending} pending of ${store.checks!.total} checks`}
+              data-tooltip={`${store.checks!.failed} failed, ${store.checks!.pending} pending of ${store.checks!.total} checks`}
               onClick={(e) => {
                 e.stopPropagation();
                 setStore("dialog", { type: "checks" });
@@ -570,6 +576,8 @@ export function Toolbar() {
           style={{ position: "relative" }}
           disabled={!store.repo || !!store.sync}
           onClick={() => doSync()}
+          data-tooltip={state().kind === "publish" ? undefined : syncTooltip()}
+          data-shortcut={syncShortcut()}
           onContextMenu={(e) =>
             store.repo &&
             openContextMenu(e, [
@@ -624,7 +632,7 @@ export function Toolbar() {
         <Show
           when={customTitleBar}
           fallback={
-            <button class="toolbar-button app-menu" aria-label="Menu" title="Menu" onMouseDown={(e) => e.preventDefault()} onClick={(e) => openContextMenu(e, appMenu())}>
+            <button class="toolbar-button app-menu" aria-label="Menu" data-tooltip="Menu" onMouseDown={(e) => e.preventDefault()} onClick={(e) => openContextMenu(e, appMenu())}>
               <MenuIcon />
             </button>
           }

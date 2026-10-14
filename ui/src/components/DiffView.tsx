@@ -4,7 +4,7 @@ import { isLineIncluded, lineKey, type FileSel } from "../lib/selection";
 import { formatBytes } from "../lib/size";
 import { pairLines, type Cell } from "../lib/split";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
-import { Segmented } from "./Controls";
+import { SplitIcon, UnifiedIcon } from "./Icons";
 import { VirtualList } from "./VirtualList";
 
 type Row =
@@ -34,16 +34,31 @@ export function setDiffLayout(layout: "unified" | "split") {
   } catch {}
 }
 
+const LAYOUTS = [
+  { value: "unified", label: "Unified", icon: UnifiedIcon },
+  { value: "split", label: "Split", icon: SplitIcon },
+] as const;
+
 export function DiffLayoutToggle() {
   return (
-    <Segmented
-      value={diffLayout()}
-      onChange={setDiffLayout}
-      options={[
-        { value: "unified", label: "Unified" },
-        { value: "split", label: "Split" },
-      ]}
-    />
+    <div class="segmented layout-toggle" role="radiogroup" aria-label="Diff layout">
+      <For each={LAYOUTS}>
+        {(layout) => (
+          <button
+            type="button"
+            role="radio"
+            aria-checked={diffLayout() === layout.value}
+            aria-label={layout.label}
+            data-tooltip={`${layout.label} diff`}
+            classList={{ active: diffLayout() === layout.value }}
+            onClick={() => setDiffLayout(layout.value)}
+          >
+            <layout.icon />
+            <span class="toggle-label">{layout.label}</span>
+          </button>
+        )}
+      </For>
+    </div>
   );
 }
 

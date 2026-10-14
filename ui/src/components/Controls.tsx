@@ -75,6 +75,8 @@ export function Select<T extends string>(p: {
   placeholder?: string;
   class?: string;
   disabled?: boolean;
+  icon?: JSX.Element;
+  tooltip?: string;
 }) {
   let button!: HTMLButtonElement;
   const [open, setOpen] = createSignal(false);
@@ -143,9 +145,10 @@ export function Select<T extends string>(p: {
     if (!r) return {};
     const height = Math.min(p.options.length * 30 + 10, 280);
     const below = window.innerHeight - r.bottom > height + 8;
+    const width = p.icon ? Math.max(r.width, 160) : r.width;
     return {
-      left: `${r.left}px`,
-      width: `${r.width}px`,
+      left: `${Math.max(8, Math.min(r.left, window.innerWidth - 8 - width))}px`,
+      width: `${width}px`,
       top: below ? `${r.bottom + 4}px` : `${Math.max(8, r.top - height - 4)}px`,
       "max-height": `${height}px`,
     };
@@ -156,15 +159,18 @@ export function Select<T extends string>(p: {
       <button
         ref={button}
         type="button"
-        class={`select ${open() ? "open" : ""} ${p.class ?? ""}`}
+        class={`select ${open() ? "open" : ""} ${p.icon ? "icon-select" : ""} ${p.class ?? ""}`}
         aria-haspopup="listbox"
         aria-expanded={open()}
         aria-label={p.ariaLabel}
+        data-tooltip={p.tooltip}
         disabled={p.disabled}
         onClick={() => (open() ? setOpen(false) : show())}
         onKeyDown={onKey}
       >
-        <span class="select-value">{selected()?.label ?? p.placeholder ?? ""}</span>
+        <Show when={p.icon} fallback={<span class="select-value">{selected()?.label ?? p.placeholder ?? ""}</span>}>
+          {p.icon}
+        </Show>
         <ChevronDown />
       </button>
       <Show when={open()}>

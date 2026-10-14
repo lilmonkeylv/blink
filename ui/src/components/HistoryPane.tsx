@@ -16,8 +16,9 @@ import { currentBranch, notify, reportError, run, setStore, store } from "../sto
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { Checkbox, Select, Segmented } from "./Controls";
 import { DiffLayoutToggle, DiffView } from "./DiffView";
-import { CloseIcon, StatusIcon } from "./Icons";
+import { CloseIcon, FilterIcon, StatusIcon } from "./Icons";
 import { ImageDiff, isImagePath } from "./ImageDiff";
+import { Loading } from "./Loading";
 import { VirtualList } from "./VirtualList";
 import { ask } from "./Prompt";
 
@@ -25,8 +26,14 @@ const PAGE = 300;
 const ROW = 52;
 const LANE = 12;
 const MAX_LANES = 16;
-const LANE_COLORS = ["#2f81f7", "#3fb950", "#d29922", "#db61a2", "#a371f7", "#f85149", "#39c5cf", "#e3b341"];
+const LANE_COLORS = 8;
 export const DRAG_TYPE = "application/x-blink-commits";
+const SEARCH_PLACEHOLDERS: Record<SearchKind, string> = {
+  message: "Search messages",
+  author: "Search authors",
+  content: "Search contents",
+  path: "Search paths",
+};
 
 const [commits, setCommits] = createSignal<CommitSummary[]>([]);
 const [rows, setRows] = createSignal<GraphRow[]>([]);
@@ -89,14 +96,14 @@ export function reloadHistory() {
 
 function Graph(p: { row: GraphRow; width: number }) {
   const x = (lane: number) => 8 + lane * LANE;
-  const color = (c: number) => LANE_COLORS[c % LANE_COLORS.length];
+  const color = (c: number) => `var(--lane-${c % LANE_COLORS})`;
   const path = (from: number, to: number, y0: number, y1: number) =>
     from === to ? `M${x(from)} ${y0}V${y1}` : `M${x(from)} ${y0}C${x(from)} ${(y0 + y1) / 2} ${x(to)} ${(y0 + y1) / 2} ${x(to)} ${y1}`;
   return (
     <svg class="graph" style={{ width: `${p.width}px`, height: `${ROW}px` }} aria-hidden="true">
-      <For each={p.row.top}>{(e) => <path d={path(e.from, e.to, 0, ROW / 2)} stroke={color(e.color)} />}</For>
-      <For each={p.row.bottom}>{(e) => <path d={path(e.from, e.to, ROW / 2, ROW)} stroke={color(e.color)} />}</For>
-      <circle cx={x(p.row.lane)} cy={ROW / 2} r="4" fill="var(--bg)" stroke={color(p.row.color)} stroke-width="2.5" />
+      <For each={p.row.top}>{(e) => <path d={path(e.from, e.to, 0, ROW / 2)} style={{ stroke: color(e.color) }} />}</For>
+      <For each={p.row.bottom}>{(e) => <path d={path(e.from, e.to, ROW / 2, ROW)} style={{ stroke: color(e.color) }} />}</For>
+      <circle cx={x(p.row.lane)} cy={ROW / 2} r="4" stroke-width="2.5" style={{ fill: "var(--bg)", stroke: color(p.row.color) }} />
     </svg>
   );
 }
@@ -177,7 +184,7 @@ function SearchBar() {
       <input
         id="history-search"
         class="input"
-        placeholder="Search history"
+        placeholder={SEARCH_PLACEHOLDERS[kind()]}
         value={query()}
         onInput={(e) => {
           setQuery(e.currentTarget.value);
@@ -190,22 +197,22 @@ function SearchBar() {
           }
         }}
       />
-      <div style={{ width: "112px", flex: "none" }}>
-        <Select
-          value={kind()}
-          onChange={(k) => {
-            setKind(k);
-            apply();
-          }}
-          ariaLabel="Search in"
-          options={[
-            { value: "message", label: "Message" },
-            { value: "author", label: "Author" },
-            { value: "content", label: "Content" },
-            { value: "path", label: "Path" },
-          ]}
-        />
-      </div>
+      <Select
+        value={kind()}
+        onChange={(k) => {
+          setKind(k);
+          apply();
+        }}
+        ariaLabel="Search in"
+        tooltip="Search in"
+        icon={<FilterIcon />}
+        options={[
+          { value: "message", label: "Message" },
+          { value: "author", label: "Author" },
+          { value: "content", label: "Content" },
+          { value: "path", label: "Path" },
+        ]}
+      />
     </div>
   );
 }
@@ -557,7 +564,7 @@ export function CommitView() {
               when={!isImagePath(f().path)}
               fallback={<ImageDiff path={f().path} oldPath={f().oldPath} sha={range() ? undefined : selected()[0]} />}
             >
-              <Show when={diff()} fallback={<div class="empty muted">Loading…</div>}>
+              <Show when={diff()} fallback={<Loading />}>
                 {(d) => <DiffView diff={d()} />}
               </Show>
             </Show>
@@ -575,7 +582,7 @@ export function CommitView() {
           when={!loadError() && currentDetail()}
           fallback={
             <div class="empty">
-              <Show when={loadError()} fallback={selected()[0] ? "Loading…" : "Select a commit"}>
+              <Show when={loadError()} fallback={selected()[0] ? <Loading /> : "Select a commit"}>
                 <div>
                   <h2>Could not load this commit</h2>
                   <p class="muted" style={{ "user-select": "text" }}>
