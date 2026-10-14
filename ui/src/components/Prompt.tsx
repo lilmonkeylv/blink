@@ -67,7 +67,7 @@ export function PromptHost() {
                 return (
                   <button
                     class="btn"
-                    classList={{ primary: choice.primary && !destructive, danger: destructive }}
+                    classList={{ primary: choice.primary, danger: destructive }}
                     autofocus={request.kind === "warning" ? !choice.primary : choice.primary}
                     onClick={() => settle(choice.value)}
                   >

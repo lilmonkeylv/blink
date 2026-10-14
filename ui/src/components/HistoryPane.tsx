@@ -25,7 +25,7 @@ const PAGE = 300;
 const ROW = 52;
 const LANE = 12;
 const MAX_LANES = 16;
-const LANE_COLORS = ["#2f81f7", "#3fb950", "#d29922", "#db61a2", "#a371f7", "#f85149", "#39c5cf", "#e3b341"];
+const LANE_COLORS = 8;
 export const DRAG_TYPE = "application/x-blink-commits";
 
 const [commits, setCommits] = createSignal<CommitSummary[]>([]);
@@ -89,14 +89,14 @@ export function reloadHistory() {
 
 function Graph(p: { row: GraphRow; width: number }) {
   const x = (lane: number) => 8 + lane * LANE;
-  const color = (c: number) => LANE_COLORS[c % LANE_COLORS.length];
+  const color = (c: number) => `var(--lane-${c % LANE_COLORS})`;
   const path = (from: number, to: number, y0: number, y1: number) =>
     from === to ? `M${x(from)} ${y0}V${y1}` : `M${x(from)} ${y0}C${x(from)} ${(y0 + y1) / 2} ${x(to)} ${(y0 + y1) / 2} ${x(to)} ${y1}`;
   return (
     <svg class="graph" style={{ width: `${p.width}px`, height: `${ROW}px` }} aria-hidden="true">
-      <For each={p.row.top}>{(e) => <path d={path(e.from, e.to, 0, ROW / 2)} stroke={color(e.color)} />}</For>
-      <For each={p.row.bottom}>{(e) => <path d={path(e.from, e.to, ROW / 2, ROW)} stroke={color(e.color)} />}</For>
-      <circle cx={x(p.row.lane)} cy={ROW / 2} r="4" fill="var(--bg)" stroke={color(p.row.color)} stroke-width="2.5" />
+      <For each={p.row.top}>{(e) => <path d={path(e.from, e.to, 0, ROW / 2)} style={{ stroke: color(e.color) }} />}</For>
+      <For each={p.row.bottom}>{(e) => <path d={path(e.from, e.to, ROW / 2, ROW)} style={{ stroke: color(e.color) }} />}</For>
+      <circle cx={x(p.row.lane)} cy={ROW / 2} r="4" stroke-width="2.5" style={{ fill: "var(--bg)", stroke: color(p.row.color) }} />
     </svg>
   );
 }
