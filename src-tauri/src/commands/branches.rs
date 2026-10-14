@@ -80,23 +80,24 @@ pub async fn delete_branch(
 ) -> CmdResult<()> {
     let handle = state.engine.get(&id)?;
     let cli = state.git_cli(handle.repo());
-    Ok(state
-        .engine
-        .write(&id, move |repo| {
-            let branch = repo.branches()?.into_iter().find(|b| b.name == name && b.kind == BranchKind::Local);
-            let upstream = branch.as_ref().and_then(|b| b.upstream.clone());
-            cli.delete_branch(&name, force.unwrap_or(false))?;
-            if let Some(b) = &branch {
-                handle.undo().record_branch_delete(repo, &name, &b.target)?;
-            }
-            if include_remote.unwrap_or(false)
-                && let Some((remote, branch)) = upstream.as_deref().and_then(|u| u.split_once('/'))
-            {
-                cli.delete_remote_branch(remote, branch)?;
-            }
-            Ok(())
-        })
-        .await?)
+    let include_remote = include_remote.unwrap_or(false);
+    let delete = move |repo: &blink_git::Repository| {
+        let branch = repo.branches()?.into_iter().find(|b| b.name == name && b.kind == BranchKind::Local);
+        let upstream = branch.as_ref().and_then(|b| b.upstream.clone());
+        cli.delete_branch(&name, force.unwrap_or(false))?;
+        if let Some(b) = &branch {
+            handle.undo().record_branch_delete(repo, &name, &b.target)?;
+        }
+        if include_remote && let Some((remote, branch)) = upstream.as_deref().and_then(|u| u.split_once('/')) {
+            cli.delete_remote_branch(remote, branch)?;
+        }
+        Ok(())
+    };
+    if include_remote {
+        Ok(state.engine.network_write(&id, delete).await?)
+    } else {
+        Ok(state.engine.write(&id, delete).await?)
+    }
 }
 
 #[tauri::command]
@@ -106,7 +107,7 @@ pub async fn delete_remote_branch(state: State<'_, AppState>, id: String, name: 
     let (remote, branch) =
         name.split_once('/').ok_or_else(|| CommandError::new("git", format!("{name} is not a remote branch")))?;
     let (remote, branch) = (remote.to_string(), branch.to_string());
-    Ok(state.engine.write(&id, move |_| cli.delete_remote_branch(&remote, &branch)).await?)
+    Ok(state.engine.network_write(&id, move |_| cli.delete_remote_branch(&remote, &branch)).await?)
 }
 
 #[tauri::command]

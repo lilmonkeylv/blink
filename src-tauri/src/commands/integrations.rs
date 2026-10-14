@@ -132,7 +132,7 @@ fn editor_command(state: &AppState) -> CmdResult<Command> {
     Ok(Command::new(exe))
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn open_in_editor(state: State<'_, AppState>, id: String, path: Option<String>) -> CmdResult<()> {
     let handle = state.engine.get(&id)?;
     let root = handle.repo().workdir().to_path_buf();
@@ -198,7 +198,7 @@ fn shell_command(state: &AppState, dir: &Path) -> CmdResult<Command> {
     Ok(cmd)
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn open_in_shell(state: State<'_, AppState>, id: String, path: Option<String>) -> CmdResult<()> {
     let handle = state.engine.get(&id)?;
     let root = handle.repo().workdir().to_path_buf();

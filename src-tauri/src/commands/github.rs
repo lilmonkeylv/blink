@@ -24,10 +24,6 @@ fn client(state: &AppState) -> CmdResult<Client> {
     state.github().ok_or_else(|| CommandError::new("signedOut", "Sign in to GitHub.com first"))
 }
 
-fn remote_url(repo: &Repository, name: &str) -> Option<String> {
-    repo.cli().remotes().ok()?.into_iter().find(|(n, _)| n == name).map(|(_, u)| u)
-}
-
 pub struct HostedRepo {
     pub host: String,
     pub owner: String,
@@ -148,7 +144,7 @@ pub async fn commit_signature(state: State<'_, AppState>, id: String, sha: Strin
 
 pub fn hosted_repo(state: &AppState, repo: &Repository, remote: Option<&str>) -> Option<HostedRepo> {
     let url = match remote {
-        Some(name) => remote_url(repo, name)?,
+        Some(name) => repo.remote_url(name)?,
         None => origin_url(repo)?,
     };
     let (host, owner, name) = parse_remote(&url)?;
@@ -230,7 +226,7 @@ pub async fn publish_repository(
     state
         .engine
         .network_write(&id, move |repo| {
-            match remote_url(repo, "origin") {
+            match repo.remote_url("origin") {
                 Some(_) => cli.set_remote_url("origin", &url)?,
                 None => cli.add_remote("origin", &url)?,
             }
@@ -266,7 +262,7 @@ pub async fn checkout_pull_request(
     head_ref: String,
 ) -> CmdResult<()> {
     let handle = state.engine.get(&id)?;
-    let remote = if remote_url(handle.repo(), "upstream").is_some() { "upstream" } else { "origin" };
+    let remote = if handle.repo().remote_url("upstream").is_some() { "upstream" } else { "origin" };
     let cli = state.git_cli(handle.repo());
     let remote = remote.to_string();
     Ok(state
@@ -360,7 +356,7 @@ pub struct ForkInfo {
 #[tauri::command]
 pub async fn fork_info(state: State<'_, AppState>, id: String) -> CmdResult<ForkInfo> {
     let handle = state.engine.get(&id)?;
-    let has_upstream = remote_url(handle.repo(), "upstream").is_some();
+    let has_upstream = handle.repo().remote_url("upstream").is_some();
     let HostedRepo { host, owner, name } = hosted(&state, handle.repo())?;
     let repo = host_client(&state, &host)?.repo(&owner, &name).await?;
     Ok(ForkInfo {

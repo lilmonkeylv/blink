@@ -45,7 +45,12 @@ pub struct GitCli {
     env: Vec<(String, String)>,
     config: Vec<String>,
     sign_commits: bool,
+    ssh_batch_mode: bool,
 }
+
+const NETWORK_COMMANDS: &[&str] = &["fetch", "pull", "push", "clone", "ls-remote"];
+const STALL_GUARD: [&str; 4] = ["-c", "http.lowSpeedLimit=1000", "-c", "http.lowSpeedTime=60"];
+const SSH_KEEPALIVE: &str = "ssh -o ServerAliveInterval=15 -o ServerAliveCountMax=4";
 
 static SYSTEM_GIT: OnceLock<Option<PathBuf>> = OnceLock::new();
 
@@ -70,7 +75,13 @@ impl GitCli {
             env: Vec::new(),
             config: Vec::new(),
             sign_commits: false,
+            ssh_batch_mode: false,
         }
+    }
+
+    pub fn with_ssh_batch_mode(mut self) -> Self {
+        self.ssh_batch_mode = true;
+        self
     }
 
     pub fn with_executable(mut self, git: impl Into<PathBuf>) -> Self {
@@ -101,12 +112,30 @@ impl GitCli {
         &self.workdir
     }
 
+    fn user_ssh_command(&self) -> bool {
+        ["GIT_SSH_COMMAND", "GIT_SSH"]
+            .iter()
+            .any(|key| self.env.iter().any(|(k, _)| k == key) || std::env::var_os(key).is_some_and(|v| !v.is_empty()))
+            || self.config_get("core.sshCommand").is_some()
+    }
+
+    fn ssh_command(&self) -> String {
+        if self.ssh_batch_mode { format!("{SSH_KEEPALIVE} -o BatchMode=yes") } else { SSH_KEEPALIVE.to_string() }
+    }
+
     pub(crate) fn command(&self, args: &[&str]) -> Command {
+        let network = args.first().is_some_and(|sub| NETWORK_COMMANDS.contains(sub));
         let mut cmd = Command::new(&self.git);
         cmd.current_dir(&self.workdir)
             .args(["-c", "core.quotepath=false", "-c", "color.ui=false"])
-            .args(self.config.iter().flat_map(|c| ["-c", c.as_str()]))
-            .args(args)
+            .args(self.config.iter().flat_map(|c| ["-c", c.as_str()]));
+        if network {
+            cmd.args(STALL_GUARD);
+            if !self.user_ssh_command() {
+                cmd.env("GIT_SSH_COMMAND", self.ssh_command());
+            }
+        }
+        cmd.args(args)
             .env("GIT_TERMINAL_PROMPT", "0")
             .env("GIT_OPTIONAL_LOCKS", "0")
             .env("LC_ALL", "C")
@@ -523,6 +552,40 @@ mod tests {
         let out = "Pruning origin\nURL: https://github.com/a/b.git\n * [pruned] origin/old-feature\n * [pruned] origin/fix/x\n";
         assert_eq!(parse_pruned(out), ["origin/old-feature", "origin/fix/x"]);
         assert!(parse_pruned("").is_empty());
+    }
+
+    fn env_of(cmd: &Command, key: &str) -> Option<String> {
+        cmd.get_envs().find(|(k, _)| *k == key).and_then(|(_, v)| v).map(|v| v.to_string_lossy().into_owned())
+    }
+
+    #[test]
+    fn network_commands_get_stall_and_keepalive_guards() {
+        let dir = tempfile::tempdir().unwrap();
+        GitCli::init(dir.path(), "main").unwrap();
+        let cli = GitCli::new(dir.path());
+        let args: Vec<String> =
+            cli.command(&["fetch", "--all"]).get_args().map(|a| a.to_string_lossy().into_owned()).collect();
+        assert!(args.windows(2).any(|w| w == ["-c", "http.lowSpeedLimit=1000"]));
+        assert!(args.windows(2).any(|w| w == ["-c", "http.lowSpeedTime=60"]));
+        assert!(args.iter().position(|a| a == "http.lowSpeedTime=60") < args.iter().position(|a| a == "fetch"));
+
+        let status: Vec<String> =
+            cli.command(&["status"]).get_args().map(|a| a.to_string_lossy().into_owned()).collect();
+        assert!(!status.iter().any(|a| a.starts_with("http.")));
+        assert_eq!(env_of(&cli.command(&["status"]), "GIT_SSH_COMMAND"), None);
+
+        if !cli.user_ssh_command() {
+            let ssh = env_of(&cli.command(&["push"]), "GIT_SSH_COMMAND").unwrap();
+            assert!(ssh.contains("ServerAliveInterval=15") && ssh.contains("ServerAliveCountMax=4"));
+            assert!(!ssh.contains("BatchMode"));
+            let batch = cli.clone().with_ssh_batch_mode();
+            assert!(env_of(&batch.command(&["fetch"]), "GIT_SSH_COMMAND").unwrap().contains("BatchMode=yes"));
+        }
+
+        cli.run(&["config", "core.sshCommand", "ssh -i custom"]).unwrap();
+        assert_eq!(env_of(&cli.command(&["fetch"]), "GIT_SSH_COMMAND"), None);
+        let custom = GitCli::new(dir.path()).with_env("GIT_SSH_COMMAND", "plink");
+        assert_eq!(env_of(&custom.command(&["fetch"]), "GIT_SSH_COMMAND").as_deref(), Some("plink"));
     }
 
     #[test]

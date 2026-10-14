@@ -25,6 +25,7 @@ impl Default for PoolConfig {
 pub struct Pools {
     foreground: rayon::ThreadPool,
     background: rayon::ThreadPool,
+    network: rayon::ThreadPool,
     config: PoolConfig,
 }
 
@@ -41,7 +42,12 @@ impl Pools {
             .start_handler(|_| lower_current_thread_priority())
             .build()
             .expect("background pool");
-        Self { foreground, background, config }
+        let network = rayon::ThreadPoolBuilder::new()
+            .num_threads(config.network_concurrency.max(1))
+            .thread_name(|i| format!("blink-net-{i}"))
+            .build()
+            .expect("network pool");
+        Self { foreground, background, network, config }
     }
 
     pub fn config(&self) -> PoolConfig {
@@ -70,6 +76,14 @@ impl Pools {
         R: Send + 'static,
     {
         spawn_on(&self.background, job)
+    }
+
+    pub fn run_network<F, R>(&self, job: F) -> impl Future<Output = Result<R>> + use<F, R>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        spawn_on(&self.network, job)
     }
 }
 

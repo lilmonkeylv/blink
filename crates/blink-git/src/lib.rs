@@ -2,6 +2,7 @@ mod blob;
 mod cli;
 mod error;
 mod graph;
+mod ignore;
 mod inspect;
 mod log;
 mod maintenance;

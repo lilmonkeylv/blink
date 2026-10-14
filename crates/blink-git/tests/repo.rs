@@ -204,3 +204,54 @@ fn push_follows_the_configured_upstream() {
     let target = cli.push_target("untracked").unwrap();
     assert_eq!(target, blink_git::PushTarget::new_branch("origin", "untracked"));
 }
+
+#[test]
+fn remotes_are_read_from_config_and_track_changes() {
+    let (_dir, repo) = fixture();
+    assert!(!repo.has_remotes());
+    let cli = repo.cli();
+    cli.add_remote("origin", "git@github.com:acme/app.git").unwrap();
+    assert_eq!(repo.remotes(), [("origin".to_string(), "git@github.com:acme/app.git".to_string())]);
+    assert!(repo.has_remotes());
+    cli.add_remote("upstream", "https://github.com/up/app.git").unwrap();
+    assert_eq!(repo.remote_url("upstream").as_deref(), Some("https://github.com/up/app.git"));
+    assert_eq!(repo.remote_url("missing"), None);
+    let expected = cli.remotes().unwrap();
+    let mut actual = repo.remotes();
+    actual.sort();
+    let mut expected = expected;
+    expected.sort();
+    assert_eq!(actual, expected);
+}
+
+#[test]
+fn filters_ignored_paths_but_keeps_tracked_ones() {
+    let (dir, repo) = fixture();
+    write(dir.path(), ".gitignore", "target/\nnode_modules\n*.log\n!keep.log\n");
+    write(dir.path(), "vendor/.gitignore", "cache/\n");
+    write(dir.path(), "target/tracked.txt", "t\n");
+    repo.cli().run(&["add", "-f", ".gitignore", "vendor/.gitignore", "target/tracked.txt"]).unwrap();
+    write(dir.path(), "target/debug/build.o", "x");
+    fs::create_dir_all(dir.path().join("node_modules/pkg")).unwrap();
+    write(dir.path(), "vendor/cache/blob", "x");
+
+    let mut paths: std::collections::BTreeSet<std::path::PathBuf> = [
+        "target",
+        "target/debug/build.o",
+        "target/tracked.txt",
+        "node_modules/pkg",
+        "node_modules/pkg/index.js",
+        "debug.log",
+        "keep.log",
+        "vendor/cache/blob",
+        "vendor/lib.rs",
+        "src/main.rs",
+        ".gitignore",
+    ]
+    .into_iter()
+    .map(std::path::PathBuf::from)
+    .collect();
+    repo.retain_unignored(&mut paths);
+    let kept: Vec<_> = paths.iter().map(|p| p.to_string_lossy().replace('\\', "/")).collect();
+    assert_eq!(kept, [".gitignore", "keep.log", "src/main.rs", "target/tracked.txt", "vendor/lib.rs"]);
+}

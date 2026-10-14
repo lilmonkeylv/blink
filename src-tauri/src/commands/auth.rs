@@ -30,6 +30,7 @@ async fn finish(state: &AppState, token: Token) -> CmdResult<SignedIn> {
         .and_then(|emails| emails.into_iter().find(|e| e.primary && e.verified).map(|e| e.email));
     state.secrets.set(&AppState::token_key(&account.login), &token.access_token)?;
     state.cache.put_app_state(ACCOUNT_KEY, &account)?;
+    state.forget_credentials(GITHUB_HOST);
     Ok(SignedIn { account, primary_email })
 }
 
@@ -64,14 +65,15 @@ pub async fn device_complete(app: AppHandle, state: State<'_, AppState>, code: D
     finish(&state, token).await
 }
 
-#[tauri::command]
+#[tauri::command(async)]
 pub fn sign_out(state: State<'_, AppState>) -> CmdResult<()> {
     if let Some(account) = state.account() {
         state.secrets.delete(&AppState::token_key(&account.login))?;
     }
     state.cache.put_app_state(ACCOUNT_KEY, &Option::<Account>::None)?;
+    state.forget_credentials(GITHUB_HOST);
     *state.github.lock() = None;
-    crate::commands::github::forget_linked_emails(crate::state::GITHUB_HOST);
+    crate::commands::github::forget_linked_emails(GITHUB_HOST);
     Ok(())
 }
 
@@ -112,6 +114,7 @@ pub async fn enterprise_sign_in(
     accounts.retain(|a| a.host != host);
     accounts.push(entry.clone());
     state.save_enterprise_accounts(&accounts)?;
+    state.forget_credentials(&host);
     Ok(entry)
 }
 
@@ -123,6 +126,7 @@ pub fn enterprise_sign_out(state: State<'_, AppState>, host: String) -> CmdResul
     }
     accounts.retain(|a| a.host != host);
     state.save_enterprise_accounts(&accounts)?;
+    state.forget_credentials(&host);
     crate::commands::github::forget_linked_emails(&host);
     Ok(())
 }
