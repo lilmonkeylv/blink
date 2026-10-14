@@ -45,6 +45,7 @@ pub fn run() {
             let settings = state.settings.read().clone();
             app.manage(state);
             let handle = app.handle().clone();
+            watch::forward_snapshots(&handle);
             apply::apply_settings(&handle, None, &settings);
             if let Some(main) = app.get_webview_window("main") {
                 commands::window::fit_to_screen(&main);
@@ -109,6 +110,7 @@ pub fn run() {
             commands::branches::rename_branch,
             commands::branches::delete_branch,
             commands::branches::unpushed_commits,
+            commands::branches::unpushed_shas,
             commands::branches::delete_remote_branch,
             commands::branches::set_upstream,
             commands::branches::prune_remotes,
