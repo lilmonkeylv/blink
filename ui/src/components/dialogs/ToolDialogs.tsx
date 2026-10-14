@@ -1,6 +1,6 @@
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { createMemo, createResource, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
-import { api, isCommandError, type DeviceCode, type JobStep, type ReleaseNote } from "../../api";
+import { api, isCommandError, type CheckRun, type DeviceCode, type JobStep, type ReleaseNote } from "../../api";
 import { baseSections, conflictCount, parseConflicts, render, type Resolution, type Segment } from "../../lib/conflicts";
 import { parseJobLog } from "../../lib/joblog";
 import { COMMIT_KEYS, DEFAULT_BINDINGS } from "../../lib/keymap";
@@ -312,20 +312,7 @@ export function ChecksDialog() {
       <Show when={checks()} fallback={<div class="empty muted">No checks for this commit</div>}>
         {(c) => (
           <>
-            <For each={c().runs}>
-              {(r) => (
-                <div class="check-run">
-                  <span class={`dot ${CONCLUSION_STATE(r.status, r.conclusion)}`} />
-                  <span class="grow">{r.name}</span>
-                  <span class="muted small">{r.conclusion ?? r.status.replace("_", " ")}</span>
-                  <Show when={r.app?.slug === "github-actions" && CONCLUSION_STATE(r.status, r.conclusion) === "failure"}>
-                    <button class="btn" onClick={() => setStore("dialog", { type: "checkLog", jobId: r.id, name: r.name })}>
-                      View log
-                    </button>
-                  </Show>
-                </div>
-              )}
-            </For>
+            <For each={c().runs}>{(r) => <CheckRunRow run={r} />}</For>
             <For each={c().statuses}>
               {(s) => (
                 <div class="check-run">
@@ -339,6 +326,76 @@ export function ChecksDialog() {
         )}
       </Show>
     </Dialog>
+  );
+}
+
+const viewLog = (jobId: number, name: string) => setStore("dialog", { type: "checkLog", jobId, name });
+
+const jobState = (status: string, conclusion: string | null) =>
+  conclusion === "skipped" || conclusion === "cancelled" ? "" : CONCLUSION_STATE(status, conclusion);
+
+async function workflowRunId(repo: string, run: CheckRun) {
+  const fromUrl = run.html_url?.match(/\/actions\/runs\/(\d+)/)?.[1];
+  return fromUrl ? Number(fromUrl) : (await api.workflowJob(repo, run.id)).run_id;
+}
+
+function CheckRunRow(p: { run: CheckRun }) {
+  const [open, setOpen] = createSignal(false);
+  const actions = () => p.run.app?.slug === "github-actions";
+  const state = () => CONCLUSION_STATE(p.run.status, p.run.conclusion);
+  const [jobs] = createResource(
+    () => (open() && actions() && store.repo ? store.repo.id : null),
+    async (repo) => api.workflowRunJobs(repo, await workflowRunId(repo, p.run)),
+  );
+  return (
+    <div class="check-group" classList={{ open: open() }}>
+      <div class="check-run">
+        <Show when={actions()} fallback={<span class="check-toggle-spacer" />}>
+          <button
+            type="button"
+            class="icon-button check-toggle"
+            aria-expanded={open()}
+            aria-label={open() ? "Hide jobs" : "Show jobs"}
+            onClick={() => setOpen(!open())}
+          >
+            <ChevronRight />
+          </button>
+        </Show>
+        <span class={`dot ${state()}`} />
+        <span class="grow">{p.run.name}</span>
+        <span class="muted small">{p.run.conclusion ?? p.run.status.replace("_", " ")}</span>
+        <Show when={actions() && state() === "failure"}>
+          <button class="btn" onClick={() => viewLog(p.run.id, p.run.name)}>
+            View log
+          </button>
+        </Show>
+      </div>
+      <Show when={open()}>
+        <div class="check-jobs">
+          <Switch fallback={<Loading />}>
+            <Match when={jobs.error}>
+              <div class="muted small">Could not load the jobs for this workflow run.</div>
+            </Match>
+            <Match when={jobs()}>
+              {(list) => (
+                <For each={list()} fallback={<div class="muted small">This workflow run has no jobs.</div>}>
+                  {(job) => (
+                    <div class="check-job" classList={{ current: job.id === p.run.id }}>
+                      <span class={`dot ${jobState(job.status, job.conclusion)}`} />
+                      <span class="grow">{job.name}</span>
+                      <span class="muted small">{job.conclusion ?? job.status.replace("_", " ")}</span>
+                      <button class="btn" disabled={job.status !== "completed"} onClick={() => viewLog(job.id, job.name)}>
+                        View log
+                      </button>
+                    </div>
+                  )}
+                </For>
+              )}
+            </Match>
+          </Switch>
+        </div>
+      </Show>
+    </div>
   );
 }
 
