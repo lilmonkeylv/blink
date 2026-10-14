@@ -1123,6 +1123,49 @@ select.input {
   background: var(--bg-hover);
 }
 
+.action-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.action-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: calc(var(--row) + 12px);
+  padding: 6px 6px 6px 12px;
+  border-radius: var(--radius);
+  transition: background-color var(--ease);
+}
+
+.action-row:hover {
+  background: var(--bg-hover);
+}
+
+.action-row .grow {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.action-row .btn {
+  padding: 4px 10px;
+  background: transparent;
+  border-color: transparent;
+}
+
+.action-row:hover .btn {
+  border-color: var(--border);
+  background: var(--bg-subtle);
+}
+
+.action-row .btn:hover:not(:disabled) {
+  background: var(--bg);
+}
+
 .static-row.current {
   font-weight: 600;
   box-shadow: inset 3px 0 0 var(--accent);
