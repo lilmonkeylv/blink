@@ -4,7 +4,21 @@ import { recentMessages, rememberMessage } from "../lib/messages";
 import { fuzzyScore } from "../lib/fuzzy";
 import { nextSelection } from "../lib/multiselect";
 import { checkState, diffSignature, setLines, toggleFile, toPayload, type CheckState, type FileSel } from "../lib/selection";
-import { cachedDiff, currentBranch, notify, refreshRepo, reportError, run, sameDiff, setStore, store, storeDiff } from "../store";
+import { EMPTY_DRAFT, type CommitDraft } from "../lib/drafts";
+import {
+  cachedDiff,
+  commitDraft,
+  currentBranch,
+  notify,
+  refreshRepo,
+  reportError,
+  run,
+  sameDiff,
+  setStore,
+  store,
+  storeDiff,
+  updateDraft,
+} from "../store";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { Checkbox } from "./Controls";
 import { DiffLayoutToggle, DiffView } from "./DiffView";
@@ -293,11 +307,20 @@ function OperationBar() {
 }
 
 function CommitBox() {
-  const [summary, setSummary] = createSignal("");
-  const [description, setDescription] = createSignal("");
-  const [coAuthors, setCoAuthors] = createSignal("");
-  const [showCoAuthors, setShowCoAuthors] = createSignal(false);
-  const [amend, setAmend] = createSignal(false);
+  const draft = () => (store.repo ? commitDraft(store.repo.id) : EMPTY_DRAFT);
+  const edit = (patch: Partial<CommitDraft>) => {
+    if (store.repo) updateDraft(store.repo.id, patch);
+  };
+  const summary = () => draft().summary;
+  const description = () => draft().description;
+  const coAuthors = () => draft().coAuthors;
+  const showCoAuthors = () => draft().showCoAuthors;
+  const amend = () => draft().amend;
+  const setSummary = (summary: string) => edit({ summary });
+  const setDescription = (description: string) => edit({ description });
+  const setCoAuthors = (coAuthors: string) => edit({ coAuthors });
+  const setShowCoAuthors = (showCoAuthors: boolean) => edit({ showCoAuthors });
+  const setAmend = (amend: boolean) => edit({ amend });
   const [committing, setCommitting] = createSignal(false);
   const [template, setTemplate] = createSignal("");
   const [recall, setRecall] = createSignal(-1);
@@ -315,11 +338,12 @@ function CommitBox() {
       () => store.repo?.id,
       async (id) => {
         setTemplate("");
+        setRecall(-1);
         if (!id) return;
         const text = (await api.commitTemplate(id).catch(() => null)) ?? "";
         if (store.repo?.id !== id) return;
         setTemplate(text);
-        if (text && !summary() && !description()) setDescription(text);
+        if (text && !summary() && !description()) updateDraft(id, { description: text });
       },
     ),
   );
@@ -329,8 +353,8 @@ function CommitBox() {
     const next = Math.min(recall() + step, list.length - 1);
     if (next === recall()) return;
     setRecall(next);
-    setSummary(next < 0 ? "" : list[next].summary);
-    setDescription(next < 0 ? template() : list[next].description);
+    const message = next < 0 ? { summary: "", description: template() } : list[next];
+    edit({ summary: message.summary, description: message.description });
   };
 
   const onSummaryKey = (e: KeyboardEvent) => {
@@ -345,12 +369,13 @@ function CommitBox() {
 
   createEffect(
     on(amend, async (enabled) => {
-      if (!enabled || summary() || !store.repo) return;
-      const [last] = await api.history(store.repo.id, 0, 1).catch(() => []);
+      const id = store.repo?.id;
+      if (!enabled || summary() || !id) return;
+      const [last] = await api.history(id, 0, 1).catch(() => []);
       if (!last) return;
-      const detail = await api.commitDetail(store.repo.id, last.id).catch(() => null);
-      setSummary(last.summary);
-      setDescription(detail?.body.trim() ?? "");
+      const detail = await api.commitDetail(id, last.id).catch(() => null);
+      if (!commitDraft(id).amend || commitDraft(id).summary) return;
+      updateDraft(id, { summary: last.summary, description: detail?.body.trim() ?? "" });
     }),
   );
 
@@ -378,22 +403,20 @@ function CommitBox() {
   const commit = async () => {
     const repo = store.repo;
     if (!repo || !canCommit()) return;
+    const { summary, description, coAuthors, amend: amended } = commitDraft(repo.id);
     setCommitting(true);
     try {
       const files = await gatherSelection(repo.id);
       if (!files) return;
-      const authors = coAuthors()
+      const authors = coAuthors
         .split(/[\n,]/)
         .map((s) => s.trim())
         .filter(Boolean);
-      await api.commit(repo.id, files, { summary: summary(), description: description(), coAuthors: authors }, amend());
+      await api.commit(repo.id, files, { summary, description, coAuthors: authors }, amended);
       const count = files.length;
-      const amended = amend();
-      rememberMessage(repo.id, { summary: summary(), description: description() });
+      rememberMessage(repo.id, { summary, description });
       setRecall(-1);
-      setSummary("");
-      setDescription(template());
-      setAmend(false);
+      updateDraft(repo.id, { summary: "", description: store.repo?.id === repo.id ? template() : "", amend: false });
       setStore("checkedPaths", {});
       notify(
         "success",

@@ -17,6 +17,7 @@ import {
   type SyncAction,
   type UpdateInfo,
 } from "./api";
+import { EMPTY_DRAFT, persistDraft, savedDrafts, type CommitDraft } from "./lib/drafts";
 import { applySidebarWidth, lastSidebarWidth, repoLayout } from "./lib/layout";
 import { resolveBindings } from "./lib/keymap";
 import { reconcile, type FileSel } from "./lib/selection";
@@ -93,6 +94,7 @@ interface AppStore {
   compareWith: string | null;
   tabs: string[];
   pickingNewTab: boolean;
+  drafts: Record<string, CommitDraft>;
 }
 
 export const [store, setStore] = createStore<AppStore>({
@@ -118,7 +120,18 @@ export const [store, setStore] = createStore<AppStore>({
   compareWith: null,
   tabs: [],
   pickingNewTab: false,
+  drafts: savedDrafts(),
 });
+
+export function commitDraft(repo: string): CommitDraft {
+  return store.drafts[repo] ?? EMPTY_DRAFT;
+}
+
+export function updateDraft(repo: string, patch: Partial<CommitDraft>) {
+  const next = { ...commitDraft(repo), ...patch };
+  setStore("drafts", repo, next);
+  persistDraft(repo, next);
+}
 
 const diffCache = new Map<string, FileDiff>();
 export const [diffVersion, setDiffVersion] = createSignal(0);
