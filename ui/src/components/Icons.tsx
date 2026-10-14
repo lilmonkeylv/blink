@@ -12,7 +12,9 @@ import CircleCheck from "lucide-solid/icons/circle-check";
 import Columns2 from "lucide-solid/icons/columns-2";
 import Copy from "lucide-solid/icons/copy";
 import Ellipsis from "lucide-solid/icons/ellipsis";
+import ExternalLink from "lucide-solid/icons/external-link";
 import FolderGit from "lucide-solid/icons/folder-git-2";
+import FolderOpen from "lucide-solid/icons/folder-open";
 import GitBranch from "lucide-solid/icons/git-branch";
 import GitPullRequest from "lucide-solid/icons/git-pull-request";
 import Info from "lucide-solid/icons/info";
@@ -56,6 +58,8 @@ export const MoreIcon = icon(Ellipsis);
 export const FilterIcon = icon(ListFilter);
 export const CopyIcon = icon(Copy);
 export const StashIcon = icon(Archive);
+export const ExternalIcon = icon(ExternalLink);
+export const FolderOpenIcon = icon(FolderOpen);
 
 const statusGlyphs: Record<ChangeKind, Component<LucideProps>> = {
   added: SquarePlus,

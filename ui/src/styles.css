@@ -2859,3 +2859,25 @@ pre code {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+
+.about-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.about-head h2 {
+  margin: 0 0 2px;
+  font-size: 20px;
+}
+
+.about-version {
+  font-family: var(--font-mono);
+  user-select: text;
+}
+
+.about-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}

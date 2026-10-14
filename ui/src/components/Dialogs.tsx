@@ -21,6 +21,7 @@ import {
 } from "./dialogs/HistoryDialogs";
 import { CloneDialog, CreateRepoDialog, FetchAllDialog, ImportDialog, InitRepoDialog, PublishDialog, RepoSettingsDialog } from "./dialogs/RepoDialogs";
 import {
+  AboutDialog,
   ApplyPatchDialog,
   CheckLogDialog,
   ChecksDialog,
@@ -80,6 +81,9 @@ export function Dialogs() {
         <Match when={of("blame")}>{(d) => <BlameDialog path={d().path} />}</Match>
         <Match when={of("signIn")}>
           <SignInDialog />
+        </Match>
+        <Match when={of("about")}>
+          <AboutDialog />
         </Match>
         <Match when={of("shortcuts")}>
           <ShortcutsDialog />

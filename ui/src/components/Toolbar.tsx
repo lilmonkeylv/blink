@@ -501,6 +501,8 @@ export function appMenu(): MenuItem[] {
     "separator",
     { label: "What's new", run: () => showWhatsNew(true) },
     { label: "Check for updates…", run: () => checkForUpdates(true) },
+    "separator",
+    { label: "About Blink", run: () => setStore("dialog", { type: "about" }) },
   ];
 }
 

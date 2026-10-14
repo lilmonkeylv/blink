@@ -1,13 +1,15 @@
+import { getVersion } from "@tauri-apps/api/app";
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
 import { createMemo, createResource, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
 import { api, isCommandError, type CheckRun, type DeviceCode, type JobStep, type ReleaseNote } from "../../api";
 import { baseSections, conflictCount, parseConflicts, render, type Resolution, type Segment } from "../../lib/conflicts";
 import { parseJobLog } from "../../lib/joblog";
 import { COMMIT_KEYS, DEFAULT_BINDINGS } from "../../lib/keymap";
-import { addRepository, keymap, notify, refreshChecks, reportError, run, setStore, store } from "../../store";
+import logo from "../../../../assets/logo.svg";
+import { addRepository, checkForUpdates, keymap, notify, refreshChecks, reportError, run, setStore, store } from "../../store";
 import { Checkbox, Field, Segmented } from "../Controls";
 import { Dialog } from "../Dialog";
-import { CheckIcon, ChevronRight } from "../Icons";
+import { CheckIcon, ChevronRight, ExternalIcon, FolderOpenIcon } from "../Icons";
 import { Loading } from "../Loading";
 import { Markdown } from "../Markdown";
 import { VirtualList } from "../VirtualList";
@@ -660,6 +662,57 @@ export function WhatsNewDialog(p: { notes: ReleaseNote[] }) {
           </section>
         )}
       </For>
+    </Dialog>
+  );
+}
+
+const REPO_URL = "https://github.com/lilmonkeylv/blink";
+
+export function AboutDialog() {
+  const [version] = createResource(() => getVersion().catch(() => null));
+  const channel = () => (store.settings?.advanced.updateChannel === "beta" ? "Beta (prereleases)" : "Stable");
+  const open = (url: string) => api.openExternal(url).catch(reportError);
+  return (
+    <Dialog
+      title="About Blink"
+      onClose={closeDialog}
+      footer={
+        <>
+          <button class="btn" onClick={() => checkForUpdates(true)}>
+            Check for updates
+          </button>
+          <button class="btn primary" onClick={closeDialog}>
+            Close
+          </button>
+        </>
+      }
+    >
+      <div class="about-head">
+        <img src={logo} alt="" width="64" height="64" />
+        <div>
+          <h2>Blink</h2>
+          <div class="muted">
+            <Show when={!version.loading} fallback="Version…">
+              Version <span class="about-version">{version() ?? "unknown"}</span>
+            </Show>
+          </div>
+          <div class="muted small">Update channel: {channel()}</div>
+        </div>
+      </div>
+      <div class="about-links">
+        <button type="button" class="btn" onClick={() => open(REPO_URL)}>
+          <ExternalIcon />
+          GitHub repository
+        </button>
+        <button type="button" class="btn" onClick={() => open(`${REPO_URL}/releases`)}>
+          <ExternalIcon />
+          Releases
+        </button>
+        <button type="button" class="btn" onClick={() => api.openLogsFolder().catch(reportError)}>
+          <FolderOpenIcon />
+          Logs folder
+        </button>
+      </div>
     </Dialog>
   );
 }
