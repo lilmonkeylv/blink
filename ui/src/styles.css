@@ -1689,6 +1689,12 @@ select.input {
   font: 11px var(--font-mono);
 }
 
+.sign-in-wait {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
 .device-code {
   font: 600 28px var(--font-mono);
   letter-spacing: 0.15em;

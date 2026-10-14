@@ -1,5 +1,5 @@
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { createMemo, createResource, createSignal, For, Match, Show, Switch } from "solid-js";
+import { createMemo, createResource, createSignal, For, Match, onCleanup, Show, Switch } from "solid-js";
 import { api, isCommandError, type DeviceCode, type JobStep, type ReleaseNote } from "../../api";
 import { conflictCount, parseConflicts, render, type Resolution, type Segment } from "../../lib/conflicts";
 import { parseJobLog } from "../../lib/joblog";
@@ -7,16 +7,25 @@ import { DEFAULT_BINDINGS } from "../../lib/keymap";
 import { addRepository, keymap, notify, refreshChecks, reportError, run, setStore, store } from "../../store";
 import { Checkbox, Field, Segmented } from "../Controls";
 import { Dialog } from "../Dialog";
+import { CheckIcon } from "../Icons";
 import { Markdown } from "../Markdown";
 import { VirtualList } from "../VirtualList";
 import { closeDialog, sanitizeBranchName } from "./common";
 
+type SignedIn = Awaited<ReturnType<typeof api.signIn>>;
+
 export function SignInDialog() {
   const [mode, setMode] = createSignal<"idle" | "browser" | "device">("idle");
   const [device, setDevice] = createSignal<DeviceCode | null>(null);
+  const [copied, setCopied] = createSignal(false);
+  let attempt = 0;
+  let copiedTimer: number | undefined;
+  onCleanup(() => {
+    attempt++;
+    clearTimeout(copiedTimer);
+  });
 
-  const finish = async (signedIn: { account: { login: string }; primaryEmail: string | null } | undefined) => {
-    if (!signedIn) return setMode("idle");
+  const finish = async (signedIn: SignedIn) => {
     const boot = await api.bootstrap();
     setStore("account", boot.account);
     const identity = await api.gitIdentity().catch(() => null);
@@ -28,17 +37,38 @@ export function SignInDialog() {
     closeDialog();
   };
 
-  const browser = async () => {
-    setMode("browser");
-    await finish(await run("Sign in", () => api.signIn()));
+  const attemptSignIn = async (start: () => Promise<SignedIn>) => {
+    const mine = ++attempt;
+    try {
+      const signedIn = await start();
+      if (mine === attempt) await finish(signedIn);
+    } catch (e) {
+      if (mine !== attempt) return;
+      reportError(e, "Sign in");
+      setMode("idle");
+    }
   };
 
-  const withCode = async () => {
+  const browser = () => {
+    setMode("browser");
+    attemptSignIn(() => api.signIn());
+  };
+
+  const withCode = () => {
     setMode("device");
-    const code = await run("Sign in", () => api.deviceStart());
-    if (!code) return setMode("idle");
-    setDevice(code);
-    await finish(await run("Sign in", () => api.deviceComplete(code)));
+    setDevice(null);
+    attemptSignIn(async () => {
+      const code = await api.deviceStart();
+      setDevice(code);
+      return api.deviceComplete(code);
+    });
+  };
+
+  const copyCode = async (code: string) => {
+    await navigator.clipboard.writeText(code).catch(reportError);
+    setCopied(true);
+    clearTimeout(copiedTimer);
+    copiedTimer = window.setTimeout(() => setCopied(false), 1500);
   };
 
   return (
@@ -46,9 +76,11 @@ export function SignInDialog() {
       <Switch>
         <Match when={!store.oauthConfigured}>
           <p style={{ margin: 0 }}>
-            GitHub sign-in is not configured for this build. Set <code>BLINK_GITHUB_CLIENT_ID</code> (see <code>.env.example</code>) and
-            restart.
+            GitHub sign-in isn't available in this build. You can sign in with a personal access token in Settings &gt; Accounts.
           </p>
+          <button class="btn primary" onClick={() => setStore("dialog", { type: "settings", tab: "Accounts" })}>
+            Open account settings
+          </button>
         </Match>
         <Match when={mode() === "idle"}>
           <p style={{ margin: 0 }}>Your browser opens so you can sign in with your password, passkey or SSO. Blink never sees your password.</p>
@@ -60,19 +92,43 @@ export function SignInDialog() {
           </button>
         </Match>
         <Match when={mode() === "browser"}>
-          <p style={{ margin: 0 }}>Finish signing in in your browser. This window updates automatically.</p>
+          <div class="sign-in-wait">
+            <span class="spinner" />
+            <span>Finish signing in in your browser. This window updates automatically.</span>
+          </div>
+          <button class="btn" onClick={withCode}>
+            Use a code instead
+          </button>
         </Match>
         <Match when={mode() === "device"}>
-          <Show when={device()} fallback={<p>Requesting a code…</p>}>
+          <Show
+            when={device()}
+            fallback={
+              <div class="sign-in-wait">
+                <span class="spinner" />
+                <span>Requesting a code…</span>
+              </div>
+            }
+          >
             {(d) => (
               <>
                 <p style={{ margin: 0 }}>
-                  Enter this code at <a>{d().verification_uri}</a>:
+                  Enter this code at{" "}
+                  <button type="button" class="link-button" onClick={() => api.openExternal(d().verification_uri).catch(reportError)}>
+                    {d().verification_uri}
+                  </button>
                 </p>
                 <div class="device-code">{d().user_code}</div>
-                <button class="btn" onClick={() => navigator.clipboard.writeText(d().user_code)}>
-                  Copy code
+                <button class="btn" onClick={() => copyCode(d().user_code)}>
+                  <Show when={copied()} fallback="Copy code">
+                    <CheckIcon />
+                    Copied
+                  </Show>
                 </button>
+                <div class="sign-in-wait muted">
+                  <span class="spinner" />
+                  <span>Waiting for you to enter the code on GitHub…</span>
+                </div>
               </>
             )}
           </Show>
