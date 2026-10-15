@@ -101,6 +101,7 @@ interface AppStore {
   banners: Banner[];
   sync: { action: SyncAction; progress: Progress | null; label?: string } | null;
   hookRun: HookRun | null;
+  commits: Record<string, { files: number; startedAt: number }>;
   hookRetry: { label: string; run: () => void } | null;
   bisect: BisectState | null;
   busy: string | null;
@@ -134,6 +135,7 @@ export const [store, setStore] = createStore<AppStore>({
   banners: [],
   sync: null,
   hookRun: null,
+  commits: {},
   hookRetry: null,
   bisect: null,
   busy: null,
