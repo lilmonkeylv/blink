@@ -1,4 +1,5 @@
-import { createEffect, createMemo, createResource, createSignal, on, Show } from "solid-js";
+import { createEffect, createMemo, createResource, createSignal, on, onCleanup, Show } from "solid-js";
+import { produce } from "solid-js/store";
 import { api, isCommandError, type FileChange, type FileDiff, type FileSelection } from "../api";
 import { recentMessages, rememberMessage } from "../lib/messages";
 import { listRowHeight } from "../lib/appearance";
@@ -419,7 +420,26 @@ function CommitBox() {
   const setCoAuthors = (coAuthors: string) => edit({ coAuthors });
   const setShowCoAuthors = (showCoAuthors: boolean) => edit({ showCoAuthors });
   const setAmend = (amend: boolean) => edit({ amend });
-  const [committing, setCommitting] = createSignal(false);
+  const pendingCommit = () => (store.repo ? store.commits[store.repo.id] : undefined);
+  const committing = () => !!pendingCommit();
+  const [now, setNow] = createSignal(Date.now());
+  createEffect(() => {
+    if (!committing()) return;
+    const timer = setInterval(() => setNow(Date.now()), 1000);
+    onCleanup(() => clearInterval(timer));
+  });
+  const commitLabel = () => {
+    const pending = pendingCommit();
+    if (!pending) return "";
+    if (hooksRunning()) return "Running hooks…";
+    const files = pending.files > 1 ? ` ${pending.files} files` : "";
+    const seconds = Math.max(0, Math.floor((now() - pending.startedAt) / 1000));
+    return seconds >= 5 ? `Committing${files}… ${seconds}s` : `Committing${files}…`;
+  };
+  const slowCommit = () => {
+    const pending = pendingCommit();
+    return !!pending && now() - pending.startedAt > 10_000;
+  };
   const [template, setTemplate] = createSignal("");
   const [recall, setRecall] = createSignal(-1);
 
@@ -530,12 +550,13 @@ function CommitBox() {
     const repo = store.repo;
     if (!repo || !canCommit()) return;
     const { summary, description, coAuthors, amend: amended } = commitDraft(repo.id);
-    setCommitting(true);
+    setStore("commits", repo.id, { files: 0, startedAt: Date.now() });
     const pending = { repo: repo.id, head: headId(), landed: false };
     inFlight = pending;
     try {
       const files = await gatherSelection(repo.id);
       if (!files) return;
+      setStore("commits", repo.id, "files", files.length);
       const authors = coAuthors
         .split(/[\n,]/)
         .map((s) => s.trim())
@@ -566,7 +587,7 @@ function CommitBox() {
       } else reportError(e, "Commit failed");
     } finally {
       if (inFlight === pending) inFlight = null;
-      setCommitting(false);
+      setStore("commits", produce((commits) => void delete commits[repo.id]));
     }
   };
 
@@ -638,8 +659,11 @@ function CommitBox() {
         )}
       </Show>
       <button class="btn primary block" disabled={!canCommit()} onClick={() => commit()} data-tooltip="Commit" data-shortcut={COMMIT_KEYS}>
-        {committing() ? (hooksRunning() ? "Running hooks…" : "Committing…") : amend() ? "Amend last commit" : `Commit to ${branch()}`}
+        {committing() ? commitLabel() : amend() ? "Amend last commit" : `Commit to ${branch()}`}
       </button>
+      <Show when={slowCommit()}>
+        <div class="muted small">Git is still adding the files. Large files and Git LFS can take a few minutes, and you can keep using Blink meanwhile.</div>
+      </Show>
     </div>
   );
 }
