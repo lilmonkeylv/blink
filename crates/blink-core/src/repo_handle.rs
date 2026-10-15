@@ -33,6 +33,10 @@ impl RepoHandle {
         }
     }
 
+    pub fn is_writing(&self) -> bool {
+        self.writer.try_lock().is_err()
+    }
+
     pub fn repo(&self) -> &Repository {
         &self.repo
     }

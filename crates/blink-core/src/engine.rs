@@ -78,6 +78,10 @@ impl Engine {
 
     pub async fn refresh(&self, id: &str) -> Result<Arc<RepoSnapshot>> {
         let handle = self.get(id)?;
+        // the running write refreshes when it finishes; a snapshot taken now would show half-written files
+        if handle.is_writing() {
+            return Ok(handle.snapshot());
+        }
         let snapshot = handle.refresh(&self.pools).await?;
         let _ =
             self.events.send(EngineEvent::SnapshotChanged { repo: id.to_string(), generation: snapshot.generation });
@@ -205,6 +209,43 @@ mod tests {
         cli.stage_all().unwrap();
         cli.commit("init", false).unwrap();
         dir
+    }
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn refresh_waits_for_a_running_write() {
+        let dir = fixture();
+        let engine = Arc::new(Engine::new(PoolConfig::default()));
+        let (id, _) = engine.open(dir.path()).await.unwrap();
+        let before = engine.refresh(&id).await.unwrap().generation;
+
+        let (started_tx, started_rx) = std::sync::mpsc::channel();
+        let (release_tx, release_rx) = std::sync::mpsc::channel::<()>();
+        let path = dir.path().to_path_buf();
+        let writer = {
+            let engine = engine.clone();
+            let id = id.clone();
+            tokio::spawn(async move {
+                engine
+                    .write(&id, move |_| {
+                        std::fs::write(path.join("half"), "x").unwrap();
+                        started_tx.send(()).unwrap();
+                        release_rx.recv().unwrap();
+                        Ok(())
+                    })
+                    .await
+            })
+        };
+        tokio::task::spawn_blocking(move || started_rx.recv().unwrap()).await.unwrap();
+
+        let during = engine.refresh(&id).await.unwrap();
+        assert_eq!(during.generation, before);
+        assert!(during.status.files.is_empty());
+
+        release_tx.send(()).unwrap();
+        writer.await.unwrap().unwrap();
+        let after = engine.get(&id).unwrap().snapshot();
+        assert!(after.generation > before);
+        assert!(after.status.files.iter().any(|f| f.path == "half"));
     }
 
     #[tokio::test(flavor = "multi_thread")]
