@@ -2,7 +2,7 @@ import { createMemo, createSignal, For, Match, onCleanup, Show, Switch } from "s
 import type { DiffHunk, DiffLine, FileDiff, LfsDiff, LfsPointer, SubmoduleDiff } from "../api";
 import { isLineIncluded, lineKey, type FileSel } from "../lib/selection";
 import { formatBytes } from "../lib/size";
-import { pairLines, type Cell } from "../lib/split";
+import { pairLines, type Cell, type SplitRow } from "../lib/split";
 import { store } from "../store";
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { CheckIcon, SplitIcon, UnifiedIcon } from "./Icons";
@@ -15,6 +15,11 @@ type Row =
 type Side = "left" | "right";
 
 const ROW_HEIGHT = 20;
+
+const hunkKey = (h: DiffHunk) => `@@${h.oldStart},${h.oldLen},${h.newStart},${h.newLen}`;
+const lineKeyOf = (l: DiffLine | undefined) => (l ? `${l.oldNo ?? ""}:${l.newNo ?? ""}:${l.text}` : "");
+const unifiedKey = (row: Row) => (row.type === "hunk" ? hunkKey(row.data) : lineKeyOf(row.data));
+const splitKey = (row: SplitRow) => (row.type === "hunk" ? hunkKey(row.data) : `${lineKeyOf(row.left?.data)}|${lineKeyOf(row.right?.data)}`);
 
 function readLayout(): "unified" | "split" {
   try {
@@ -316,6 +321,7 @@ export function DiffView(p: {
           items={splitRows()}
           rowHeight={ROW_HEIGHT}
           dynamic
+          itemKey={splitKey}
           render={(row, index) =>
             row.type === "hunk" ? (
               <div class={`diff-row hunk ${p.selectable ? "selectable" : ""}`}>
@@ -348,6 +354,7 @@ export function DiffView(p: {
           items={rows()}
           rowHeight={ROW_HEIGHT}
           dynamic
+          itemKey={unifiedKey}
           onKeyDown={onKeyDown}
           scrollToIndex={cursor()}
           render={(row, index) =>

@@ -1,5 +1,5 @@
 import { createVirtualizer } from "@tanstack/solid-virtual";
-import { createEffect, For, on, Show, type JSX } from "solid-js";
+import { createEffect, createMemo, For, on, Show, type JSX } from "solid-js";
 
 export function VirtualList<T>(p: {
   items: readonly T[];
@@ -14,6 +14,7 @@ export function VirtualList<T>(p: {
   ref?: (el: HTMLDivElement) => void;
   style?: JSX.CSSProperties;
   dynamic?: boolean;
+  itemKey?: (item: T, index: number) => string | number;
 }) {
   let scroller!: HTMLDivElement;
   const virtualizer = createVirtualizer({
@@ -22,8 +23,24 @@ export function VirtualList<T>(p: {
     },
     getScrollElement: () => scroller,
     estimateSize: () => p.rowHeight,
+    get getItemKey() {
+      const key = p.itemKey;
+      return key ? (index: number) => key(p.items[index], index) : (index: number) => index;
+    },
     overscan: 12,
   });
+
+  const indexByKey = createMemo(() => new Map(virtualizer.getVirtualItems().map((v) => [v.key, v.index])));
+  const measure = (el: HTMLDivElement) => queueMicrotask(() => el.isConnected && virtualizer.measureElement(el));
+
+  createEffect(
+    on(
+      () => (p.itemKey && p.items.length ? p.itemKey(p.items[0], 0) : undefined),
+      (first, previous) => {
+        if (previous !== undefined && first !== previous) virtualizer.scrollToOffset(0);
+      },
+    ),
+  );
 
   createEffect(
     on(
@@ -74,13 +91,29 @@ export function VirtualList<T>(p: {
               transform: `translateY(${virtualizer.getVirtualItems()[0]?.start ?? 0}px)`,
             }}
           >
-            <For each={virtualizer.getVirtualItems()}>
-              {(row) => (
-                <div data-index={row.index} ref={(el) => queueMicrotask(() => el.isConnected && virtualizer.measureElement(el))}>
-                  {p.render(p.items[row.index], row.index)}
-                </div>
-              )}
-            </For>
+            <Show
+              when={p.itemKey}
+              fallback={
+                <For each={virtualizer.getVirtualItems()}>
+                  {(row) => (
+                    <div data-index={row.index} ref={measure}>
+                      {p.render(p.items[row.index], row.index)}
+                    </div>
+                  )}
+                </For>
+              }
+            >
+              <For each={[...indexByKey().keys()]}>
+                {(key) => {
+                  const index = indexByKey().get(key) ?? 0;
+                  return (
+                    <div data-index={indexByKey().get(key)} ref={measure}>
+                      {p.render(p.items[index], index)}
+                    </div>
+                  );
+                }}
+              </For>
+            </Show>
           </div>
         </Show>
       </div>

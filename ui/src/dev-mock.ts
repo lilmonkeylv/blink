@@ -48,6 +48,28 @@ const diff: FileDiff = {
   ],
 };
 
+const addedFileDiff: FileDiff = {
+  binary: false,
+  tooLarge: false,
+  additions: 213,
+  deletions: 0,
+  hunks: [
+    {
+      oldStart: 0,
+      oldLen: 0,
+      newStart: 1,
+      newLen: 213,
+      lines: Array.from({ length: 213 }, (_, i) => ({
+        kind: "added" as const,
+        oldNo: null,
+        newNo: i + 1,
+        text: i % 7 === 3 ? `    print(('%-28s %10.3f %10.2f %7.2f%% %10.1f'):format(row.name:sub(1, 28), row.avg, row.peak, row.pct, row.total)) -- ${i}` : `local value${i} = ${i}`,
+        noNewline: false,
+      })),
+    },
+  ],
+};
+
 diff.hunks.push({
   oldStart: 40,
   oldLen: 40,
@@ -174,7 +196,7 @@ export function installDevMock() {
         return { ...repo, id: a.id, name: String(a.id).split("/").pop() };
       case "file_diff":
         if (!opened.has(String(a.id))) throw { kind: "core", message: `repository not open: ${a.id}`, detail: null };
-        return diff;
+        return String(a.path).endsWith(".md") ? addedFileDiff : diff;
       case "commit_file_diff":
         return diff;
       case "history":
