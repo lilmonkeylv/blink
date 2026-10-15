@@ -1,5 +1,5 @@
 import { open as openDialog } from "@tauri-apps/plugin-dialog";
-import { createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from "solid-js";
+import { createEffect, createMemo, createResource, createSignal, For, on, onCleanup, onMount, Show } from "solid-js";
 import { api, isCommandError, type Branch, type PullRequest, type RepoRecord, type SyncAction } from "../api";
 import { fuzzyFilter } from "../lib/fuzzy";
 import { relativeTime } from "../lib/time";
@@ -450,6 +450,23 @@ async function pushWithoutHooks(force: boolean) {
   if (ok) await doSync("push", force, true);
 }
 
+const STALE_FETCH_MS = 2 * 60_000;
+const lastFetch = new Map<string, number>();
+
+export async function fetchIfStale() {
+  const repo = store.repo;
+  if (!repo?.hasRemote || store.sync || Date.now() - (lastFetch.get(repo.id) ?? 0) < STALE_FETCH_MS) return;
+  lastFetch.set(repo.id, Date.now());
+  setStore("sync", { action: "fetch", progress: null });
+  try {
+    await api.sync(repo.id, "fetch", false, false);
+  } catch {
+    lastFetch.delete(repo.id);
+  } finally {
+    setStore("sync", null);
+  }
+}
+
 export async function doSync(action?: SyncAction, force = false, noVerify = false) {
   const repo = store.repo;
   if (!repo || store.sync) return;
@@ -466,6 +483,7 @@ export async function doSync(action?: SyncAction, force = false, noVerify = fals
   setStore("sync", { action: act, progress: null });
   try {
     await api.sync(repo.id, act, force, false, noVerify);
+    lastFetch.set(repo.id, Date.now());
     if (act === "push") clearFailedHooks("push");
   } catch (e) {
     const detail = typeof e === "object" && e && "detail" in e ? String((e as { detail: unknown }).detail ?? "") : "";
@@ -473,6 +491,7 @@ export async function doSync(action?: SyncAction, force = false, noVerify = fals
       setStore("hookRetry", { label: "Push without hooks", run: () => void pushWithoutHooks(force) });
       notify("error", `${e.message}, so nothing was pushed. See the hook output in the sidebar.`);
     } else if (act === "push" && /rejected|non-fast-forward|fetch first/i.test(detail)) {
+      await api.sync(repo.id, "fetch", false, false).then(() => lastFetch.set(repo.id, Date.now()), () => undefined);
       await message("The remote has commits you don't have. Pull first, then push.", { title: "Push rejected", kind: "warning" });
     } else {
       reportError(e, `${act[0].toUpperCase()}${act.slice(1)} failed`);
@@ -591,6 +610,10 @@ function AccountButton() {
 
 export function Toolbar() {
   const [dropping, setDropping] = createSignal(false);
+  const onFocus = () => void fetchIfStale();
+  onMount(() => window.addEventListener("focus", onFocus));
+  onCleanup(() => window.removeEventListener("focus", onFocus));
+  createEffect(on(() => store.repo?.id, (id) => id && void fetchIfStale()));
   const toggle = (p: "repos" | "branches") => setStore("popover", store.popover === p ? null : p);
   const branchLabel = () => {
     const head = store.repo?.head;
