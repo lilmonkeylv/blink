@@ -33,6 +33,7 @@ import {
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { Checkbox } from "./Controls";
 import { DiffLayoutToggle, DiffView } from "./DiffView";
+import { FilePath } from "./FilePath";
 import { ChevronDown, ChevronRight, LockIcon, StashIcon, StatusIcon, WhitespaceIcon } from "./Icons";
 import { ImageDiff, isImagePath } from "./ImageDiff";
 import { Loading } from "./Loading";
@@ -307,9 +308,7 @@ export function ChangesList() {
                   ariaLabel={`Include ${f.path}`}
                   stopPropagation
                 />
-                <span class="path">
-                  <bdi>{f.oldPath ? `${f.oldPath} -> ${f.path}` : f.path}</bdi>
-                </span>
+                <FilePath path={f.path} oldPath={f.oldPath} />
                 <Show when={lfsLockFor(f.path)}>
                   {(lock) => (
                     <span class="lfs-lock" data-tooltip={lock().owner ? `Locked by ${lock().owner}` : "Locked"}>
@@ -756,7 +755,7 @@ export function ChangesDiff() {
         <>
           <div class="diff-header">
             <StatusIcon kind={f().kind} />
-            <span class="path">{f().oldPath ? `${f().oldPath} -> ${f().path}` : f().path}</span>
+            <FilePath path={f().path} oldPath={f().oldPath} />
             <Show when={diff()}>
               {(d) => (
                 <span class="muted">

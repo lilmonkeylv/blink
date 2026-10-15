@@ -31,7 +31,8 @@
   --toolbar-fg: #f0f3f6;
   --toolbar-muted: #9198a1;
   --toolbar-hover: #32383f;
-  --toolbar-border: #3d444d;
+  --toolbar-border: rgba(255, 255, 255, 0.08);
+  --row-divider: rgba(31, 35, 40, 0.07);
   --add-bg: #e6ffec;
   --add-num: #ccffd8;
   --add-fg: #1a7f37;
@@ -68,7 +69,8 @@
   --toolbar-fg: #e6edf3;
   --toolbar-muted: #8b949e;
   --toolbar-hover: #1b222c;
-  --toolbar-border: #2d3540;
+  --toolbar-border: rgba(255, 255, 255, 0.06);
+  --row-divider: rgba(255, 255, 255, 0.05);
   --add-bg: rgba(46, 160, 67, 0.15);
   --add-num: rgba(46, 160, 67, 0.3);
   --add-fg: #3fb950;
@@ -691,6 +693,60 @@ a {
 
 .row .path bdi {
   direction: ltr;
+}
+
+.file-path {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.file-part {
+  display: flex;
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.file-path .dir {
+  flex: 0 1000 auto;
+  min-width: min(6ch, 30%);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--fg-muted);
+}
+
+.file-path .dir:empty {
+  display: none;
+}
+
+.file-path .name {
+  flex: 0 1 auto;
+  min-width: 3ch;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--fg);
+  font-weight: 600;
+}
+
+.file-path .arrow {
+  flex: none;
+  padding: 0 6px;
+  color: var(--fg-muted);
+}
+
+.list:focus .row.selected .file-path .dir,
+.list:focus .row.selected .file-path .arrow {
+  color: color-mix(in srgb, var(--fg-selected-focus) 72%, transparent);
+}
+
+.list:focus .row.selected .file-path .name {
+  color: var(--fg-selected-focus);
+}
+
+.list .row {
+  box-shadow: inset 0 -1px 0 var(--row-divider);
 }
 
 .status {
