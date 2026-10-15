@@ -2,6 +2,16 @@
 
 All notable changes to Blink are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.1.0-alpha.14] - 2026-10-15
+
+### Features
+
+- **ui:** GitHub Desktop style file paths and row dividers ([1ea3f1b](https://github.com/lilmonkeylv/blink/commit/1ea3f1ba4574c8c9f0119fca4eaa861f8da5aec1))
+
+### Fixes
+
+- **changes:** Keep a running commit visible and locked across tab and repo switches ([31b6fd7](https://github.com/lilmonkeylv/blink/commit/31b6fd7cace98d76a76383bc1c50ea346eb948e9))
+
 ## [0.1.0-alpha.13] - 2026-10-15
 
 ### Fixes
