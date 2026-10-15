@@ -2,6 +2,12 @@
 
 All notable changes to Blink are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.1.0-alpha.16] - 2026-10-15
+
+### Fixes
+
+- **core:** Don't publish half-written worktrees while a pull or other write runs ([1c45690](https://github.com/lilmonkeylv/blink/commit/1c456908b2ec26b9306f0f35c4a4c08b8581f17c))
+
 ## [0.1.0-alpha.15] - 2026-10-15
 
 ### Fixes
