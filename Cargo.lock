@@ -334,7 +334,7 @@ dependencies = [
 
 [[package]]
 name = "blink"
-version = "0.1.0-alpha.12"
+version = "0.1.0-alpha.13"
 dependencies = [
  "base64 0.23.1",
  "blink-core",
@@ -369,7 +369,7 @@ dependencies = [
 
 [[package]]
 name = "blink-benches"
-version = "0.1.0-alpha.12"
+version = "0.1.0-alpha.13"
 dependencies = [
  "blink-core",
  "blink-diff",
@@ -383,7 +383,7 @@ dependencies = [
 
 [[package]]
 name = "blink-core"
-version = "0.1.0-alpha.12"
+version = "0.1.0-alpha.13"
 dependencies = [
  "arc-swap",
  "blink-diff",
@@ -401,7 +401,7 @@ dependencies = [
 
 [[package]]
 name = "blink-diff"
-version = "0.1.0-alpha.12"
+version = "0.1.0-alpha.13"
 dependencies = [
  "imara-diff",
  "serde",
@@ -412,7 +412,7 @@ dependencies = [
 
 [[package]]
 name = "blink-git"
-version = "0.1.0-alpha.12"
+version = "0.1.0-alpha.13"
 dependencies = [
  "gix",
  "serde",
@@ -424,7 +424,7 @@ dependencies = [
 
 [[package]]
 name = "blink-github"
-version = "0.1.0-alpha.12"
+version = "0.1.0-alpha.13"
 dependencies = [
  "base64 0.23.1",
  "parking_lot",
@@ -441,7 +441,7 @@ dependencies = [
 
 [[package]]
 name = "blink-store"
-version = "0.1.0-alpha.12"
+version = "0.1.0-alpha.13"
 dependencies = [
  "directories",
  "keyring",
@@ -458,7 +458,7 @@ dependencies = [
 
 [[package]]
 name = "blink-watch"
-version = "0.1.0-alpha.12"
+version = "0.1.0-alpha.13"
 dependencies = [
  "blink-git",
  "crossbeam-channel",
