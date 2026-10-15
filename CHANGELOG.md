@@ -2,6 +2,12 @@
 
 All notable changes to Blink are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.1.0-alpha.15] - 2026-10-15
+
+### Fixes
+
+- **sync:** Fetch after a rejected push and when the window comes back, so Pull shows up ([cc96e0e](https://github.com/lilmonkeylv/blink/commit/cc96e0e22b4db2b38e09fa1c8891a830b7d8baa7))
+
 ## [0.1.0-alpha.14] - 2026-10-15
 
 ### Features
