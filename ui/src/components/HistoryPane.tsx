@@ -17,6 +17,7 @@ import { currentBranch, notify, reportError, run, setStore, store, undoHeadCommi
 import { openContextMenu, type MenuItem } from "./ContextMenu";
 import { Checkbox, Select, Segmented } from "./Controls";
 import { DiffLayoutToggle, DiffView } from "./DiffView";
+import { FilePath } from "./FilePath";
 import { CloseIcon, FilterIcon, StatusIcon, UpIcon } from "./Icons";
 import { ImageDiff, isImagePath } from "./ImageDiff";
 import { Loading } from "./Loading";
@@ -524,9 +525,7 @@ function FileList(p: { files: CommitFile[]; current: CommitFile | null; onSelect
           }
           title={f.path}
         >
-          <span class="path">
-            <bdi>{f.path}</bdi>
-          </span>
+          <FilePath path={f.path} oldPath={f.oldPath} />
           <StatusIcon kind={f.kind} />
         </div>
       )}
@@ -620,7 +619,7 @@ export function CommitView() {
           {(f) => (
             <div class="diff-header">
               <StatusIcon kind={f().kind} />
-              <span class="path">{f().oldPath ? `${f().oldPath} -> ${f().path}` : f().path}</span>
+              <FilePath path={f().path} oldPath={f().oldPath} />
               <DiffLayoutToggle />
             </div>
           )}
