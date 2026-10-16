@@ -16,6 +16,7 @@ import {
   openInNewWindow,
   initSubmodules,
   openRepo,
+  refreshRepo,
   pullLfs,
   reloadRepositories,
   reportError,
@@ -610,7 +611,7 @@ function AccountButton() {
 
 export function Toolbar() {
   const [dropping, setDropping] = createSignal(false);
-  const onFocus = () => void fetchIfStale();
+  const onFocus = () => void refreshRepo().then(fetchIfStale);
   onMount(() => window.addEventListener("focus", onFocus));
   onCleanup(() => window.removeEventListener("focus", onFocus));
   createEffect(on(() => store.repo?.id, (id) => id && void fetchIfStale()));

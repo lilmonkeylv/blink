@@ -298,10 +298,10 @@ export function cycleRepoTab(step: number) {
   if (next && next !== store.repo?.id) void openRepo(next);
 }
 
-export function applyRepoView(view: RepoView) {
+export function applyRepoView(view: RepoView, fresh = false) {
   if (store.tabs.includes(view.id)) tabViews.set(view.id, view);
   if (store.repo && store.repo.id !== view.id) return;
-  if (store.repo && view.generation < store.repo.generation) return;
+  if (store.repo && !fresh && view.generation < store.repo.generation) return;
   batch(() => {
     setStore("repo", reconcileStore(view, { key: "path" }));
     const present = new Set(view.files.map((f) => f.path));
@@ -445,7 +445,7 @@ export async function refreshRepo() {
   const repo = store.repo;
   if (!repo) return;
   try {
-    applyRepoView(await api.refreshRepository(repo.id));
+    applyRepoView(await api.refreshRepository(repo.id), true);
   } catch (e) {
     reportError(e);
   }
