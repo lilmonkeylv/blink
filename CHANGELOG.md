@@ -2,6 +2,12 @@
 
 All notable changes to Blink are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.1.0-alpha.17] - 2026-10-16
+
+### Fixes
+
+- **changes:** Refresh the repository when the window comes back into focus ([2df857d](https://github.com/lilmonkeylv/blink/commit/2df857dbefa02a18a579dda4308e388c02454932))
+
 ## [0.1.0-alpha.16] - 2026-10-15
 
 ### Fixes

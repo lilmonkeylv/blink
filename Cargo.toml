@@ -3,7 +3,7 @@ resolver = "3"
 members = ["crates/*", "src-tauri", "benches"]
 
 [workspace.package]
-version = "0.1.0-alpha.16"
+version = "0.1.0-alpha.17"
 edition = "2024"
 license = "MIT"
 repository = "https://github.com/lilmonkeylv/blink"
