@@ -2,6 +2,12 @@
 
 All notable changes to Blink are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.1.0-alpha.18] - 2026-10-20
+
+### Fixes
+
+- **diff:** Render each row from its current index so switching files never mixes content ([2eae783](https://github.com/lilmonkeylv/blink/commit/2eae7830180688df010a35fe1d5dbb672f2d6974))
+
 ## [0.1.0-alpha.17] - 2026-10-16
 
 ### Fixes
