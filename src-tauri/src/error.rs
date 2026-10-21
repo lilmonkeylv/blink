@@ -35,6 +35,54 @@ fn sso_link(stderr: &str) -> String {
         .unwrap_or_else(|| SSO_FALLBACK_URL.to_string())
 }
 
+const PROGRESS_PHASES: [&str; 9] = [
+    "Enumerating objects",
+    "Counting objects",
+    "Compressing objects",
+    "Total ",
+    "Receiving objects",
+    "Resolving deltas",
+    "Unpacking objects",
+    "Updating files",
+    "Filtering content",
+];
+
+fn is_progress(line: &str) -> bool {
+    let line = line.trim_start_matches("remote:").trim();
+    line.is_empty() || PROGRESS_PHASES.iter().any(|phase| line.starts_with(phase))
+}
+
+fn clean_git_output(stderr: &str) -> String {
+    let mut lines: Vec<&str> = Vec::new();
+    for line in stderr.split(['\n', '\r']).map(str::trim_end).filter(|l| !is_progress(l)) {
+        if lines.last() != Some(&line) {
+            lines.push(line);
+        }
+    }
+    lines.join("\n")
+}
+
+fn headline(output: &str) -> Option<String> {
+    let line = output.lines().find_map(|l| l.strip_prefix("error: ").or_else(|| l.strip_prefix("fatal: ")))?;
+    let line = line.trim().trim_end_matches(':');
+    let mut chars = line.chars();
+    chars.next().map(|first| first.to_uppercase().chain(chars).collect())
+}
+
+fn overwritten_files(output: &str) -> Option<Vec<&str>> {
+    if !output.contains("would be overwritten by") {
+        return None;
+    }
+    let files = output
+        .lines()
+        .skip_while(|l| !l.contains("would be overwritten by"))
+        .skip(1)
+        .take_while(|l| l.starts_with('\t') || l.starts_with("    "))
+        .map(str::trim)
+        .collect();
+    Some(files)
+}
+
 impl From<blink_git::Error> for CommandError {
     fn from(e: blink_git::Error) -> Self {
         match e {
@@ -45,7 +93,17 @@ impl From<blink_git::Error> for CommandError {
                 detail: Some(blink_git::locked_file(&stderr).map(str::to_string).unwrap_or(stderr)),
             },
             blink_git::Error::Cli { command, stderr, .. } => {
-                Self { kind: "git", message: format!("git {command} failed"), detail: Some(stderr) }
+                let output = clean_git_output(&stderr);
+                if let Some(files) = overwritten_files(&output) {
+                    let what = if files.len() == 1 { "1 file".to_string() } else { format!("{} files", files.len()) };
+                    return Self {
+                        kind: "localChangesOverwritten",
+                        message: format!("Your local changes to {what} would be overwritten by the {command}"),
+                        detail: Some(output),
+                    };
+                }
+                let message = headline(&output).unwrap_or_else(|| format!("git {command} failed"));
+                Self { kind: "git", message, detail: Some(output) }
             }
             blink_git::Error::Tool { tool, stderr } => {
                 Self { kind: "tool", message: format!("{tool} failed"), detail: Some(blink_git::redact(&stderr)) }
@@ -107,6 +165,24 @@ impl From<tauri::Error> for CommandError {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn progress_noise_is_dropped_and_the_real_error_leads() {
+        let stderr = "remote: Enumerating objects: 20, done.\nremote: Counting objects:   5% (1/18)\rremote: Counting objects: 100% (18/18), done.\nerror: Your local changes to the following files would be overwritten by merge:\n\tstream/a.ycd\n\tstream/b.ycd\nPlease commit your changes or stash them before you merge.\nAborting\nUpdating 0ecaed5..2131c94";
+        let e: CommandError =
+            blink_git::Error::Cli { command: "pull".into(), stderr: stderr.into(), code: Some(1) }.into();
+        assert_eq!(e.kind, "localChangesOverwritten");
+        assert_eq!(e.message, "Your local changes to 2 files would be overwritten by the pull");
+        let detail = e.detail.unwrap();
+        assert!(!detail.contains("Counting objects"));
+        assert!(detail.starts_with("error: Your local changes"));
+
+        let plain = clean_git_output(
+            "remote: Compressing objects: 50% (1/2)\rremote: Compressing objects: 100% (2/2), done.\nfatal: refusing to merge unrelated histories",
+        );
+        assert_eq!(plain, "fatal: refusing to merge unrelated histories");
+        assert_eq!(headline(&plain).as_deref(), Some("Refusing to merge unrelated histories"));
+    }
 
     fn push_failure(stderr: &str) -> CommandError {
         blink_git::Error::Cli { command: "push".into(), stderr: stderr.into(), code: Some(128) }.into()

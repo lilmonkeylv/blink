@@ -468,6 +468,25 @@ export async function fetchIfStale() {
   }
 }
 
+async function offerStashAndPull(id: string, reason: string) {
+  const picked = await choose(
+    "Pull blocked by local changes",
+    `${reason}. Stash them to pull now, then restore them from the stash when you're ready.`,
+    [{ label: "Stash and pull", value: "stash" as const, primary: true }],
+    "warning",
+  );
+  if (picked !== "stash") return;
+  try {
+    await api.stash(id, "Before pulling");
+  } catch (err) {
+    return reportError(err, "Stash failed");
+  }
+  await doSync("pull");
+  notify("success", "Your changes are in the stash.", {
+    action: { label: "Restore", run: () => run("Restore stash", () => api.stashPop(id, "stash@{0}")) },
+  });
+}
+
 export async function doSync(action?: SyncAction, force = false, noVerify = false) {
   const repo = store.repo;
   if (!repo || store.sync) return;
@@ -491,6 +510,9 @@ export async function doSync(action?: SyncAction, force = false, noVerify = fals
     if (act === "push" && isCommandError(e) && e.kind === "hookFailed" && !noVerify) {
       setStore("hookRetry", { label: "Push without hooks", run: () => void pushWithoutHooks(force) });
       notify("error", `${e.message}, so nothing was pushed. See the hook output in the sidebar.`);
+    } else if (act === "pull" && isCommandError(e) && e.kind === "localChangesOverwritten") {
+      setStore("sync", null);
+      await offerStashAndPull(repo.id, e.message);
     } else if (act === "push" && /rejected|non-fast-forward|fetch first/i.test(detail)) {
       await api.sync(repo.id, "fetch", false, false).then(() => lastFetch.set(repo.id, Date.now()), () => undefined);
       await message("The remote has commits you don't have. Pull first, then push.", { title: "Push rejected", kind: "warning" });
