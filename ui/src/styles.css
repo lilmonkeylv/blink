@@ -546,6 +546,22 @@ a {
   transition: background-color var(--ease);
 }
 
+.commit-split.resizable {
+  position: relative;
+}
+
+.split-resizer {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  z-index: 5;
+  width: 6px;
+  cursor: col-resize;
+  transition: background-color var(--ease);
+}
+
+.split-resizer:hover,
+.resizing .split-resizer,
 .sidebar-resizer:hover,
 .resizing .sidebar-resizer {
   background: color-mix(in srgb, var(--accent) 40%, transparent);
