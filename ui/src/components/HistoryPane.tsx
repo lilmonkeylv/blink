@@ -79,11 +79,13 @@ function FileListResizer(p: { split: () => HTMLDivElement }) {
       handle.removeEventListener("pointermove", move);
       handle.removeEventListener("pointerup", done);
       document.documentElement.classList.remove("resizing");
+      handle.classList.remove("active");
       try {
         localStorage.setItem("blink.commitFileList", String(fileListWidth() ?? ""));
       } catch {}
     };
     document.documentElement.classList.add("resizing");
+    handle.classList.add("active");
     handle.addEventListener("pointermove", move);
     handle.addEventListener("pointerup", done);
   };

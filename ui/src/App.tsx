@@ -109,10 +109,12 @@ function SidebarResizer() {
       handle.removeEventListener("pointermove", move);
       handle.removeEventListener("pointerup", done);
       document.documentElement.classList.remove("resizing");
+      handle.classList.remove("active");
       const id = store.repo?.id;
       if (id && width) saveRepoLayout(id, { sidebar: width });
     };
     document.documentElement.classList.add("resizing");
+    handle.classList.add("active");
     handle.addEventListener("pointermove", move);
     handle.addEventListener("pointerup", done);
   };

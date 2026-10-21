@@ -561,9 +561,9 @@ a {
 }
 
 .split-resizer:hover,
-.resizing .split-resizer,
+.split-resizer.active,
 .sidebar-resizer:hover,
-.resizing .sidebar-resizer {
+.sidebar-resizer.active {
   background: color-mix(in srgb, var(--accent) 40%, transparent);
 }
 
