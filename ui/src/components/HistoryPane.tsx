@@ -51,6 +51,62 @@ let loading = false;
 let exhausted = false;
 let loadedFor = "";
 
+const MIN_FILE_LIST = 160;
+const MIN_COMMIT_DIFF = 280;
+
+function readFileListWidth() {
+  try {
+    return Number(localStorage.getItem("blink.commitFileList")) || null;
+  } catch {
+    return null;
+  }
+}
+
+const [fileListWidth, setFileListWidth] = createSignal<number | null>(readFileListWidth());
+
+function FileListResizer(p: { split: () => HTMLDivElement }) {
+  const start = (e: PointerEvent) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const handle = e.currentTarget as HTMLElement;
+    handle.setPointerCapture(e.pointerId);
+    const box = p.split().getBoundingClientRect();
+    const move = (ev: PointerEvent) => {
+      const max = Math.max(MIN_FILE_LIST, box.width - MIN_COMMIT_DIFF);
+      setFileListWidth(Math.round(Math.min(max, Math.max(MIN_FILE_LIST, ev.clientX - box.left))));
+    };
+    const done = () => {
+      handle.removeEventListener("pointermove", move);
+      handle.removeEventListener("pointerup", done);
+      document.documentElement.classList.remove("resizing");
+      try {
+        localStorage.setItem("blink.commitFileList", String(fileListWidth() ?? ""));
+      } catch {}
+    };
+    document.documentElement.classList.add("resizing");
+    handle.addEventListener("pointermove", move);
+    handle.addEventListener("pointerup", done);
+  };
+  return (
+    <div
+      class="split-resizer"
+      style={{
+        left: fileListWidth()
+          ? `calc(min(${fileListWidth()}px, 100% - ${MIN_COMMIT_DIFF}px) - 3px)`
+          : `calc(max(${MIN_FILE_LIST}px, 30%) - 3px)`,
+      }}
+      onPointerDown={start}
+      onDblClick={() => {
+        setFileListWidth(null);
+        try {
+          localStorage.removeItem("blink.commitFileList");
+        } catch {}
+      }}
+      data-tooltip="Drag to resize, double-click to reset"
+    />
+  );
+}
+
 function readGraphPref() {
   try {
     return localStorage.getItem("blink.graph") !== "off";
@@ -611,9 +667,15 @@ export function CommitView() {
     ),
   );
 
+  let split!: HTMLDivElement;
   const body = () => (
-    <div class="commit-split">
+    <div
+      class="commit-split resizable"
+      ref={split}
+      style={fileListWidth() ? { "grid-template-columns": `min(${fileListWidth()}px, calc(100% - ${MIN_COMMIT_DIFF}px)) 1fr` } : undefined}
+    >
       <FileList files={files()} current={file()} onSelect={setFile} />
+      <FileListResizer split={() => split} />
       <div class="content">
         <Show when={file()}>
           {(f) => (
