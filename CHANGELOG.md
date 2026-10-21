@@ -2,6 +2,12 @@
 
 All notable changes to Blink are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.1.0-alpha.19] - 2026-10-21
+
+### Features
+
+- **history:** Drag to resize the commit file list ([95d3d81](https://github.com/lilmonkeylv/blink/commit/95d3d81a6bb7bc1e6cb07db2fc1fb6444a5c0143))
+
 ## [0.1.0-alpha.18] - 2026-10-20
 
 ### Fixes
