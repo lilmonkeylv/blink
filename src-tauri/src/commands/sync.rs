@@ -238,10 +238,6 @@ pub fn spawn_background_fetch(app: AppHandle) {
                     continue;
                 }
                 maintain_commit_graph(&state, id.clone());
-                if let Ok(handle) = engine.get(&id) {
-                    let view = RepoView::from_snapshot(&id, handle.repo().name(), &handle.snapshot());
-                    let _ = app.emit(REPO_CHANGED, view);
-                }
             }
         }
     });
