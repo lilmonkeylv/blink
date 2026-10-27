@@ -2,6 +2,12 @@
 
 All notable changes to Blink are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.1.0-alpha.22] - 2026-10-27
+
+### Fixes
+
+- **ui:** Redraw virtual lists that end up with no visible rows after a big change ([6c04cd1](https://github.com/lilmonkeylv/blink/commit/6c04cd1be8ae6aeb06278a4aa3bcd511d7553c50))
+
 ## [0.1.0-alpha.21] - 2026-10-21
 
 ### Fixes
