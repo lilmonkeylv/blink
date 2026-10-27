@@ -15,18 +15,18 @@
     "lint": "tsc --noEmit -p ui"
   },
   "dependencies": {
-    "@tanstack/solid-virtual": "^3.13.44",
-    "@tauri-apps/api": "^2.12.3",
-    "@tauri-apps/plugin-dialog": "^2.8.2",
-    "lucide-solid": "^1.56.0",
+    "@tanstack/solid-virtual": "^3.13.49",
+    "@tauri-apps/api": "^2.12.4",
+    "@tauri-apps/plugin-dialog": "^2.8.3",
+    "lucide-solid": "^1.61.0",
     "solid-js": "^1.9.17"
   },
   "devDependencies": {
-    "@tauri-apps/cli": "^2.12.2",
+    "@tauri-apps/cli": "^2.12.4",
     "@types/bun": "latest",
     "git-cliff": "2.14.2",
     "typescript": "^7.0.2",
-    "vite": "^8.3.4",
+    "vite": "^8.3.5",
     "vite-plugin-solid": "^2.11.14"
   }
 }
