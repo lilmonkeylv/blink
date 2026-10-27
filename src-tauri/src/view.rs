@@ -34,6 +34,7 @@ const CACHED_VIEW_KEY: &str = "view";
 const CACHED_VIEW_MAX_FILES: usize = 5_000;
 
 static REMEMBERED: LazyLock<Mutex<HashMap<String, u64>>> = LazyLock::new(Default::default);
+static EMITTED: LazyLock<Mutex<HashMap<String, u64>>> = LazyLock::new(Default::default);
 
 impl RepoView {
     fn fingerprint(&self) -> u64 {
@@ -41,6 +42,11 @@ impl RepoView {
         let unversioned = Self { generation: 0, ..self.clone() };
         serde_json::to_string(&unversioned).unwrap_or_default().hash(&mut hasher);
         hasher.finish()
+    }
+
+    pub fn differs_from_last_emit(&self) -> bool {
+        let fingerprint = self.fingerprint();
+        EMITTED.lock().insert(self.id.clone(), fingerprint) != Some(fingerprint)
     }
 
     pub fn remember(&self, cache: &blink_store::Cache) {
@@ -101,6 +107,16 @@ mod tests {
             has_remote: true,
             bisecting: false,
         }
+    }
+
+    #[test]
+    fn identical_views_are_emitted_once() {
+        let mut view = RepoView::from_snapshot("/emit-once", "r".into(), &blink_core::RepoSnapshot::empty());
+        assert!(view.differs_from_last_emit());
+        view.generation += 1;
+        assert!(!view.differs_from_last_emit());
+        view.has_remote = !view.has_remote;
+        assert!(view.differs_from_last_emit());
     }
 
     #[test]

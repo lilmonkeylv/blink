@@ -16,6 +16,8 @@ use crate::view::RepoView;
 pub const REPO_CHANGED: &str = "repo-changed";
 
 const MIN_REFRESH_INTERVAL: Duration = Duration::from_millis(300);
+const LARGE_CHANGESET: usize = 1_000;
+const LARGE_REFRESH_INTERVAL: Duration = Duration::from_secs(2);
 
 pub fn ensure_watcher(app: &AppHandle, state: &AppState, id: &str) -> CmdResult<()> {
     let mut watchers = state.watchers.lock();
@@ -36,7 +38,13 @@ pub fn ensure_watcher(app: &AppHandle, state: &AppState, id: &str) -> CmdResult<
             let mut last_refresh: Option<Instant> = None;
             while rx.recv().is_ok() {
                 if let Some(at) = last_refresh {
-                    std::thread::sleep(MIN_REFRESH_INTERVAL.saturating_sub(at.elapsed()));
+                    let large = app
+                        .state::<AppState>()
+                        .engine
+                        .get(&id)
+                        .is_ok_and(|h| h.snapshot().status.files.len() > LARGE_CHANGESET);
+                    let interval = if large { LARGE_REFRESH_INTERVAL } else { MIN_REFRESH_INTERVAL };
+                    std::thread::sleep(interval.saturating_sub(at.elapsed()));
                 }
                 while rx.try_recv().is_ok() {}
                 last_refresh = Some(Instant::now());
@@ -83,6 +91,9 @@ fn publish_snapshot(app: &AppHandle, id: &str, generation: Option<u64>) {
         return;
     }
     let view = RepoView::from_snapshot(id, handle.repo().name(), &snapshot);
+    if !view.differs_from_last_emit() {
+        return;
+    }
     view.remember(&state.cache);
     let _ = app.emit(REPO_CHANGED, view);
 }
