@@ -50,6 +50,27 @@ export function VirtualList<T>(p: {
     ),
   );
 
+  createEffect(
+    on(
+      () => p.items.length,
+      (count) => {
+        requestAnimationFrame(() => {
+          if (!count || !scroller?.isConnected || !scroller.clientHeight) return;
+          const items = virtualizer.getVirtualItems();
+          const top = scroller.scrollTop;
+          const bottom = top + scroller.clientHeight;
+          const first = items[0];
+          const last = items[items.length - 1];
+          // the virtualizer can keep an offset from before a big list change and draw rows off screen
+          if (!first || first.start > bottom || last.end < top) {
+            virtualizer.scrollToOffset(top);
+            virtualizer.measure();
+          }
+        });
+      },
+    ),
+  );
+
   createEffect(() => {
     const items = virtualizer.getVirtualItems();
     const last = items[items.length - 1];
