@@ -2,6 +2,12 @@
 
 All notable changes to Blink are listed here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and versions follow [Semantic Versioning](https://semver.org/).
 
+## [0.1.0-alpha.23] - 2026-10-27
+
+### Fixes
+
+- **watch:** Stop flooding the window with refreshes when thousands of files change ([f99a002](https://github.com/lilmonkeylv/blink/commit/f99a00292d743a3cd5da8ed33d85af2db197c0e0))
+
 ## [0.1.0-alpha.22] - 2026-10-27
 
 ### Fixes
